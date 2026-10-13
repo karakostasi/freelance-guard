@@ -1,0 +1,19 @@
+node_modules/
+dist/
+*.log
+.DS_Store
+.vscode/
+.idea/
+
+# Env
+.env
+.env.*
+!.env.example
+
+# Hardhat
+artifacts/
+cache/
+typechain-types/
+
+# Claude Code local settings
+.claude/settings.local.json

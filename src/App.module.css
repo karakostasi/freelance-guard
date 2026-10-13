@@ -1,0 +1,6 @@
+.page { max-width: 640px; margin: 0 auto; padding: 2rem 1rem; }
+.section { margin: 2rem 0; display: flex; flex-direction: column; gap: .5rem; }
+.input { padding: .5rem; border-radius: 6px; border: 1px solid #333; background: #181b22; color: inherit; }
+.button { padding: .5rem 1rem; border-radius: 6px; border: 0; background: #4f7cff; color: #fff; cursor: pointer; }
+.button:disabled { opacity: .5; cursor: not-allowed; }
+.error { color: #ff6b6b; }

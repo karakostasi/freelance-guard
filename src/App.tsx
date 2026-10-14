@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useAccount, useConnect, useDisconnect, useReadContract, useWriteContract } from "wagmi";
+import { useEffect, useState } from "react";
+import { useAccount, useConnect, useDisconnect, useReadContract, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
 import { isAddress, parseEther, formatEther } from "viem";
 import { escrowAbi, escrowAddress } from "./wagmi";
 import styles from "./App.module.css";
@@ -43,16 +43,22 @@ function CreateJob() {
 
 function JobPanel() {
   const { address } = useAccount();
-  const { writeContract, error } = useWriteContract();
+  const { writeContract, data: txHash, isPending, error } = useWriteContract();
+  const { isLoading: confirming, isSuccess: confirmed } = useWaitForTransactionReceipt({ hash: txHash });
   const [id, setId] = useState("1");
   const [deliverable, setDeliverable] = useState("");
 
-  const { data: job } = useReadContract({
+  const { data, refetch } = useReadContract({
     address: escrowAddress,
     abi: escrowAbi,
     functionName: "jobs",
     args: [BigInt(id || 0)],
-  }) as { data: readonly [string, string, bigint, bigint, bigint, number, string, string] | undefined };
+  });
+  const job = data as readonly [string, string, bigint, bigint, bigint, number, string, string] | undefined;
+
+  useEffect(() => {
+    if (confirmed) refetch();
+  }, [confirmed, refetch]);
 
   const call = (functionName: string, args: unknown[]) =>
     writeContract({ address: escrowAddress, abi: escrowAbi, functionName, args });
@@ -95,6 +101,7 @@ function JobPanel() {
           )}
         </>
       )}
+      {(isPending || confirming) && <p>Waiting for transaction…</p>}
       {error && <p className={styles.error}>{error.message.split("\n")[0]}</p>}
     </section>
   );

@@ -1,13 +1,76 @@
 import { useEffect, useState } from "react";
-import { useAccount, useConnect, useDisconnect, useReadContract, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
-import { isAddress, parseEther, formatEther } from "viem";
+import { useQueryClient } from "@tanstack/react-query";
+import { useAccount, useConnect, useDisconnect, useReadContract, useReadContracts, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
+import { isAddress, parseEther, formatEther, type Abi } from "viem";
 import { escrowAbi, escrowAddress } from "./wagmi";
 import styles from "./App.module.css";
 
 const STATUS = ["None", "Funded", "Submitted", "Disputed", "Paid", "Refunded"];
 
+type Job = readonly [string, string, bigint, bigint, bigint, number, string, string];
+
+const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
+
+function useRefreshOnConfirm(hash: `0x${string}` | undefined) {
+  const queryClient = useQueryClient();
+  const { isLoading, isSuccess } = useWaitForTransactionReceipt({ hash });
+  useEffect(() => {
+    if (isSuccess) queryClient.invalidateQueries();
+  }, [isSuccess, queryClient]);
+  return isLoading;
+}
+
+function MyJobs({ selected, onSelect }: { selected: string; onSelect: (id: string) => void }) {
+  const { address } = useAccount();
+  const { data: count } = useReadContract({ address: escrowAddress, abi: escrowAbi, functionName: "jobCount" });
+  const total = Number(count ?? 0n);
+  const { data } = useReadContracts({
+    contracts: Array.from({ length: total }, (_, i) => ({
+      address: escrowAddress,
+      abi: escrowAbi as Abi,
+      functionName: "jobs",
+      args: [BigInt(i + 1)],
+    })),
+    query: { enabled: total > 0 },
+  });
+
+  const me = address?.toLowerCase();
+  const mine = (data ?? [])
+    .map((r, i) => ({ id: i + 1, job: r.result as Job | undefined }))
+    .filter(({ job }) => job && (job[0].toLowerCase() === me || job[1].toLowerCase() === me))
+    .reverse();
+
+  return (
+    <section className={styles.section}>
+      <h2>My jobs</h2>
+      {mine.length === 0 && <p>No jobs for this account yet.</p>}
+      <div className={styles.cards}>
+        {mine.map(({ id, job }) => {
+          const isClient = job![0].toLowerCase() === me;
+          return (
+            <button
+              key={id}
+              className={`${styles.card} ${selected === String(id) ? styles.cardActive : ""}`}
+              onClick={() => onSelect(String(id))}
+            >
+              <strong>Job #{id}</strong>
+              <span className={styles.badge}>{STATUS[job![5]]}</span>
+              <span>{formatEther(job![2])} ETH</span>
+              <span className={styles.muted}>
+                {isClient ? "You hired" : "Hired by"} {short(isClient ? job![1] : job![0])}
+              </span>
+              <span className={styles.muted}>{isClient ? "Client" : "Freelancer"}</span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 function CreateJob() {
-  const { writeContract, isPending, error } = useWriteContract();
+  const { writeContract, data: txHash, isPending, error } = useWriteContract();
+  const confirming = useRefreshOnConfirm(txHash);
   const [freelancer, setFreelancer] = useState("");
   const [amount, setAmount] = useState("");
   const [days, setDays] = useState("7");
@@ -23,7 +86,7 @@ function CreateJob() {
       <input className={styles.input} placeholder="Days to deliver" value={days} onChange={(e) => setDays(e.target.value)} />
       <textarea className={styles.input} placeholder="Job description or IPFS link" value={description} onChange={(e) => setDescription(e.target.value)} />
       <button className={styles.button}
-        disabled={!valid || isPending}
+        disabled={!valid || isPending || confirming}
         onClick={() =>
           writeContract({
             address: escrowAddress,
@@ -41,24 +104,25 @@ function CreateJob() {
   );
 }
 
-function JobPanel() {
+function JobPanel({ id, onClose }: { id: string; onClose: () => void }) {
   const { address } = useAccount();
   const { writeContract, data: txHash, isPending, error } = useWriteContract();
-  const { isLoading: confirming, isSuccess: confirmed } = useWaitForTransactionReceipt({ hash: txHash });
-  const [id, setId] = useState("1");
+  const confirming = useRefreshOnConfirm(txHash);
   const [deliverable, setDeliverable] = useState("");
 
-  const { data, refetch } = useReadContract({
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const { data, isLoading, error: readError } = useReadContract({
     address: escrowAddress,
     abi: escrowAbi,
     functionName: "jobs",
     args: [BigInt(id || 0)],
   });
   const job = data as readonly [string, string, bigint, bigint, bigint, number, string, string] | undefined;
-
-  useEffect(() => {
-    if (confirmed) refetch();
-  }, [confirmed, refetch]);
 
   const call = (functionName: string, args: unknown[]) =>
     writeContract({ address: escrowAddress, abi: escrowAbi, functionName, args });
@@ -69,9 +133,12 @@ function JobPanel() {
   const n = BigInt(id || 0);
 
   return (
-    <section className={styles.section}>
-      <h2>Job</h2>
-      <input className={styles.input} value={id} onChange={(e) => setId(e.target.value)} placeholder="Job id" />
+    <div className={styles.overlay} onClick={onClose}>
+    <section className={styles.modal} onClick={(e) => e.stopPropagation()}>
+      <button className={styles.close} onClick={onClose} aria-label="Close">×</button>
+      <h2>Job #{id}</h2>
+      {isLoading && <p>Loading…</p>}
+      {readError && <p className={styles.error}>{readError.message.split("\n")[0]}</p>}
       {job && status !== "None" && (
         <>
           <p>Client: {job[0]}</p>
@@ -104,6 +171,7 @@ function JobPanel() {
       {(isPending || confirming) && <p>Waiting for transaction…</p>}
       {error && <p className={styles.error}>{error.message.split("\n")[0]}</p>}
     </section>
+    </div>
   );
 }
 
@@ -111,6 +179,7 @@ export default function App() {
   const { address, isConnected } = useAccount();
   const { connect, connectors, error: connectError } = useConnect();
   const { disconnect } = useDisconnect();
+  const [selected, setSelected] = useState("");
 
   return (
     <main className={styles.page}>
@@ -128,7 +197,8 @@ export default function App() {
       {isConnected && (
         <>
           <CreateJob />
-          <JobPanel />
+          <MyJobs selected={selected} onSelect={setSelected} />
+          {selected && <JobPanel id={selected} onClose={() => setSelected("")} />}
         </>
       )}
     </main>

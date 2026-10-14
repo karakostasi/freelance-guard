@@ -1,7 +1,7 @@
 import { useAccount, useReadContract, useReadContracts } from "wagmi";
 import { formatEther, type Abi } from "viem";
 import { escrowAbi, escrowAddress } from "../wagmi";
-import { STATUS, STATUS_CLASS, short, timeInfo, type Job } from "../lib/jobs";
+import { STATUS, STATUS_CLASS, STATUS_LABEL, roleOf, short, timeInfo, type Job } from "../lib/jobs";
 import { useEscrowConfig } from "../hooks/useEscrowConfig";
 import { useNow } from "../hooks/useNow";
 import styles from "../App.module.css";
@@ -40,21 +40,26 @@ export function MyJobs({ selected, onSelect }: { selected: string; onSelect: (id
       <div className={styles.cards}>
         {mine.map(({ id, job }) => {
           const isClient = job![0].toLowerCase() === me;
-          const isFreelancer = job![1].toLowerCase() === me;
           const hint = timeInfo(job!, reviewPeriod, now);
+          const role = roleOf(job!, me);
           return (
             <button
               key={id}
               className={`${styles.card} ${STATUS_CLASS[job![5]]} ${selected === String(id) ? styles.cardActive : ""}`}
               onClick={() => onSelect(String(id))}
             >
-              <strong>Job #{id}</strong>
-              <span className={`${styles.badge} ${STATUS_CLASS[job![5]]}`}>{STATUS[job![5]]}</span>
-              <span>{formatEther(job![2])} ETH</span>
-              <span className={styles.muted}>
-                {isClient ? "You hired" : "Hired by"} {short(isClient ? job![1] : job![0])}
+              <div className={styles.cardHeader}>
+                <strong>Job #{id}</strong>
+                <span className={`${styles.role} ${role.className}`}>{role.label}</span>
+              </div>
+              <span className={`${styles.badge} ${STATUS_CLASS[job![5]]}`}>{STATUS_LABEL[job![5]]}</span>
+              <span>
+                <span className={styles.muted}>{role.amountLabel}</span>{" "}
+                {formatEther(job![2])} ETH
               </span>
-              <span className={styles.muted}>{isClient ? "Client" : isFreelancer ? "Freelancer" : "Arbiter"}</span>
+              <span className={styles.muted}>
+                {isClient ? "Freelancer" : "Client"}: {short(isClient ? job![1] : job![0])}
+              </span>
               {hint && <span className={styles.muted}>{hint}</span>}
             </button>
           );

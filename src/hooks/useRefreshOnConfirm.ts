@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useWaitForTransactionReceipt } from "wagmi";
 
@@ -6,11 +6,16 @@ import { useWaitForTransactionReceipt } from "wagmi";
 // still hit a node that hasn't seen the block. Refresh again shortly after.
 const REFRESH_DELAYS_MS = [0, 2000, 5000];
 
-export function useRefreshOnConfirm(hash: `0x${string}` | undefined) {
+export function useRefreshOnConfirm(hash: `0x${string}` | undefined, onConfirmed?: () => void) {
   const queryClient = useQueryClient();
   const { isLoading, isSuccess } = useWaitForTransactionReceipt({ hash });
+  const onConfirmedRef = useRef(onConfirmed);
+  useEffect(() => {
+    onConfirmedRef.current = onConfirmed;
+  });
   useEffect(() => {
     if (!isSuccess) return;
+    onConfirmedRef.current?.();
     const timers = REFRESH_DELAYS_MS.map((ms) => setTimeout(() => queryClient.invalidateQueries(), ms));
     return () => timers.forEach(clearTimeout);
   }, [isSuccess, queryClient]);

@@ -33,3 +33,13 @@
 .brand { display: flex; align-items: center; gap: .75rem; margin-bottom: 1rem; }
 .brand h1 { margin: 0; }
 .logo { width: 44px; height: 44px; }
+.cardHeader { display: flex; align-items: center; justify-content: space-between; gap: .5rem; width: 100%; }
+.role { font-size: .7rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; padding: .1rem .5rem; border-radius: 4px; }
+.roleClient { color: #b39dff; background: rgba(139, 108, 255, .16); }
+.roleFreelancer { color: #4cc9f0; background: rgba(76, 201, 240, .16); }
+.roleArbiter { color: #aab; background: rgba(170, 170, 187, .16); }
+.modalHeader { display: flex; align-items: center; gap: .75rem; padding-right: 2rem; }
+.modalHeader h2 { margin: 0; }
+.suffixField { position: relative; display: flex; flex-direction: column; }
+.suffixField .input { padding-right: 3.5rem; }
+.suffix { position: absolute; right: .75rem; top: 50%; transform: translateY(-50%); opacity: .6; pointer-events: none; }

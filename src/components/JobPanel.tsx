@@ -3,7 +3,9 @@ import { useAccount, useReadContract, useWriteContract } from "wagmi";
 import { formatEther } from "viem";
 import { escrowAbi, escrowAddress } from "../wagmi";
 import { useRefreshOnConfirm } from "../hooks/useRefreshOnConfirm";
-import { STATUS, STATUS_CLASS, type Job } from "../lib/jobs";
+import { STATUS, STATUS_CLASS, formatDate, formatDuration, type Job } from "../lib/jobs";
+import { useEscrowConfig } from "../hooks/useEscrowConfig";
+import { useNow } from "../hooks/useNow";
 import styles from "../App.module.css";
 
 export function JobPanel({ id, onClose }: { id: string; onClose: () => void }) {
@@ -29,10 +31,29 @@ export function JobPanel({ id, onClose }: { id: string; onClose: () => void }) {
   const call = (functionName: string, args: unknown[]) =>
     writeContract({ address: escrowAddress, abi: escrowAbi, functionName, args });
 
-  const isClient = job && address?.toLowerCase() === job[0].toLowerCase();
-  const isFreelancer = job && address?.toLowerCase() === job[1].toLowerCase();
+  const { reviewPeriod, arbiter } = useEscrowConfig();
+  const now = useNow();
+  const busy = isPending || confirming;
+
+  const me = address?.toLowerCase();
+  const isClient = job && me === job[0].toLowerCase();
+  const isFreelancer = job && me === job[1].toLowerCase();
+  const isArbiter = !!me && arbiter?.toLowerCase() === me;
   const status = job ? STATUS[job[5]] : "";
   const n = BigInt(id || 0);
+
+  const deadline = job?.[3] ?? 0n;
+  const reviewEnd = job && reviewPeriod !== undefined ? job[4] + reviewPeriod : undefined;
+
+  // Each action is disabled (with a hint) when the contract would revert.
+  const action = (label: string, fn: string, args: unknown[], blockedReason = "") => (
+    <div className={styles.action}>
+      <button className={styles.button} disabled={busy || !!blockedReason} onClick={() => call(fn, args)}>
+        {label}
+      </button>
+      {blockedReason && <span className={styles.muted}>{blockedReason}</span>}
+    </div>
+  );
 
   return (
     <div className={styles.overlay} onClick={onClose}>
@@ -48,26 +69,44 @@ export function JobPanel({ id, onClose }: { id: string; onClose: () => void }) {
           <p>Amount: {formatEther(job[2])} ETH</p>
           <p>Status: <span className={`${styles.badge} ${STATUS_CLASS[job[5]]}`}>{status}</span></p>
           <p>Spec: {job[6]}</p>
+          {status === "Funded" && (
+            <p>
+              Deadline: {formatDate(deadline)}{" "}
+              <span className={styles.muted}>({now > deadline ? "overdue" : `in ${formatDuration(deadline - now)}`})</span>
+            </p>
+          )}
+          {job[4] > 0n && <p>Submitted: {formatDate(job[4])}</p>}
+          {status === "Submitted" && reviewEnd !== undefined && (
+            <p>
+              Review ends: {formatDate(reviewEnd)}{" "}
+              <span className={styles.muted}>({now >= reviewEnd ? "ended" : `in ${formatDuration(reviewEnd - now)}`})</span>
+            </p>
+          )}
           {job[7] && <p>Deliverable: {job[7]}</p>}
 
           {isFreelancer && status === "Funded" && (
             <>
               <input className={styles.input} placeholder="Deliverable link" value={deliverable} onChange={(e) => setDeliverable(e.target.value)} />
-              <button className={styles.button} onClick={() => call("submitWork", [n, deliverable])}>Submit work</button>
+              {action("Submit work", "submitWork", [n, deliverable], now > deadline ? "Deadline passed" : !deliverable ? "Add a deliverable link" : "")}
             </>
           )}
-          {isFreelancer && status === "Submitted" && (
-            <button className={styles.button} onClick={() => call("claimAfterTimeout", [n])}>Claim (after review period)</button>
-          )}
+          {isFreelancer && status === "Submitted" &&
+            action("Claim payment", "claimAfterTimeout", [n], reviewEnd === undefined || now < reviewEnd ? `Available in ${formatDuration((reviewEnd ?? now) - now)}` : "")}
           {isClient && status === "Submitted" && (
             <>
-              <button className={styles.button} onClick={() => call("approve", [n])}>Approve & pay</button>
-              <button className={styles.button} onClick={() => call("dispute", [n])}>Dispute</button>
+              {action("Approve & pay", "approve", [n])}
+              {action("Dispute", "dispute", [n], reviewEnd !== undefined && now >= reviewEnd ? "Review period ended" : "")}
             </>
           )}
-          {isClient && status === "Funded" && (
-            <button className={styles.button} onClick={() => call("refundExpired", [n])}>Refund (after deadline)</button>
+          {isClient && status === "Funded" &&
+            action("Refund", "refundExpired", [n], now <= deadline ? `Available in ${formatDuration(deadline - now + 1n)}` : "")}
+          {status === "Disputed" && isArbiter && (
+            <>
+              {action("Pay freelancer", "resolve", [n, true])}
+              {action("Refund client", "resolve", [n, false])}
+            </>
           )}
+          {status === "Disputed" && !isArbiter && <p className={styles.muted}>Waiting for the arbiter to resolve this dispute.</p>}
         </>
       )}
       {(isPending || confirming) && <p>Waiting for transaction…</p>}

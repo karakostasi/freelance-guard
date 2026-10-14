@@ -22,3 +22,4 @@
 .refunded { --c: #ff5c5c; }
 .badge.funded, .badge.submitted, .badge.disputed, .badge.paid, .badge.refunded { color: var(--c); background: color-mix(in srgb, var(--c) 18%, transparent); border: 1px solid var(--c); }
 .card.funded, .card.submitted, .card.disputed, .card.paid, .card.refunded { border-left: 4px solid var(--c); }
+.action { display: flex; flex-direction: column; gap: .25rem; align-items: flex-start; }

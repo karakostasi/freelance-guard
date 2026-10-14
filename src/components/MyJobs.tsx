@@ -1,7 +1,9 @@
 import { useAccount, useReadContract, useReadContracts } from "wagmi";
 import { formatEther, type Abi } from "viem";
 import { escrowAbi, escrowAddress } from "../wagmi";
-import { STATUS, STATUS_CLASS, short, type Job } from "../lib/jobs";
+import { STATUS, STATUS_CLASS, short, timeInfo, type Job } from "../lib/jobs";
+import { useEscrowConfig } from "../hooks/useEscrowConfig";
+import { useNow } from "../hooks/useNow";
 import styles from "../App.module.css";
 
 export function MyJobs({ selected, onSelect }: { selected: string; onSelect: (id: string) => void }) {
@@ -18,10 +20,17 @@ export function MyJobs({ selected, onSelect }: { selected: string; onSelect: (id
     query: { enabled: total > 0 },
   });
 
+  const { reviewPeriod, arbiter } = useEscrowConfig();
+  const now = useNow(30_000);
+
   const me = address?.toLowerCase();
+  const isArbiter = !!me && arbiter?.toLowerCase() === me;
   const mine = (data ?? [])
     .map((r, i) => ({ id: i + 1, job: r.result as Job | undefined }))
-    .filter(({ job }) => job && (job[0].toLowerCase() === me || job[1].toLowerCase() === me))
+    .filter(
+      ({ job }) =>
+        job && (job[0].toLowerCase() === me || job[1].toLowerCase() === me || (isArbiter && STATUS[job[5]] === "Disputed")),
+    )
     .reverse();
 
   return (
@@ -31,6 +40,8 @@ export function MyJobs({ selected, onSelect }: { selected: string; onSelect: (id
       <div className={styles.cards}>
         {mine.map(({ id, job }) => {
           const isClient = job![0].toLowerCase() === me;
+          const isFreelancer = job![1].toLowerCase() === me;
+          const hint = timeInfo(job!, reviewPeriod, now);
           return (
             <button
               key={id}
@@ -43,7 +54,8 @@ export function MyJobs({ selected, onSelect }: { selected: string; onSelect: (id
               <span className={styles.muted}>
                 {isClient ? "You hired" : "Hired by"} {short(isClient ? job![1] : job![0])}
               </span>
-              <span className={styles.muted}>{isClient ? "Client" : "Freelancer"}</span>
+              <span className={styles.muted}>{isClient ? "Client" : isFreelancer ? "Freelancer" : "Arbiter"}</span>
+              {hint && <span className={styles.muted}>{hint}</span>}
             </button>
           );
         })}

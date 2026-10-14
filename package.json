@@ -8,6 +8,7 @@
     "test": "hardhat test",
     "node": "hardhat node",
     "deploy:local": "hardhat run scripts/deploy.cjs --network localhost",
+    "deploy:base-sepolia": "hardhat run scripts/deploy.cjs --network baseSepolia",
     "predev": "hardhat compile",
     "dev": "vite",
     "build": "hardhat compile && tsc -b && vite build",

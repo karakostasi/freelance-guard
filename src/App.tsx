@@ -102,7 +102,7 @@ function JobPanel() {
 
 export default function App() {
   const { address, isConnected } = useAccount();
-  const { connect, connectors } = useConnect();
+  const { connect, connectors, error: connectError } = useConnect();
   const { disconnect } = useDisconnect();
 
   return (
@@ -113,7 +113,10 @@ export default function App() {
           {address} <button className={styles.button} onClick={() => disconnect()}>Disconnect</button>
         </p>
       ) : (
-        <button className={styles.button} onClick={() => connect({ connector: connectors[0] })}>Connect wallet</button>
+        <>
+          <button className={styles.button} onClick={() => connect({ connector: connectors[0] })}>Connect wallet</button>
+          {connectError && <p className={styles.error}>{connectError.message.split("\n")[0]}</p>}
+        </>
       )}
       {isConnected && (
         <>

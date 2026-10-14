@@ -3,7 +3,7 @@ import { useAccount, useReadContract, useWriteContract } from "wagmi";
 import { formatEther } from "viem";
 import { escrowAbi, escrowAddress } from "../wagmi";
 import { useRefreshOnConfirm } from "../hooks/useRefreshOnConfirm";
-import { STATUS, STATUS_CLASS, formatDate, formatDuration, type Job } from "../lib/jobs";
+import { STATUS, STATUS_CLASS, STATUS_LABEL, formatDate, formatDuration, roleOf, type Job } from "../lib/jobs";
 import { useEscrowConfig } from "../hooks/useEscrowConfig";
 import { useNow } from "../hooks/useNow";
 import styles from "../App.module.css";
@@ -59,15 +59,24 @@ export function JobPanel({ id, onClose }: { id: string; onClose: () => void }) {
     <div className={styles.overlay} onClick={onClose}>
     <section className={styles.modal} onClick={(e) => e.stopPropagation()}>
       <button className={styles.close} onClick={onClose} aria-label="Close">×</button>
-      <h2>Job #{id}</h2>
+      <div className={styles.modalHeader}>
+        <h2>Job #{id}</h2>
+        {job && status !== "None" && <span className={`${styles.role} ${roleOf(job, me).className}`}>{roleOf(job, me).label}</span>}
+      </div>
       {isLoading && <p>Loading…</p>}
       {readError && <p className={styles.error}>{readError.message.split("\n")[0]}</p>}
       {job && status !== "None" && (
         <>
-          <p>Client: {job[0]}</p>
-          <p>Freelancer: {job[1]}</p>
-          <p>Amount: {formatEther(job[2])} ETH</p>
-          <p>Status: <span className={`${styles.badge} ${STATUS_CLASS[job[5]]}`}>{status}</span></p>
+          <p>
+            Client: {job[0]} {isClient && <span className={`${styles.role} ${styles.roleClient}`}>You</span>}
+          </p>
+          <p>
+            Freelancer: {job[1]} {isFreelancer && <span className={`${styles.role} ${styles.roleFreelancer}`}>You</span>}
+          </p>
+          <p>
+            {roleOf(job, me).amountLabel}: {formatEther(job[2])} ETH
+          </p>
+          <p>Status: <span className={`${styles.badge} ${STATUS_CLASS[job[5]]}`}>{STATUS_LABEL[job[5]]}</span></p>
           <p>Spec: {job[6]}</p>
           {status === "Funded" && (
             <p>

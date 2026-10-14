@@ -4,7 +4,20 @@ export type Job = readonly [string, string, bigint, bigint, bigint, number, stri
 
 export const STATUS = ["None", "Funded", "Submitted", "Disputed", "Paid", "Refunded"];
 
+/** Human-friendly labels, indexed like STATUS. STATUS itself stays the contract's enum names. */
+export const STATUS_LABEL = ["None", "In progress", "Submitted", "Disputed", "Delivered", "Refunded"];
+
 export const STATUS_CLASS = ["", styles.funded, styles.submitted, styles.disputed, styles.paid, styles.refunded];
+
+export type Role = { label: string; className: string; amountLabel: string };
+
+/** Which side of the job `me` is on. Anyone who is neither party is the arbiter. */
+export function roleOf(job: Job, me: string | undefined): Role {
+  const addr = me?.toLowerCase();
+  if (addr === job[0].toLowerCase()) return { label: "Client", className: styles.roleClient, amountLabel: "You pay" };
+  if (addr === job[1].toLowerCase()) return { label: "Freelancer", className: styles.roleFreelancer, amountLabel: "You earn" };
+  return { label: "Arbiter", className: styles.roleArbiter, amountLabel: "Escrow" };
+}
 
 export const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 

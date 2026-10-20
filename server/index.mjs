@@ -1,7 +1,7 @@
 import "./env.mjs";
 import { createServer } from "node:http";
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { db, save } from "./db.mjs";
+import { db, flush, save } from "./db.mjs";
 import { watchEscrow, ESCROW_ADDRESS, RPC_URL } from "./chain.mjs";
 import { bankReceived, createRun, fail, onChainEvent, publicRun, subscribe } from "./pipeline.mjs";
 import { EUR_PER_ETH } from "./providers.mjs";
@@ -159,6 +159,14 @@ const server = createServer(async (req, res) => {
     send(res, e.status ?? 500, { error: e.message });
   }
 });
+
+// Render and similar hosts send SIGTERM on restart: finish writing state first.
+for (const signal of ["SIGTERM", "SIGINT"]) {
+  process.on(signal, async () => {
+    await flush();
+    process.exit(0);
+  });
+}
 
 server.listen(PORT, () => {
   console.log(`Freelance Guard backend on http://localhost:${PORT}`);

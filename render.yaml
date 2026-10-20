@@ -1,0 +1,23 @@
+# Render Blueprint for the backend. The frontend is deployed separately on Vercel.
+services:
+  - type: web
+    name: freelance-guard-api
+    runtime: node
+    plan: free
+    buildCommand: npm install --omit=dev
+    startCommand: node server/index.mjs
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: RPC_URL
+        value: https://sepolia.base.org
+      - key: WEBHOOK_SECRET
+        generateValue: true
+      # Set these in the Render dashboard:
+      - key: ESCROW_ADDRESS
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false # your Vercel URL, e.g. https://freelance-guard.vercel.app
+      - key: DATABASE_URL
+        sync: false # Supabase "Session pooler" connection string

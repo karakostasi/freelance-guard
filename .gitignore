@@ -17,3 +17,6 @@ typechain-types/
 
 # Claude Code local settings
 .claude/settings.local.json
+
+# Backend state
+server/data/

@@ -7,6 +7,7 @@
     "compile": "hardhat compile",
     "test": "hardhat test",
     "node": "hardhat node",
+    "server": "node server/index.mjs",
     "deploy:local": "hardhat run scripts/deploy.cjs --network localhost",
     "deploy:base-sepolia": "hardhat run scripts/deploy.cjs --network baseSepolia",
     "predev": "hardhat compile",

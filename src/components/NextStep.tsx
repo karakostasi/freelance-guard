@@ -15,6 +15,8 @@ export type PayoutControls = {
   start: () => void;
   reset: () => void;
   amountEur: number;
+  /** Payout is run by the backend, so there is nothing to click. */
+  auto?: boolean;
 };
 
 /** Plain-language "what happens next" for a job, with the real action buttons for whoever has to act. */
@@ -46,7 +48,7 @@ export function NextStep({ id, job, payout }: { id: number; job: Job; payout: Pa
     detail = "The client contested the work.";
   } else if (status === "Paid") {
     const s = payout.state.status;
-    title = s === "done" ? "All done" : s === "running" ? "Routing the payout…" : "Payment released. Choose where the money goes";
+    title = s === "done" ? "All done" : s === "running" ? "Routing the payout…" : payout.auto ? "Payment released. The payout starts automatically" : "Payment released. Choose where the money goes";
     detail =
       s === "done"
         ? `${euro(payout.amountEur)} ${payout.route === "eurc" ? "kept as EURC in the wallet" : "sent to the bank account via SEPA Instant"}.`
@@ -63,7 +65,9 @@ export function NextStep({ id, job, payout }: { id: number; job: Job; payout: Pa
         {detail && <p className={styles.muted}>{detail}</p>}
       </div>
       <div className={page.nextActions}>
-        {status === "Paid" ? (
+        {status === "Paid" && payout.auto ? (
+          <span className={styles.muted}>Route: {payout.route === "eurc" ? "keep EURC" : "SEPA bank transfer"}</span>
+        ) : status === "Paid" ? (
           <>
             <select className={styles.input} value={payout.route} disabled={payout.state.status === "running"} onChange={(e) => payout.setRoute(e.target.value as PayoutRoute)}>
               <option value="sepa">Off-ramp to SEPA</option>

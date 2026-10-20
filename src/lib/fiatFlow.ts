@@ -349,3 +349,11 @@ export const WORK_STAGE_INDEX = FUNDING_STAGES.length;
 
 /** Funding, work and payout as one ordered list of stages. */
 export const journeyStages = (route: PayoutRoute): Stage[] => [...FUNDING_STAGES, WORK_STAGE, ...payoutStages(route)];
+
+/** Maps a stage/step id pair from the backend to its position in the journey. */
+export function stepIndex(stageId: string, stepId: string) {
+  const stages = journeyStages("sepa");
+  const stage = stages.findIndex((s) => s.id === stageId);
+  const step = stages[stage]?.steps.findIndex((st) => st.id === stepId) ?? -1;
+  return stage < 0 || step < 0 ? null : { stage, step };
+}

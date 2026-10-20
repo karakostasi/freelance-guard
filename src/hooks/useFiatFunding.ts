@@ -3,10 +3,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import { getBlock, readContract, waitForTransactionReceipt } from "wagmi/actions";
 import { parseEther, parseEventLogs, type Abi } from "viem";
 import { config, escrowAbi, escrowAddress } from "../wagmi";
-import { EUR_PER_ETH, FUNDING_STAGES, stepKey, type FlowContext } from "../lib/fiatFlow";
+import { EUR_PER_ETH, FUNDING_STAGES, stepKey, type FlowContext, type PayoutRoute } from "../lib/fiatFlow";
 import { useFlowRun } from "./useFlowRun";
 
-export type FundingForm = { freelancer: string; amountEth: string; days: string; description: string };
+export type FundingForm = { freelancer: string; amountEth: string; days: string; description: string; route?: PayoutRoute };
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 

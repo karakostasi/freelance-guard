@@ -6,12 +6,15 @@ import { Briefcase, Code, Plus, RotateCcw } from "lucide-react";
 import { FlowStepper, type FlowMode } from "./FlowStepper";
 import { NextStep } from "./NextStep";
 import { PayDrawer } from "./PayDrawer";
-import { useFiatFunding } from "../hooks/useFiatFunding";
+import { useBackendFunding } from "../hooks/useBackendFunding";
+import { useBackendOnline } from "../hooks/useBackend";
+import { useBackendRun } from "../hooks/useBackendRun";
+import { useFiatFunding, type FundingForm } from "../hooks/useFiatFunding";
 import { useFlowRun } from "../hooks/useFlowRun";
 import { useJobTrace } from "../hooks/useJobTrace";
 import { useMyJobs } from "../hooks/useMyJobs";
 import { deriveJourney, simulatedPayloads } from "../lib/chainFlow";
-import { EUR_PER_ETH, FUNDING_STAGES, ROUTING_STAGE, journeyStages, type PayoutRoute } from "../lib/fiatFlow";
+import { EUR_PER_ETH, FUNDING_STAGES, ROUTING_STAGE, journeyStages, type FlowState, type PayoutRoute } from "../lib/fiatFlow";
 import { STATUS_CLASS, STATUS_LABEL, euro, type Job } from "../lib/jobs";
 import { escrowAbi, escrowAddress } from "../wagmi";
 import styles from "../App.module.css";
@@ -36,15 +39,30 @@ export function FlowPage({ jobId: routeJobId }: { jobId?: string }) {
   useLiveEscrowEvents();
 
   // Once a new payment lands on-chain, hand over from the live run to that job's own journey.
+  const backendOnline = useBackendOnline();
+  const [liveMode, setLiveMode] = useState<"backend" | "local">("local");
   const resetLive = useRef<() => void>(() => {});
-  const live = useFiatFunding((newId) => {
+  const onFunded = (newId: number) => {
     setSelectedId(String(newId));
     setTimeout(() => resetLive.current(), 1500);
-  });
+  };
+  const backend = useBackendFunding(onFunded);
+  const local = useFiatFunding(onFunded);
+  const live = liveMode === "backend" ? backend : local;
   useEffect(() => {
-    resetLive.current = live.reset;
+    resetLive.current = () => {
+      backend.reset();
+      local.reset();
+    };
   });
   const showingLive = live.state.status !== "idle";
+
+  // The mode is picked when the payment starts, so losing the backend mid-run doesn't swap the view.
+  const startPayment = (form: FundingForm) => {
+    setLiveMode(backendOnline ? "backend" : "local");
+    if (backendOnline) backend.fund(form);
+    else local.fund(form);
+  };
 
   const id = selectedId || routeJobId || String(mine[0]?.id ?? "");
   const selected = mine.find((m) => String(m.id) === id);
@@ -53,6 +71,7 @@ export function FlowPage({ jobId: routeJobId }: { jobId?: string }) {
     <div className={page.page}>
       <div className={flow.header}>
         <h2 className={page.title}>Payment flow</h2>
+        <span className={backendOnline ? flow.pillLive : flow.demo}>{backendOnline ? "Live backend" : "Offline demo"}</span>
         <div className={flow.toggle} role="group" aria-label="View mode">
           <button className={mode === "simple" ? flow.toggleOn : ""} onClick={() => setMode("simple")}>
             <Briefcase size={14} /> Business
@@ -69,10 +88,11 @@ export function FlowPage({ jobId: routeJobId }: { jobId?: string }) {
 
       {drawerOpen && (
         <PayDrawer
+          backendOnline={backendOnline}
           onClose={() => setDrawerOpen(false)}
           onSubmit={(form) => {
             setDrawerOpen(false);
-            live.fund(form);
+            startPayment(form);
           }}
         />
       )}
@@ -113,10 +133,31 @@ function JobJourney({ id, job, mode }: { id: number; job: Job; mode: FlowMode })
   const amountEur = Number(formatEther(job[2])) * EUR_PER_ETH;
   const sim = useMemo(() => simulatedPayloads(FUNDING_STAGES, { jobId: String(id), amountEur }), [id, amountEur]);
 
-  const [route, setRoute] = useState<PayoutRoute>("sepa");
-  const payout = useFlowRun(`journey-payout:${id}`);
+  const [localRoute, setRoute] = useState<PayoutRoute>("sepa");
+  const localPayout = useFlowRun(`journey-payout:${id}`);
+  const backend = useBackendRun(id);
+  const route = backend?.run.route ?? localRoute;
   const stages = journeyStages(route);
-  const journey = deriveJourney(id, job, trace, sim, payout.state, route);
+
+  // With a backend run, bank/ledger payloads and the whole payout come from the backend's real events.
+  const fromBackend = (keep: (stage: number) => boolean) =>
+    Object.fromEntries(Object.entries(backend?.state.done ?? {}).filter(([k]) => keep(Number(k.split(".")[0]))));
+  const simPayloads = backend
+    ? { ...sim, ...Object.fromEntries(Object.entries(fromBackend((s) => s < FUNDING_STAGES.length)).map(([k, v]) => [k, v.payload])) }
+    : sim;
+  const routingDone = fromBackend((s) => s >= ROUTING_STAGE) as FlowState["done"];
+  const routingActive = !!backend && backend.state.status === "running" && (backend.state.current?.stage ?? -1) >= ROUTING_STAGE;
+  const payoutState: FlowState = backend
+    ? {
+        status: routingActive ? "running" : backend.state.status === "done" ? "done" : "idle",
+        done: routingDone,
+        current: routingActive ? backend.state.current : undefined,
+        startedAt: backend.state.startedAt,
+        finishedAt: backend.state.finishedAt,
+      }
+    : localPayout.state;
+  const payout = { ...localPayout, state: payoutState };
+  const journey = deriveJourney(id, job, trace, simPayloads, payoutState, route);
 
   return (
     <>
@@ -134,14 +175,15 @@ function JobJourney({ id, job, mode }: { id: number; job: Job; mode: FlowMode })
           state: payout.state,
           route,
           setRoute,
-          start: () => payout.start(stages, { jobId: String(id), amountEur, route }, ROUTING_STAGE),
-          reset: payout.reset,
+          start: () => localPayout.start(stages, { jobId: String(id), amountEur, route }, ROUTING_STAGE),
+          reset: localPayout.reset,
           amountEur,
+          auto: !!backend,
         }}
       />
 
       <div className={page.block}>
-        <FlowStepper stages={stages} state={journey} mode={mode} timer={payout.state.status !== "idle"} />
+        <FlowStepper stages={stages} state={journey} mode={mode} timer={payoutState.status !== "idle"} />
       </div>
     </>
   );

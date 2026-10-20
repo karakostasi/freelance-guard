@@ -59,3 +59,6 @@
 .tag { align-self: flex-start; font-size: .65rem; font-weight: 600; letter-spacing: .03em; padding: .05rem .4rem; border-radius: 4px; text-decoration: none; }
 .tagReal { color: #4cc9f0; background: rgba(76, 201, 240, .14); }
 .tagDemo { color: #aab; background: rgba(170, 170, 187, .14); }
+.tagBackend { color: #3ecf8e; background: rgba(62, 207, 142, .14); }
+.tagSandbox { color: #f5b942; background: rgba(245, 185, 66, .14); }
+.pillLive { font-size: .75rem; padding: .1rem .5rem; border-radius: 999px; color: #3ecf8e; background: rgba(62, 207, 142, .14); }

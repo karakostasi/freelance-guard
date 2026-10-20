@@ -30,6 +30,19 @@ npm run dev             # terminal 2: frontend
 
 Connect MetaMask to `http://127.0.0.1:8545` (chain id 31337).
 
+## Payment flow backend (optional)
+
+`npm run server` starts a small Node backend (default `http://localhost:8787`) that runs the fiat-to-escrow pipeline for real and streams every step to the Payment flow page:
+
+- receives the bank webhook (HMAC-signed, signature verified) and records ledger entries,
+- prepares the exact `createJob` call for the user's wallet and watches the escrow contract for events,
+- runs the payout routing automatically once the escrow releases the funds,
+- keeps all state in `server/data/db.json` and resumes from the last processed block after a restart.
+
+The bank, AML, FX and off-ramp providers are **sandboxes** (`server/providers.mjs`), each shaped like its real counterpart. Without the backend the page falls back to a local demo.
+
+Set `VITE_PAYMASTER_URL` to try sponsored gas. It only applies if the wallet supports sponsored calls (EIP-5792 + ERC-7677) and otherwise the wallet pays as usual.
+
 ## Known limitations
 
 - ETH only, no stablecoins yet.

@@ -43,6 +43,16 @@ The bank, AML, FX and off-ramp providers are **sandboxes** (`server/providers.mj
 
 Set `VITE_PAYMASTER_URL` to try sponsored gas. It only applies if the wallet supports sponsored calls (EIP-5792 + ERC-7677) and otherwise the wallet pays as usual.
 
+## Deploying (free tiers)
+
+The contract ABI is committed in `abi/` (refreshed by `npm run compile`), so neither host needs Hardhat to build.
+
+1. **Database (Supabase).** Create a project, then Project Settings, Database, Connection string, **Session pooler**. Copy the URI and put your password in. Use the pooler, not the direct connection: the direct one is IPv6-only and Render's free tier can't reach it. The backend creates its table on first start.
+2. **Backend (Render).** New, Blueprint, pick this repo (it reads `render.yaml`). Set `ESCROW_ADDRESS`, `DATABASE_URL`, and later `CORS_ORIGIN`. The free tier sleeps after ~15 minutes idle, so point a free uptime pinger (e.g. UptimeRobot) at `/api/health` every 5 minutes.
+3. **Frontend (Vercel).** Import the repo (framework: Vite). Set `VITE_ESCROW_ADDRESS`, `VITE_ESCROW_DEPLOY_BLOCK` and `VITE_API_URL` (the Render URL). Then put the Vercel URL into Render's `CORS_ORIGIN`.
+
+Never upload your local `.env` (it holds the deployer key). Set variables in each dashboard instead.
+
 ## Known limitations
 
 - ETH only, no stablecoins yet.

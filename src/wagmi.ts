@@ -1,7 +1,7 @@
 import { createConfig, http } from "wagmi";
 import { baseSepolia, hardhat, sepolia } from "wagmi/chains";
 import { injected } from "wagmi/connectors";
-import artifact from "../artifacts/contracts/FreelanceEscrow.sol/FreelanceEscrow.json";
+import artifact from "../abi/FreelanceEscrow.json";
 
 export const escrowAbi = artifact.abi;
 export const escrowAddress = import.meta.env.VITE_ESCROW_ADDRESS as `0x${string}`;

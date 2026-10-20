@@ -5,7 +5,7 @@ import { createPublicClient, http, parseEventLogs } from "viem";
 import { db, save } from "./db.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-export const abi = JSON.parse(readFileSync(join(root, "artifacts/contracts/FreelanceEscrow.sol/FreelanceEscrow.json"), "utf8")).abi;
+export const abi = JSON.parse(readFileSync(join(root, "abi/FreelanceEscrow.json"), "utf8")).abi;
 
 export const RPC_URL = process.env.RPC_URL ?? "https://sepolia.base.org";
 export const ESCROW_ADDRESS = process.env.ESCROW_ADDRESS ?? process.env.VITE_ESCROW_ADDRESS;

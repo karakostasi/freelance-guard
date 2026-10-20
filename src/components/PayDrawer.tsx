@@ -1,18 +1,19 @@
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { isAddress } from "viem";
-import { EUR_PER_ETH } from "../lib/fiatFlow";
+import { EUR_PER_ETH, type PayoutRoute } from "../lib/fiatFlow";
 import { euro } from "../lib/jobs";
 import type { FundingForm } from "../hooks/useFiatFunding";
 import styles from "../App.module.css";
 import page from "./FlowPage.module.css";
 
 /** Side drawer with the "fund a job with euros" form. */
-export function PayDrawer({ onClose, onSubmit }: { onClose: () => void; onSubmit: (form: FundingForm) => void }) {
+export function PayDrawer({ backendOnline, onClose, onSubmit }: { backendOnline: boolean; onClose: () => void; onSubmit: (form: FundingForm) => void }) {
   const [freelancer, setFreelancer] = useState("");
   const [amountEth, setAmountEth] = useState("");
   const [days, setDays] = useState("");
   const [description, setDescription] = useState("");
+  const [route, setRoute] = useState<PayoutRoute>("sepa");
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -42,8 +43,17 @@ export function PayDrawer({ onClose, onSubmit }: { onClose: () => void; onSubmit
           <span className={styles.suffix}>days</span>
         </div>
         <textarea className={styles.input} placeholder="Job description or IPFS link" value={description} onChange={(e) => setDescription(e.target.value)} />
-        <p className={styles.muted}>Demo rate: 1 ETH = {euro(EUR_PER_ETH)}. The bank steps are simulated. Your wallet signs the real escrow deposit.</p>
-        <button className={styles.button} disabled={!valid} onClick={() => onSubmit({ freelancer, amountEth, days, description })}>
+        {backendOnline && (
+          <select className={styles.input} value={route} onChange={(e) => setRoute(e.target.value as PayoutRoute)} aria-label="Freelancer payout">
+            <option value="sepa">Freelancer payout: SEPA bank transfer</option>
+            <option value="eurc">Freelancer payout: keep EURC</option>
+          </select>
+        )}
+        <p className={styles.muted}>
+          Demo rate: 1 ETH = {euro(EUR_PER_ETH)}. The bank, AML and FX providers are sandboxes. Your wallet signs the real escrow deposit.
+          {!backendOnline && " The backend is offline, so the bank steps run as a local demo."}
+        </p>
+        <button className={styles.button} disabled={!valid} onClick={() => onSubmit({ freelancer, amountEth, days, description, route })}>
           {Number(amountEth) > 0 ? `Fund a Job (${euro(eur)})` : "Fund a Job"}
         </button>
       </aside>

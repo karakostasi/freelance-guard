@@ -51,6 +51,8 @@ export function FlowStepper({ stages, state, mode, timer = false }: { stages: St
       <div className={styles.meta}>
         <span className={styles.legend}>
           <span className={`${styles.tag} ${styles.tagReal}`}>On-chain</span>
+          <span className={`${styles.tag} ${styles.tagBackend}`}>Backend</span>
+          <span className={`${styles.tag} ${styles.tagSandbox}`}>Sandbox</span>
           <span className={`${styles.tag} ${styles.tagDemo}`}>Demo</span>
         </span>
         <span className={styles.muted}>
@@ -110,7 +112,7 @@ export function FlowStepper({ stages, state, mode, timer = false }: { stages: St
                                 </span>
                                 <span className={styles.stepBody}>
                                   <span>{mode === "simple" ? step.simple : step.label}</span>
-                                  <StepTag real={!!step.real} txHash={done?.payload.txHash as string | undefined} />
+                                  <StepTag real={!!step.real} source={done?.payload.source as string | undefined} txHash={done?.payload.txHash as string | undefined} />
                                   {mode === "auditor" && done && <AuditDetails payload={done.payload} />}
                                 </span>
                               </li>
@@ -137,7 +139,9 @@ export function FlowStepper({ stages, state, mode, timer = false }: { stages: St
   );
 }
 
-function StepTag({ real, txHash }: { real: boolean; txHash?: string }) {
+function StepTag({ real, source, txHash }: { real: boolean; source?: string; txHash?: string }) {
+  if (!real && source === "backend") return <span className={`${styles.tag} ${styles.tagBackend}`}>Backend</span>;
+  if (!real && source === "sandbox") return <span className={`${styles.tag} ${styles.tagSandbox}`}>Sandbox</span>;
   if (!real) return <span className={`${styles.tag} ${styles.tagDemo}`}>Demo</span>;
   return txHash ? (
     <a className={`${styles.tag} ${styles.tagReal}`} href={`${EXPLORER}/tx/${txHash}`} target="_blank" rel="noreferrer">

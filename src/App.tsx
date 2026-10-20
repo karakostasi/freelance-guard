@@ -4,6 +4,7 @@ import { Briefcase, Workflow } from "lucide-react";
 import { CreateJob } from "./components/CreateJob";
 import { FlowPage } from "./components/FlowPage";
 import { JobPanel } from "./components/JobPanel";
+import { Landing } from "./components/Landing";
 import { MyJobs } from "./components/MyJobs";
 import { WalletBar } from "./components/WalletBar";
 import { navigate, useHashRoute } from "./hooks/useHashRoute";
@@ -19,12 +20,12 @@ export default function App() {
   return (
     <main className={styles.page}>
       <header className={styles.header}>
-        <div className={styles.brand}>
+        <a className={`${styles.brand} ${styles.brandLink}`} href="#/" aria-label="Home">
           <img src={logo} alt="" className={styles.logo} />
           <h1>Freelance Guard</h1>
-        </div>
+        </a>
         <nav className={styles.nav}>
-          <button className={`${styles.navLink} ${route.page === "jobs" ? styles.navActive : ""}`} onClick={() => navigate("/")}>
+          <button className={`${styles.navLink} ${route.page === "jobs" ? styles.navActive : ""}`} onClick={() => navigate("/jobs")}>
             <Briefcase size={16} /> Jobs
           </button>
           <button className={`${styles.navLink} ${route.page === "flow" ? styles.navActive : ""}`} onClick={() => navigate("/flow")}>
@@ -32,9 +33,9 @@ export default function App() {
           </button>
         </nav>
       </header>
-      {isConnected ? (
-        <WalletBar />
-      ) : (
+      {route.page === "home" && <Landing />}
+      {isConnected && route.page !== "home" && <WalletBar />}
+      {!isConnected && route.page !== "home" && (
         <>
           <button className={styles.button} onClick={() => connect({ connector: connectors[0] })}>Connect wallet</button>
           {connectError && <p className={styles.error}>{connectError.message.split("\n")[0]}</p>}

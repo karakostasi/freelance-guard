@@ -1,17 +1,18 @@
 import { useEffect, useState } from "react";
 
-export type Route = { page: "jobs" | "flow"; jobId?: string };
+export type Route = { page: "home" | "jobs" | "flow"; jobId?: string };
 
 const parse = (hash: string): Route => {
   const [, page, jobId] = hash.replace(/^#/, "").split("/");
-  return page === "flow" ? { page: "flow", jobId: jobId || undefined } : { page: "jobs" };
+  if (page === "flow") return { page: "flow", jobId: jobId || undefined };
+  return page === "jobs" ? { page: "jobs" } : { page: "home" };
 };
 
 export const navigate = (path: string) => {
   window.location.hash = path;
 };
 
-/** Minimal hash router: "#/" is the jobs page, "#/flow" or "#/flow/<jobId>" is the payment flow page. */
+/** Minimal hash router: "#/" is the landing page, "#/jobs" the jobs page, "#/flow[/<jobId>]" the payment flow page. */
 export function useHashRoute() {
   const [route, setRoute] = useState<Route>(() => parse(window.location.hash));
   useEffect(() => {

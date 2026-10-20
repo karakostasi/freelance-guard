@@ -70,7 +70,7 @@ export function FlowStepper({ stages, state, mode, timer = false }: { stages: St
           {groups.map((group) => (
             <div key={group.name} className={styles.group} style={{ flex: group.items.length }}>
               <div className={styles.groupLabel}>{group.name}</div>
-              <div className={styles.groupStages} style={{ gridTemplateColumns: `repeat(${group.items.length}, minmax(130px, 1fr))` }}>
+              <div className={styles.groupStages} style={{ gridTemplateColumns: `repeat(${group.items.length}, minmax(120px, 1fr))` }}>
                 {group.items.map(({ stage, index: si }) => {
                   const doneCount = stage.steps.filter((_, i) => state.done[stepKey(si, i)]).length;
                   const stageDone = doneCount === stage.steps.length;

@@ -11,7 +11,7 @@
 .badge { font-size: .75rem; padding: .1rem .5rem; border-radius: 999px; background: #2a2f3b; }
 .muted { opacity: .6; font-size: .85rem; }
 .overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, .6); display: flex; align-items: center; justify-content: center; padding: 1rem; z-index: 10; }
-.modal { position: relative; width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto; margin: 0; padding: 1.5rem; display: flex; flex-direction: column; gap: .5rem; border-radius: 12px; border: 1px solid #333; background: #12141a; word-break: break-all; }
+.modal { position: relative; width: 100%; max-width: 1040px; max-height: 90vh; overflow-y: auto; margin: 0; padding: 1.5rem; display: flex; flex-direction: column; gap: .5rem; border-radius: 12px; border: 1px solid #333; background: #12141a; word-break: break-all; }
 .close { position: absolute; top: .5rem; right: .75rem; border: 0; background: none; color: inherit; font-size: 1.5rem; line-height: 1; cursor: pointer; }
 
 /* status colors: --c is used by badges (fill) and cards (left accent) */
@@ -30,7 +30,8 @@
 .walletAddress { font-weight: 600; font-family: ui-monospace, monospace; }
 .ghostButton { padding: .4rem .9rem; border-radius: 999px; border: 1px solid #444; background: none; color: inherit; cursor: pointer; }
 .ghostButton:hover { border-color: #ff5c5c; color: #ff5c5c; }
-.brand { display: flex; align-items: center; gap: .75rem; margin-bottom: 1rem; }
+.header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.brand { display: flex; align-items: center; gap: .75rem; }
 .brand h1 { margin: 0; }
 .logo { width: 44px; height: 44px; }
 .cardHeader { display: flex; align-items: center; justify-content: space-between; gap: .5rem; width: 100%; }
@@ -43,3 +44,8 @@
 .suffixField { position: relative; display: flex; flex-direction: column; }
 .suffixField .input { padding-right: 3.5rem; }
 .suffix { position: absolute; right: .75rem; top: 50%; transform: translateY(-50%); opacity: .6; pointer-events: none; }
+.pageWide { max-width: 1100px; }
+.nav { display: flex; gap: .5rem; }
+.navLink { display: inline-flex; align-items: center; gap: .4rem; padding: .4rem .9rem; border-radius: 999px; border: 1px solid #333; background: none; color: inherit; font: inherit; cursor: pointer; }
+.navLink:hover { border-color: #4f7cff; }
+.navActive { background: #4f7cff; border-color: #4f7cff; color: #fff; }

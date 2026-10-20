@@ -4,6 +4,7 @@ import { formatEther } from "viem";
 import { escrowAbi, escrowAddress } from "../wagmi";
 import { useRefreshOnConfirm } from "../hooks/useRefreshOnConfirm";
 import { STATUS, STATUS_CLASS, STATUS_LABEL, formatDate, formatDuration, roleOf, type Job } from "../lib/jobs";
+import { navigate } from "../hooks/useHashRoute";
 import { useEscrowConfig } from "../hooks/useEscrowConfig";
 import { useNow } from "../hooks/useNow";
 import styles from "../App.module.css";
@@ -117,6 +118,17 @@ export function JobPanel({ id, onClose }: { id: string; onClose: () => void }) {
           )}
           {status === "Disputed" && !isArbiter && <p className={styles.muted}>Waiting for the arbiter to resolve this dispute.</p>}
         </>
+      )}
+      {job && status !== "None" && (
+        <button
+          className={styles.ghostButton}
+          onClick={() => {
+            onClose();
+            navigate(`/flow/${id}`);
+          }}
+        >
+          View payment flow
+        </button>
       )}
       {(isPending || confirming) && <p>Waiting for transaction…</p>}
       {error && <p className={styles.error}>{error.message.split("\n")[0]}</p>}

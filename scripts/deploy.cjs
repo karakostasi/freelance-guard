@@ -7,6 +7,8 @@ async function main() {
   const escrow = await ethers.deployContract("FreelanceEscrow", [deployer.address, reviewPeriod]);
   await escrow.waitForDeployment();
   console.log("FreelanceEscrow deployed to", await escrow.getAddress());
+  const receipt = await escrow.deploymentTransaction().wait();
+  console.log("Deploy block", receipt.blockNumber, "(set VITE_ESCROW_DEPLOY_BLOCK to this)");
 }
 
 main().catch((e) => {

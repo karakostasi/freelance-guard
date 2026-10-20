@@ -53,9 +53,6 @@ export function FlowPage({ jobId: routeJobId }: { jobId?: string }) {
     <div className={page.page}>
       <div className={flow.header}>
         <h2 className={page.title}>Payment flow</h2>
-        <button className={styles.button} disabled={live.running} onClick={() => setDrawerOpen(true)}>
-          <Plus size={14} /> Pay a milestone
-        </button>
         <div className={flow.toggle} role="group" aria-label="View mode">
           <button className={mode === "simple" ? flow.toggleOn : ""} onClick={() => setMode("simple")}>
             <Briefcase size={14} /> Business
@@ -65,6 +62,10 @@ export function FlowPage({ jobId: routeJobId }: { jobId?: string }) {
           </button>
         </div>
       </div>
+
+      <button className={page.fab} disabled={live.running} onClick={() => setDrawerOpen(true)}>
+        <Plus size={18} /> Fund a job
+      </button>
 
       {drawerOpen && (
         <PayDrawer
@@ -99,7 +100,7 @@ export function FlowPage({ jobId: routeJobId }: { jobId?: string }) {
               ))}
             </select>
           )}
-          {selected ? <JobJourney key={selected.id} id={selected.id} job={selected.job} mode={mode} /> : <p className={flow.muted}>No jobs for this account yet. Use "Pay a milestone" to create one.</p>}
+          {selected ? <JobJourney key={selected.id} id={selected.id} job={selected.job} mode={mode} /> : <p className={flow.muted}>No jobs for this account yet. Use "Fund a job" to create one.</p>}
         </section>
       )}
     </div>

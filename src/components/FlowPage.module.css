@@ -13,3 +13,7 @@
 .drawerHeader { display: flex; align-items: center; justify-content: space-between; }
 .drawerHeader h3 { margin: 0; }
 .iconButton { border: 0; background: none; color: inherit; cursor: pointer; display: inline-flex; padding: .25rem; }
+
+.fab { position: fixed; right: 1.5rem; bottom: 1.5rem; z-index: 15; display: inline-flex; align-items: center; gap: .5rem; padding: .8rem 1.4rem; border: 0; border-radius: 999px; background: #4f7cff; color: #fff; font: inherit; font-weight: 600; cursor: pointer; box-shadow: 0 6px 20px rgba(79, 124, 255, .45); transition: transform .15s; }
+.fab:hover:not(:disabled) { transform: translateY(-2px); }
+.fab:disabled { opacity: .5; cursor: not-allowed; box-shadow: none; }

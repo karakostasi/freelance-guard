@@ -67,7 +67,7 @@ export const FUNDING_STAGES: Stage[] = [
       {
         id: "ledger",
         label: "Internal ledger allocation",
-        simple: "Funds reserved for this milestone",
+        simple: "Funds reserved for this job",
         durationMs: 800,
         payload: (c) => ({ ledgerEntry: hex(16), account: `milestone:${c.jobId}`, debit: "client_vIBAN", credit: "escrow_pending", amountEur: eur(c.amountEur) }),
       },
@@ -138,7 +138,7 @@ export const FUNDING_STAGES: Stage[] = [
   {
     id: "activated",
     group: "Fund",
-    title: "Milestone Activated",
+    title: "Job Activated",
     icon: "check",
     assurance: "Funds secured in tamper-proof escrow.",
     steps: [
@@ -146,7 +146,7 @@ export const FUNDING_STAGES: Stage[] = [
         id: "funded",
         real: true,
         label: "Escrow state → FUNDED",
-        simple: "Milestone is funded and locked",
+        simple: "Job is funded and locked",
         durationMs: 700,
         payload: (c) => ({ contract: escrowAddress, jobId: c.jobId, status: "FUNDED" }),
       },

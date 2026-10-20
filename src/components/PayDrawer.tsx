@@ -7,7 +7,7 @@ import type { FundingForm } from "../hooks/useFiatFunding";
 import styles from "../App.module.css";
 import page from "./FlowPage.module.css";
 
-/** Side drawer with the "pay a milestone with euros" form. */
+/** Side drawer with the "fund a job with euros" form. */
 export function PayDrawer({ onClose, onSubmit }: { onClose: () => void; onSubmit: (form: FundingForm) => void }) {
   const [freelancer, setFreelancer] = useState("");
   const [amountEth, setAmountEth] = useState("");
@@ -27,7 +27,7 @@ export function PayDrawer({ onClose, onSubmit }: { onClose: () => void; onSubmit
     <div className={page.drawerOverlay} onClick={onClose}>
       <aside className={page.drawer} onClick={(e) => e.stopPropagation()}>
         <div className={page.drawerHeader}>
-          <h3>Pay a milestone with euros</h3>
+          <h3>Fund a job with euros</h3>
           <button className={page.iconButton} onClick={onClose} aria-label="Close">
             <X size={18} />
           </button>
@@ -44,7 +44,7 @@ export function PayDrawer({ onClose, onSubmit }: { onClose: () => void; onSubmit
         <textarea className={styles.input} placeholder="Job description or IPFS link" value={description} onChange={(e) => setDescription(e.target.value)} />
         <p className={styles.muted}>Demo rate: 1 ETH = {euro(EUR_PER_ETH)}. The bank steps are simulated. Your wallet signs the real escrow deposit.</p>
         <button className={styles.button} disabled={!valid} onClick={() => onSubmit({ freelancer, amountEth, days, description })}>
-          {Number(amountEth) > 0 ? `Fund Milestone (${euro(eur)})` : "Fund Milestone"}
+          {Number(amountEth) > 0 ? `Fund a Job (${euro(eur)})` : "Fund a Job"}
         </button>
       </aside>
     </div>

@@ -1,9 +1,15 @@
-.page { display: flex; flex-direction: column; gap: 1.5rem; }
-.title { margin: 0; }
-.subtitle { margin: 0 0 .25rem; }
-.form { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: .5rem; }
-.actions { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
-.live { display: flex; flex-direction: column; gap: .5rem; margin-top: .5rem; padding: 1rem; border-radius: 12px; border: 1px solid #333; background: #12141a; }
+.page { display: flex; flex-direction: column; gap: 1.25rem; }
+.title { margin: 0; margin-right: auto; }
+.subtitle { margin: 0; margin-right: auto; }
 .summary { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
 .block { display: flex; flex-direction: column; gap: .5rem; padding: 1rem; border-radius: 12px; border: 1px solid #2a2f3b; }
-.block h4 { margin: 0; }
+
+.next { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; padding: 1rem 1.25rem; border-radius: 12px; border: 1px solid #2a2f3b; border-left: 4px solid var(--c, #4f7cff); background: color-mix(in srgb, var(--c, #4f7cff) 8%, #12141a); }
+.next p { margin: .25rem 0 0; }
+.nextActions { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+
+.drawerOverlay { position: fixed; inset: 0; background: rgba(0, 0, 0, .5); display: flex; justify-content: flex-end; z-index: 20; }
+.drawer { width: 100%; max-width: 420px; height: 100%; padding: 1.5rem; display: flex; flex-direction: column; gap: .75rem; background: #12141a; border-left: 1px solid #333; overflow-y: auto; }
+.drawerHeader { display: flex; align-items: center; justify-content: space-between; }
+.drawerHeader h3 { margin: 0; }
+.iconButton { border: 0; background: none; color: inherit; cursor: pointer; display: inline-flex; padding: .25rem; }

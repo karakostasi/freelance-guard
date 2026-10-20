@@ -3,18 +3,26 @@
 .muted { opacity: .6; font-size: .85rem; }
 
 .scroll { overflow-x: auto; padding-bottom: .5rem; }
-.stepper { display: grid; gap: 1rem; min-width: min-content; }
-.column { display: flex; flex-direction: column; gap: .5rem; min-width: 190px; position: relative; }
-.column:not(:last-child)::after { content: ""; position: absolute; top: 2.1rem; right: -1rem; width: 1rem; border-top: 2px dashed #333; }
+.journey { display: flex; gap: 1.25rem; min-width: min-content; }
+.group { display: flex; flex-direction: column; gap: .5rem; min-width: 0; }
+.groupLabel { font-size: .7rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; opacity: .55; padding-bottom: .25rem; border-bottom: 1px solid #2a2f3b; }
+.groupStages { display: grid; gap: .75rem; }
+.column { display: flex; flex-direction: column; gap: .5rem; min-width: 0; }
 
-.stage { display: flex; flex-direction: column; gap: .5rem; padding: .75rem; border-radius: 10px; border: 1px solid #333; background: #181b22; transition: border-color .2s; }
-.stageTop { display: flex; align-items: center; gap: .5rem; }
+.stage { display: flex; flex-direction: column; gap: .4rem; padding: .6rem .7rem; border-radius: 10px; border: 1px solid #333; background: #181b22; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: border-color .2s; }
+.stage:hover { border-color: #555; }
+.stageTop { display: flex; align-items: center; gap: .4rem; font-size: .85rem; }
+.stageTop strong { flex: 1; min-width: 0; }
+.chevron { opacity: .5; transition: transform .2s; }
+.chevronOpen { transform: rotate(180deg); }
 .stageActive { border-color: #4f7cff; box-shadow: 0 0 0 1px #4f7cff; }
 .stageDone { border-color: #3ecf8e; }
-.bar { height: 4px; border-radius: 2px; background: #2a2f3b; overflow: hidden; }
-.barFill { height: 100%; background: #4f7cff; transition: width .3s; }
+.stageFailed { border-color: #ff5c5c; box-shadow: 0 0 0 1px #ff5c5c; }
+.stageLocked { opacity: .55; }
+.bar { height: 4px; border-radius: 2px; background: #2a2f3b; overflow: hidden; display: block; }
+.barFill { display: block; height: 100%; background: #4f7cff; transition: width .3s; }
 .stageDone .barFill { background: #3ecf8e; }
-.assurance { font-size: .8rem; opacity: .7; }
+.assurance { font-size: .75rem; opacity: .7; }
 
 .steps { list-style: none; margin: 0; padding: 0 .25rem; display: flex; flex-direction: column; gap: .5rem; }
 .step { display: flex; gap: .5rem; align-items: flex-start; font-size: .85rem; opacity: .5; }
@@ -46,3 +54,8 @@
 
 .stepFailed { opacity: 1; color: #ff5c5c; }
 .errorBanner { margin: .75rem 0 0; padding: .5rem .75rem; border-radius: 8px; background: rgba(255, 92, 92, .12); color: #ff5c5c; }
+
+.legend { display: inline-flex; gap: .4rem; }
+.tag { align-self: flex-start; font-size: .65rem; font-weight: 600; letter-spacing: .03em; padding: .05rem .4rem; border-radius: 4px; text-decoration: none; }
+.tagReal { color: #4cc9f0; background: rgba(76, 201, 240, .14); }
+.tagDemo { color: #aab; background: rgba(170, 170, 187, .14); }

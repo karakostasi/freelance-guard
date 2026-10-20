@@ -16,12 +16,16 @@ export type SubStep = {
   /** Plain-language text for "Simple Business Mode". */
   simple: string;
   durationMs: number;
+  /** True when the step is backed by the real escrow contract rather than simulated. */
+  real?: boolean;
   /** Raw data shown in "Auditor / Dev Mode". */
   payload: (ctx: FlowContext) => Record<string, unknown>;
 };
 
 export type Stage = {
   id: string;
+  /** Phase of the journey this stage belongs to, shown above the stage boxes. */
+  group: "Fund" | "Work" | "Payout";
   title: string;
   /** Lucide icon name, resolved in the UI. */
   icon: "landmark" | "coins" | "shield" | "check" | "route" | "send";
@@ -41,6 +45,7 @@ const eur = (n: number) => n.toFixed(2);
 export const FUNDING_STAGES: Stage[] = [
   {
     id: "inbound",
+    group: "Fund",
     title: "Fiat Inbound",
     icon: "landmark",
     assurance: "Your payment was received and verified.",
@@ -70,6 +75,7 @@ export const FUNDING_STAGES: Stage[] = [
   },
   {
     id: "tokenization",
+    group: "Fund",
     title: "Tokenization",
     icon: "coins",
     assurance: "Euros are backed 1:1 by reserves.",
@@ -99,6 +105,7 @@ export const FUNDING_STAGES: Stage[] = [
   },
   {
     id: "escrow",
+    group: "Fund",
     title: "Escrow Deposit",
     icon: "shield",
     assurance: "Funds are locked in a tamper-proof escrow contract.",
@@ -112,6 +119,7 @@ export const FUNDING_STAGES: Stage[] = [
       },
       {
         id: "signature",
+        real: true,
         label: "Deposit signed in wallet",
         simple: "You approve the deposit in your wallet",
         durationMs: 900,
@@ -119,6 +127,7 @@ export const FUNDING_STAGES: Stage[] = [
       },
       {
         id: "deposit",
+        real: true,
         label: "Deposit confirmed on-chain",
         simple: "Deposit recorded on the blockchain",
         durationMs: 1500,
@@ -128,12 +137,14 @@ export const FUNDING_STAGES: Stage[] = [
   },
   {
     id: "activated",
+    group: "Fund",
     title: "Milestone Activated",
     icon: "check",
     assurance: "Funds secured in tamper-proof escrow.",
     steps: [
       {
         id: "funded",
+        real: true,
         label: "Escrow state → FUNDED",
         simple: "Milestone is funded and locked",
         durationMs: 700,
@@ -157,15 +168,43 @@ export const FUNDING_STAGES: Stage[] = [
   },
 ];
 
+export const WORK_STAGE: Stage = {
+  id: "work",
+  group: "Work",
+  title: "Work & Review",
+  icon: "check",
+  assurance: "The work was reviewed and accepted.",
+  steps: [
+    {
+      id: "submitted",
+      real: true,
+      label: "Work submitted",
+      simple: "Freelancer delivered the work",
+      durationMs: 0,
+      payload: () => ({ note: "Filled in from the real escrow state" }),
+    },
+    {
+      id: "review",
+      real: true,
+      label: "Client review",
+      simple: "Client reviews and accepts the work",
+      durationMs: 0,
+      payload: () => ({ note: "Filled in from the real escrow state" }),
+    },
+  ],
+};
+
 export const payoutStages = (route: PayoutRoute): Stage[] => [
   {
     id: "release",
+    group: "Payout",
     title: "Release",
     icon: "shield",
     assurance: "Approved by the client, released automatically.",
     steps: [
       {
         id: "approval",
+        real: true,
         label: "Client approval verified",
         simple: "The delivered work was accepted",
         durationMs: 800,
@@ -173,6 +212,7 @@ export const payoutStages = (route: PayoutRoute): Stage[] => [
       },
       {
         id: "release",
+        real: true,
         label: "Release confirmed on-chain",
         simple: "Escrow released the funds",
         durationMs: 1500,
@@ -182,6 +222,7 @@ export const payoutStages = (route: PayoutRoute): Stage[] => [
   },
   {
     id: "routing",
+    group: "Payout",
     title: "Payout Routing",
     icon: "route",
     assurance: route === "eurc" ? "You keep the digital euros." : "Converted to euros automatically.",
@@ -204,6 +245,7 @@ export const payoutStages = (route: PayoutRoute): Stage[] => [
   },
   {
     id: "settlement",
+    group: "Payout",
     title: "Settlement",
     icon: "send",
     assurance: route === "eurc" ? "Funds are in your wallet." : "Funds are on their way to your bank.",
@@ -239,6 +281,8 @@ export type FlowEvent =
 export type FlowState = {
   status: "idle" | "running" | "done" | "error";
   error?: string;
+  /** Set on chain-derived state: the current step is waiting on a person, not running. */
+  waiting?: boolean;
   startedAt?: number;
   finishedAt?: number;
   current?: { stage: number; step: number };
@@ -297,3 +341,11 @@ export function runFlow(stages: Stage[], ctx: FlowContext, emit: (ev: FlowEvent)
     clearTimeout(timer);
   };
 }
+
+/** Stage index where the simulated routing starts inside the full journey. */
+export const ROUTING_STAGE = FUNDING_STAGES.length + 2;
+export const RELEASE_STAGE = FUNDING_STAGES.length + 1;
+export const WORK_STAGE_INDEX = FUNDING_STAGES.length;
+
+/** Funding, work and payout as one ordered list of stages. */
+export const journeyStages = (route: PayoutRoute): Stage[] => [...FUNDING_STAGES, WORK_STAGE, ...payoutStages(route)];

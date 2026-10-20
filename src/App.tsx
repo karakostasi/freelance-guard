@@ -17,7 +17,7 @@ export default function App() {
   const route = useHashRoute();
 
   return (
-    <main className={`${styles.page} ${route.page === "flow" ? styles.pageWide : ""}`}>
+    <main className={styles.page}>
       <header className={styles.header}>
         <div className={styles.brand}>
           <img src={logo} alt="" className={styles.logo} />
@@ -42,11 +42,11 @@ export default function App() {
       )}
       {isConnected && route.page === "flow" && <FlowPage jobId={route.jobId} />}
       {isConnected && route.page === "jobs" && (
-        <>
+        <div className={styles.narrow}>
           <CreateJob />
           <MyJobs selected={selected} onSelect={setSelected} />
           {selected && <JobPanel id={selected} onClose={() => setSelected("")} />}
-        </>
+        </div>
       )}
     </main>
   );

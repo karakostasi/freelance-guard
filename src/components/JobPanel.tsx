@@ -1,19 +1,16 @@
-import { useEffect, useState } from "react";
-import { useAccount, useReadContract, useWriteContract } from "wagmi";
+import { useEffect } from "react";
+import { useAccount, useReadContract } from "wagmi";
 import { formatEther } from "viem";
 import { escrowAbi, escrowAddress } from "../wagmi";
-import { useRefreshOnConfirm } from "../hooks/useRefreshOnConfirm";
 import { STATUS, STATUS_CLASS, STATUS_LABEL, formatDate, formatDuration, roleOf, type Job } from "../lib/jobs";
 import { navigate } from "../hooks/useHashRoute";
+import { JobActions } from "./JobActions";
 import { useEscrowConfig } from "../hooks/useEscrowConfig";
 import { useNow } from "../hooks/useNow";
 import styles from "../App.module.css";
 
 export function JobPanel({ id, onClose }: { id: string; onClose: () => void }) {
   const { address } = useAccount();
-  const { writeContract, data: txHash, isPending, error } = useWriteContract();
-  const confirming = useRefreshOnConfirm(txHash);
-  const [deliverable, setDeliverable] = useState("");
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -29,32 +26,16 @@ export function JobPanel({ id, onClose }: { id: string; onClose: () => void }) {
   });
   const job = data as Job | undefined;
 
-  const call = (functionName: string, args: unknown[]) =>
-    writeContract({ address: escrowAddress, abi: escrowAbi, functionName, args });
-
-  const { reviewPeriod, arbiter } = useEscrowConfig();
+  const { reviewPeriod } = useEscrowConfig();
   const now = useNow();
-  const busy = isPending || confirming;
 
   const me = address?.toLowerCase();
   const isClient = job && me === job[0].toLowerCase();
   const isFreelancer = job && me === job[1].toLowerCase();
-  const isArbiter = !!me && arbiter?.toLowerCase() === me;
   const status = job ? STATUS[job[5]] : "";
-  const n = BigInt(id || 0);
 
   const deadline = job?.[3] ?? 0n;
   const reviewEnd = job && reviewPeriod !== undefined ? job[4] + reviewPeriod : undefined;
-
-  // Each action is disabled (with a hint) when the contract would revert.
-  const action = (label: string, fn: string, args: unknown[], blockedReason = "") => (
-    <div className={styles.action}>
-      <button className={styles.button} disabled={busy || !!blockedReason} onClick={() => call(fn, args)}>
-        {label}
-      </button>
-      {blockedReason && <span className={styles.muted}>{blockedReason}</span>}
-    </div>
-  );
 
   return (
     <div className={styles.overlay} onClick={onClose}>
@@ -94,29 +75,7 @@ export function JobPanel({ id, onClose }: { id: string; onClose: () => void }) {
           )}
           {job[7] && <p>Deliverable: {job[7]}</p>}
 
-          {isFreelancer && status === "Funded" && (
-            <>
-              <input className={styles.input} placeholder="Deliverable link" value={deliverable} onChange={(e) => setDeliverable(e.target.value)} />
-              {action("Submit work", "submitWork", [n, deliverable], now > deadline ? "Deadline passed" : !deliverable ? "Add a deliverable link" : "")}
-            </>
-          )}
-          {isFreelancer && status === "Submitted" &&
-            action("Claim payment", "claimAfterTimeout", [n], reviewEnd === undefined || now < reviewEnd ? `Available in ${formatDuration((reviewEnd ?? now) - now)}` : "")}
-          {isClient && status === "Submitted" && (
-            <>
-              {action("Approve & pay", "approve", [n])}
-              {action("Dispute", "dispute", [n], reviewEnd !== undefined && now >= reviewEnd ? "Review period ended" : "")}
-            </>
-          )}
-          {isClient && status === "Funded" &&
-            action("Refund", "refundExpired", [n], now <= deadline ? `Available in ${formatDuration(deadline - now + 1n)}` : "")}
-          {status === "Disputed" && isArbiter && (
-            <>
-              {action("Pay freelancer", "resolve", [n, true])}
-              {action("Refund client", "resolve", [n, false])}
-            </>
-          )}
-          {status === "Disputed" && !isArbiter && <p className={styles.muted}>Waiting for the arbiter to resolve this dispute.</p>}
+          <JobActions id={id} job={job} />
         </>
       )}
       {job && status !== "None" && (
@@ -130,8 +89,6 @@ export function JobPanel({ id, onClose }: { id: string; onClose: () => void }) {
           View payment flow
         </button>
       )}
-      {(isPending || confirming) && <p>Waiting for transaction…</p>}
-      {error && <p className={styles.error}>{error.message.split("\n")[0]}</p>}
     </section>
     </div>
   );

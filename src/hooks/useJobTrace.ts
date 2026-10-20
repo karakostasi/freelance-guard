@@ -6,6 +6,7 @@ import { escrowAbi, escrowAddress, escrowDeployBlock } from "../wagmi";
 export type TxInfo = { txHash: `0x${string}`; blockNumber: bigint; gasUsed: bigint; blockTime: number };
 export type JobTrace = {
   created?: TxInfo;
+  submitted?: TxInfo;
   released?: TxInfo & { kind: "Approved" | "Resolved" };
   /** Event lookup failed (usually an RPC log-range limit). */
   unavailable?: boolean;
@@ -38,14 +39,16 @@ export function useJobTrace(id: number | undefined, status: number | undefined) 
           return { txHash: log.transactionHash, blockNumber: log.blockNumber, gasUsed: receipt.gasUsed, blockTime: Number(block.timestamp) };
         };
 
-        const [created, approved, resolved] = await Promise.all([
+        const [created, submitted, approved, resolved] = await Promise.all([
           find("JobCreated"),
+          (status ?? 0) >= 2 ? find("WorkSubmitted") : [],
           status === PAID ? find("Approved") : [],
           status === PAID ? find("Resolved") : [],
         ]);
 
         const trace: JobTrace = {};
         if (created[0]) trace.created = await toInfo(created[0]);
+        if (submitted[0]) trace.submitted = await toInfo(submitted[0]);
         const release = approved[0] ?? resolved[0];
         if (release) trace.released = { ...(await toInfo(release)), kind: approved[0] ? "Approved" : "Resolved" };
         if (!trace.created) trace.unavailable = true;

@@ -46,3 +46,5 @@ export function timeInfo(job: Job, reviewPeriod: bigint | undefined, now: bigint
   }
   return "";
 }
+
+export const euro = (n: number) => `€${n.toLocaleString("en-IE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;

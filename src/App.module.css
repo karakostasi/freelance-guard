@@ -1,4 +1,4 @@
-.page { max-width: 640px; margin: 0 auto; padding: 2rem 1rem; }
+.page { max-width: 1100px; margin: 0 auto; padding: 2rem 1rem; }
 .section { margin: 2rem 0; display: flex; flex-direction: column; gap: .5rem; }
 .input { padding: .5rem; border-radius: 6px; border: 1px solid #333; background: #181b22; color: inherit; }
 .button { padding: .5rem 1rem; border-radius: 6px; border: 0; background: #4f7cff; color: #fff; cursor: pointer; }
@@ -44,7 +44,7 @@
 .suffixField { position: relative; display: flex; flex-direction: column; }
 .suffixField .input { padding-right: 3.5rem; }
 .suffix { position: absolute; right: .75rem; top: 50%; transform: translateY(-50%); opacity: .6; pointer-events: none; }
-.pageWide { max-width: 1100px; }
+.narrow { max-width: 640px; margin: 0 auto; }
 .nav { display: flex; gap: .5rem; }
 .navLink { display: inline-flex; align-items: center; gap: .4rem; padding: .4rem .9rem; border-radius: 999px; border: 1px solid #333; background: none; color: inherit; font: inherit; cursor: pointer; }
 .navLink:hover { border-color: #4f7cff; }

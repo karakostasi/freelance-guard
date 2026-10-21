@@ -18,10 +18,21 @@ if (!process.env.WEBHOOK_SECRET) console.warn("[warn] WEBHOOK_SECRET not set, us
 
 const sign = (body) => createHmac("sha256", WEBHOOK_SECRET).update(body).digest("hex");
 
-const cors = {
-  "access-control-allow-origin": process.env.CORS_ORIGIN ?? "*",
-  "access-control-allow-headers": "content-type, x-signature, last-event-id",
-  "access-control-allow-methods": "GET, POST, OPTIONS",
+// CORS_ORIGIN: comma-separated list of allowed site origins. Empty means any origin.
+// Trailing slashes are ignored, so "https://site.vercel.app/" works too.
+const allowedOrigins = (process.env.CORS_ORIGIN ?? "")
+  .split(",")
+  .map((o) => o.trim().replace(/\/+$/, ""))
+  .filter(Boolean);
+
+const corsFor = (req) => {
+  const origin = req.headers.origin;
+  return {
+    "access-control-allow-origin": allowedOrigins.length === 0 ? "*" : allowedOrigins.includes(origin) ? origin : allowedOrigins[0],
+    vary: "Origin",
+    "access-control-allow-headers": "content-type, x-signature, last-event-id",
+    "access-control-allow-methods": "GET, POST, OPTIONS",
+  };
 };
 
 const readBody = (req) =>
@@ -36,7 +47,7 @@ const readBody = (req) =>
   });
 
 const send = (res, status, body) => {
-  res.writeHead(status, { "content-type": "application/json", ...cors });
+  res.writeHead(status, { "content-type": "application/json", ...res.cors });
   res.end(JSON.stringify(body));
 };
 
@@ -60,7 +71,7 @@ function validatePayment(b) {
 }
 
 function stream(req, res, run) {
-  res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive", ...cors });
+  res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive", ...res.cors });
   const write = (ev) => res.write(`id: ${ev.seq}\ndata: ${JSON.stringify(ev)}\n\n`);
   const last = Number(req.headers["last-event-id"] ?? -1);
   run.events.filter((e) => e.seq > last).forEach(write);
@@ -75,9 +86,10 @@ function stream(req, res, run) {
 const server = createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const path = url.pathname;
+  res.cors = corsFor(req);
   try {
     if (req.method === "OPTIONS") {
-      res.writeHead(204, cors);
+      res.writeHead(204, res.cors);
       return res.end();
     }
 

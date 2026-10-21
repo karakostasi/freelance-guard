@@ -20,3 +20,26 @@
 .fab:hover:not(:disabled) { transform: translateY(-2px); }
 .fab:disabled { opacity: .5; cursor: not-allowed; box-shadow: none; }
 .viewHint { margin: -.75rem 0 0; }
+
+.pickerRow { display: flex; align-items: center; gap: .75rem; }
+.pickerRow select { flex: 1; }
+.pickerLabel { font-size: .8rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; opacity: .6; }
+
+.msTabs { display: flex; gap: .5rem; flex-wrap: wrap; }
+.msTab { display: inline-flex; align-items: center; gap: .45rem; padding: .45rem .9rem; border-radius: 999px; border: 1px solid #2a2f3b; background: none; color: inherit; font: inherit; cursor: pointer; transition: border-color .15s, background .15s; }
+.msTab:hover { border-color: var(--c); }
+.msTabActive { border-color: var(--c); background: color-mix(in srgb, var(--c) 14%, transparent); }
+.msDot { width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
+.msNum { font-weight: 600; opacity: .7; }
+.msTitle { max-width: 14ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Details of the selected milestone, with room before the "what's next" banner below it. */
+.msDetails { display: flex; flex-direction: column; gap: .85rem; margin-bottom: 1.25rem; padding: 1rem 1.25rem; border-radius: 12px; border: 1px solid #2a2f3b; border-left: 4px solid var(--c, #8a8fa0); background: #14171d; }
+.facts { display: grid; grid-template-columns: max-content 1fr; gap: .4rem 1.25rem; margin: 0; }
+.facts dt { opacity: .6; }
+.facts dd { margin: 0; min-width: 0; }
+.factLabel { opacity: .6; }
+.wrap { overflow-wrap: anywhere; }
+.txLink { display: inline-flex; align-items: center; gap: .25rem; color: #8fa8ff; text-decoration: none; }
+.txLink:hover { text-decoration: underline; }
+@media (max-width: 560px) { .facts { grid-template-columns: 1fr; gap: 0; } .facts dd { margin-bottom: .5rem; } }

@@ -2,9 +2,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useWatchContractEvent } from "wagmi";
 import type { Abi } from "viem";
-import { Code, Eye, Plus, RotateCcw } from "lucide-react";
+import { Check, Code, Eye, Plus, RotateCcw } from "lucide-react";
 import { FlowStepper, type FlowMode } from "./FlowStepper";
 import { NextStep } from "./NextStep";
+import { MilestoneDetails } from "./MilestoneDetails";
 import { PayDrawer } from "./PayDrawer";
 import { useBackendFunding } from "../hooks/useBackendFunding";
 import { useBackendStatus } from "../hooks/useBackend";
@@ -16,7 +17,7 @@ import { useJobTrace } from "../hooks/useJobTrace";
 import { useMyJobs } from "../hooks/useMyJobs";
 import { deriveJourney, simulatedPayloads } from "../lib/chainFlow";
 import { FUNDING_STAGES, ROUTING_STAGE, journeyStages, type FlowState, type PayoutRoute } from "../lib/fiatFlow";
-import { STATUS_CLASS, STATUS_LABEL, currentMilestone, euro, jobTotal, type Job } from "../lib/jobs";
+import { STATUS_CLASS, STATUS_LABEL, currentMilestone, jobTotal, type Job } from "../lib/jobs";
 import { formatAmount, toEur, tokenOf } from "../lib/tokens";
 import { escrowAbi, escrowAddress } from "../wagmi";
 import styles from "../App.module.css";
@@ -127,6 +128,8 @@ export function FlowPage({ jobId: routeJobId }: { jobId?: string }) {
       ) : (
         <section className={styles.section}>
           {mine.length > 0 && (
+            <label className={page.pickerRow}>
+              <span className={page.pickerLabel}>Job</span>
             <select className={styles.input} value={id} onChange={(e) => setSelectedId(e.target.value)}>
               {mine.map(({ id: jid, job }) => (
                 <option key={jid} value={jid}>
@@ -134,6 +137,7 @@ export function FlowPage({ jobId: routeJobId }: { jobId?: string }) {
                 </option>
               ))}
             </select>
+            </label>
           )}
           {selected ? <JobJourney key={selected.id} id={selected.id} job={selected.job} mode={mode} /> : <p className={flow.muted}>No jobs for this account yet. Use "Fund a job" to create one.</p>}
         </section>
@@ -146,6 +150,7 @@ function JobJourney({ id, job, mode }: { id: number; job: Job; mode: FlowMode })
   const [picked, setPicked] = useState<number | null>(null);
   const index = picked ?? currentMilestone(job);
   const ms = job.milestones[index];
+  const multi = job.milestones.length > 1;
   const status = ms.status;
   const { data: trace } = useJobTrace(id, index, status);
   const amountEur = toEur(tokenOf(job), ms.amount);
@@ -181,21 +186,27 @@ function JobJourney({ id, job, mode }: { id: number; job: Job; mode: FlowMode })
 
   return (
     <>
-      <div className={page.summary}>
-        <strong>Job #{id}</strong>
-        <span className={`${styles.badge} ${STATUS_CLASS[status]}`}>{STATUS_LABEL[status]}</span>
-        <span>{formatAmount(job, ms.amount)}</span>
-        <span className={flow.muted}>≈ {euro(amountEur)}</span>
-        {job.milestones.length > 1 && (
-          <select className={styles.input} value={index} onChange={(e) => setPicked(Number(e.target.value))} aria-label="Milestone">
-            {job.milestones.map((m, i) => (
-              <option key={i} value={i}>
-                Milestone {i + 1}: {m.title || "Untitled"} · {STATUS_LABEL[m.status]}
-              </option>
-            ))}
-          </select>
-        )}
-      </div>
+      {multi && (
+        <div className={page.msTabs} role="tablist" aria-label="Milestones">
+          {job.milestones.map((m, i) => (
+            <button
+              key={i}
+              role="tab"
+              aria-selected={i === index}
+              className={`${page.msTab} ${STATUS_CLASS[m.status]} ${i === index ? page.msTabActive : ""}`}
+              onClick={() => setPicked(i)}
+              title={`${m.title || "Untitled"}: ${STATUS_LABEL[m.status]}`}
+            >
+              <span className={page.msDot} />
+              <span className={page.msNum}>{i + 1}</span>
+              <span className={page.msTitle}>{m.title || "Untitled"}</span>
+              {m.status === 4 && <Check size={13} />}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <MilestoneDetails job={job} index={index} trace={trace} />
 
       <NextStep
         id={id}
@@ -213,6 +224,7 @@ function JobJourney({ id, job, mode }: { id: number; job: Job; mode: FlowMode })
       />
 
       <div className={page.block}>
+        {status === 0 && <p className={flow.muted}>These steps start once the milestone is funded.</p>}
         <FlowStepper stages={stages} state={journey} mode={mode} timer={payoutState.status !== "idle"} />
       </div>
     </>

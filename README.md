@@ -83,10 +83,14 @@ A job has a title, an optional spec and optional attachments. A milestone's deli
 - **Uploads need a wallet signature** (one sign-in message per hour), so the backend can't be used as free file hosting. Limits: 10 MB per file, 5 files per form, 50 uploads and 200 MB per address per day, and 300 MB in total (see `.env.example`). Files are served with `nosniff` and a sandbox policy, and only images, PDFs, text and JSON are shown in the browser. Everything else downloads.
 - Files are **not private**: anyone with a file's hash can download it. Don't upload secrets.
 
+## Wallet card
+
+On the Jobs and Payment flow pages a wallet card is always visible on the right: your ETH, EURC and USDC balances (with a euro estimate at the app's demo rates), **Send**, and **Receive** (your address and links to test-fund faucets). A send checks the address and amount first, shows a review with the full address, then your own wallet asks you to confirm, so the app never holds keys. There is deliberately no swap: the test tokens have no real market on Base Sepolia.
+
 ## Tests and CI
 
 - `npm test` runs the contract tests (Hardhat).
-- `npm run test:unit` checks the document format, sign-in sessions and file stores (no chain or network needed).
+- `npm run test:unit` checks the document format, balance formatting, send rules, sign-in sessions and file stores (no chain or network needed).
 - `npm run test:flow` is an end-to-end check of the payment flow. It starts its own throwaway chain and backend on ports 8645 and 8799 (override with `TEST_CHAIN_PORT` and `TEST_API_PORT`), so it never touches your dev servers. It drives real ETH and EURC payments, including a 3-milestone split, plus the upload, sign-in, download and quota rules, through the API and the contract, and takes about half a minute.
 - `npm run lint` and `npm run build` check the frontend.
 

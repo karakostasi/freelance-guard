@@ -2,6 +2,7 @@ import { useState } from "react";
 import { HireForm } from "./HireForm";
 import { JobDetails } from "./JobDetails";
 import { JobList } from "./JobList";
+import { WalletCard } from "./WalletCard";
 import { useMyJobs } from "../hooks/useMyJobs";
 import { navigate } from "../hooks/useHashRoute";
 import { setPendingPayment } from "../lib/pendingPayment";
@@ -15,6 +16,7 @@ export function JobsPage() {
   return (
     <div className={page.jobsLayout}>
       <JobList jobs={mine} selectedId={open ?? ""} onSelect={setOpen} emptyText="No jobs yet. Fill in the form to hire someone." />
+      <WalletCard className={page.wallet} />
       <div className={page.top}>
         <div className={page.formWrap}>
           <HireForm

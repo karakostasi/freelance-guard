@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { useAccount, useReadContract } from "wagmi";
 import { escrowAbi, escrowAddress } from "../wagmi";
 import { formatAmount } from "../lib/tokens";
@@ -13,14 +12,9 @@ import styles from "../App.module.css";
 
 type RawJob = readonly [Omit<Job, "milestones">, readonly Milestone[]];
 
-export function JobPanel({ id, onClose }: { id: string; onClose: () => void }) {
+/** One job in full: its parties, spec and every milestone with the actions available to you. */
+export function JobDetails({ id }: { id: string }) {
   const { address } = useAccount();
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
 
   const { data, isLoading, error: readError } = useReadContract({
     address: escrowAddress,
@@ -40,9 +34,8 @@ export function JobPanel({ id, onClose }: { id: string; onClose: () => void }) {
   const exists = !!job && job.milestones.length > 0;
 
   return (
-    <div className={styles.overlay} onClick={onClose}>
-      <section className={styles.modal} onClick={(e) => e.stopPropagation()}>
-        <button className={styles.close} onClick={onClose} aria-label="Close">×</button>
+    <>
+      <section className={styles.panel}>
         <div className={styles.modalHeader}>
           <h2 className={styles.modalTitle}>{job ? jobTitle(job.description, id) : `Job #${id}`}</h2>
           <span className={styles.muted}>Job #{id}</span>
@@ -99,16 +92,13 @@ export function JobPanel({ id, onClose }: { id: string; onClose: () => void }) {
 
             <button
               className={styles.ghostButton}
-              onClick={() => {
-                onClose();
-                navigate(`/flow/${id}`);
-              }}
+              onClick={() => navigate(`/flow/${id}`)}
             >
               View payment flow
             </button>
           </>
         )}
       </section>
-    </div>
+    </>
   );
 }

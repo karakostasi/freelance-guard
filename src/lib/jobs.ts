@@ -50,6 +50,21 @@ export function milestoneName(job: Job, index: number) {
   return title.length > 22 ? `${title.slice(0, 21)}…` : title;
 }
 
+/** Where a job stands as a whole: its current milestone, how many are paid, and a label and color for it. */
+export function jobSummary(job: Job) {
+  const current = job.milestones[currentMilestone(job)];
+  const finished = job.milestones.every(isDone);
+  const paid = job.milestones.filter((m) => m.status === PAID).length;
+  const allPaid = paid === job.milestones.length;
+  return {
+    current,
+    finished,
+    paid,
+    label: finished ? (allPaid ? "Completed" : "Closed") : STATUS_LABEL[current.status],
+    tone: STATUS_CLASS[finished ? (allPaid ? PAID : REFUNDED) : current.status],
+  };
+}
+
 export type Role = { label: string; className: string; amountLabel: string };
 
 /** Which side of the job `me` is on. Anyone who is neither party is the arbiter. */

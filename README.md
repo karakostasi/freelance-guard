@@ -73,6 +73,16 @@ The contract ABI is committed in `abi/` (refreshed by `npm run compile`), so nei
 
 Never upload your local `.env` (it holds the deployer key). Set variables in each dashboard instead.
 
+## Tests and CI
+
+- `npm test` runs the contract tests (Hardhat).
+- `npm run test:flow` is an end-to-end check of the payment flow. It starts its own throwaway chain and backend on ports 8645 and 8799 (override with `TEST_CHAIN_PORT` and `TEST_API_PORT`), so it never touches your dev servers. It drives real ETH and EURC payments, including a 3-milestone split, through the API and the contract, and takes about half a minute.
+- `npm run lint` and `npm run build` check the frontend.
+
+GitHub Actions runs all of them on every pull request and on pushes to `main` (`.github/workflows/ci.yml`), and also checks that the committed ABI in `abi/` matches the contract. If that check fails, run `npm run compile` and commit the result.
+
+CI installs with `npm ci`, so it uses exactly the versions in `package-lock.json`. After adding or changing a dependency, run `npm install` and commit the updated lockfile, or CI will refuse it.
+
 ## Known limitations
 
 - Jobs can be paid in ETH or ERC-20 tokens (EURC and USDC are listed). Fee-on-transfer tokens are rejected, and each job is in a single token.

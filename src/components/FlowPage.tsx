@@ -152,7 +152,7 @@ function JobJourney({ id, job, mode }: { id: number; job: Job; mode: FlowMode })
   const ms = job.milestones[index];
   const multi = job.milestones.length > 1;
   const status = ms.status;
-  const { data: trace } = useJobTrace(id, index, status);
+  const { data: trace } = useJobTrace(id, index, ms);
   const amountEur = toEur(tokenOf(job), ms.amount);
   const sim = useMemo(() => simulatedPayloads(FUNDING_STAGES, { jobId: String(id), amountEur }), [id, amountEur]);
 

@@ -7,46 +7,25 @@ import { navigate } from "../hooks/useHashRoute";
 import { setPendingPayment } from "../lib/pendingPayment";
 import page from "./FlowPage.module.css";
 
-/** Your jobs as a list on the left. On the right: the selected job, or the form to hire someone. */
+/** The form to hire a freelancer, with your jobs as a list beside it. Clicking a job opens it as a card over the page. */
 export function JobsPage() {
   const mine = useMyJobs();
-  // A job id, "new", or null for the default (your newest job, or the form if you have none).
-  const [choice, setChoice] = useState<string | null>(null);
-  // How many jobs there were when a wallet job was just sent, so the new one can be shown once it lands.
-  const [jobsBefore, setJobsBefore] = useState<number | null>(null);
-
-  const justCreated = jobsBefore !== null && mine.length > jobsBefore;
-  const selectedId =
-    justCreated && (choice === "new" || choice === null) ? String(mine[0].id) : (choice ?? (mine.length > 0 ? String(mine[0].id) : "new"));
-  const creating = selectedId === "new";
+  const [open, setOpen] = useState<string | null>(null);
 
   return (
     <div className={page.jobsLayout}>
-      <JobList
-        jobs={mine}
-        selectedId={selectedId}
-        onSelect={setChoice}
-        creating={creating}
-        onNew={() => {
-          setChoice("new");
-          setJobsBefore(null);
-        }}
-      />
+      <JobList jobs={mine} selectedId={open ?? ""} onSelect={setOpen} emptyText="No jobs yet. Fill in the form to hire someone." />
       <div className={page.top}>
-        {creating ? (
-          <div className={page.formWrap}>
-            <HireForm
-              onBank={(form) => {
-                setPendingPayment(form);
-                navigate("/flow");
-              }}
-              onCreated={() => setJobsBefore(mine.length)}
-            />
-          </div>
-        ) : (
-          <JobDetails key={selectedId} id={selectedId} />
-        )}
+        <div className={page.formWrap}>
+          <HireForm
+            onBank={(form) => {
+              setPendingPayment(form);
+              navigate("/flow");
+            }}
+          />
+        </div>
       </div>
+      {open && <JobDetails key={open} id={open} onClose={() => setOpen(null)} />}
     </div>
   );
 }

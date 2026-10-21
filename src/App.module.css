@@ -30,7 +30,7 @@
 .roleClient { color: #b39dff; background: rgba(139, 108, 255, .16); }
 .roleFreelancer { color: #4cc9f0; background: rgba(76, 201, 240, .16); }
 .roleArbiter { color: #aab; background: rgba(170, 170, 187, .16); }
-.modalHeader { display: flex; align-items: center; gap: .75rem; }
+.modalHeader { display: flex; align-items: center; gap: .75rem; padding-right: 2.5rem; }
 .modalHeader h2 { margin: 0; }
 .suffixField { position: relative; display: flex; flex-direction: column; }
 .suffixField .input { padding-right: 3.5rem; }
@@ -100,5 +100,18 @@ a.chipButton { text-decoration: none; }
 .deliverableRow { display: flex; flex-direction: column; align-items: flex-start; gap: .25rem; width: 100%; }
 .modalTitle { margin: 0; min-width: 0; overflow-wrap: anywhere; }
 
-/* A job shown in full on the page, as a panel (it used to be a popup). */
-.panel { position: relative; display: flex; flex-direction: column; gap: .5rem; min-width: 0; padding: 1.5rem; border-radius: 12px; border: 1px solid #2a2f3b; background: #12141a; }
+/* A job shown in full as a card floating over the page. */
+.overlay { position: fixed; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center; padding: 1rem; background: rgba(0, 0, 0, .6); backdrop-filter: blur(2px); }
+.modal { position: relative; width: 100%; max-width: 860px; max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column; gap: .5rem; padding: 1.5rem; border-radius: 14px; border: 1px solid #333; background: #12141a; box-shadow: 0 24px 64px rgba(0, 0, 0, .55); overflow-wrap: anywhere; }
+.close { position: absolute; top: .75rem; right: .75rem; display: inline-flex; align-items: center; justify-content: center; padding: .35rem; border: 0; border-radius: 8px; background: none; color: inherit; cursor: pointer; opacity: .7; }
+.close:hover { opacity: 1; background: #232733; }
+
+/* the top of a job card: who is involved, and how much */
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: .75rem; }
+.tile { display: flex; flex-direction: column; align-items: flex-start; gap: .45rem; min-width: 0; padding: .85rem 1rem; border-radius: 12px; border: 1px solid #262b38; background: linear-gradient(180deg, rgba(255, 255, 255, .03), transparent), #171a22; }
+.tileLabel { font-size: .7rem; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; opacity: .6; }
+.tileValue { font-size: 1.2rem; }
+.partyRow { display: flex; align-items: center; gap: .6rem; width: 100%; min-width: 0; }
+.partyText { display: flex; align-items: center; gap: .4rem; flex: 1; min-width: 0; flex-wrap: wrap; }
+.partyAddress { font-family: ui-monospace, monospace; font-weight: 600; }
+a.iconButton { color: inherit; text-decoration: none; }

@@ -63,7 +63,6 @@
 .jobItemBottom { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
 .jobItem > span:last-child { width: 100%; }
 
-.sidebarTitleRow { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
 
 /* The Jobs page: the same list, with the selected job or the hire form beside it. */
 .jobsLayout { display: grid; grid-template-columns: 280px minmax(0, 1fr); grid-template-areas: "side top"; gap: 1.5rem; align-items: start; }

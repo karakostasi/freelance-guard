@@ -3,109 +3,88 @@ const { ethers } = require("hardhat");
 const { time } = require("@nomicfoundation/hardhat-network-helpers");
 
 const REVIEW = 3 * 24 * 3600;
-const AMOUNT = 500n * 10n ** 6n; // 500 tokens with 6 decimals, like EURC and USDC
+const DAY = 24 * 3600;
+const U = (n) => BigInt(n) * 10n ** 6n; // 6 decimals, like EURC and USDC
 
-describe("FreelanceEscrow with ERC-20", () => {
-  let escrow, token, client, freelancer, arbiter, other, deadline;
+const item = (title, amount, days = 7) => ({ title, amount, duration: days * DAY });
+
+describe("FreelanceEscrow (ERC-20)", () => {
+  let escrow, token, client, freelancer, arbiter, other, escrowAddr;
 
   beforeEach(async () => {
     [client, freelancer, arbiter, other] = await ethers.getSigners();
     escrow = await ethers.deployContract("FreelanceEscrow", [arbiter.address, REVIEW]);
+    escrowAddr = await escrow.getAddress();
     token = await ethers.deployContract("MockERC20", ["Mock EURC", "EURC", 6]);
-    await token.mint(client.address, 10_000n * 10n ** 6n);
-    deadline = (await time.latest()) + 7 * 24 * 3600;
+    await token.mint(client.address, U(10_000));
   });
 
-  const fund = async () => {
-    await token.connect(client).approve(await escrow.getAddress(), AMOUNT);
-    await escrow.connect(client).createTokenJob(freelancer.address, deadline, "ipfs://spec", await token.getAddress(), AMOUNT);
+  const create = async (items, fundNow, approve = 0n, tok = token) => {
+    if (approve > 0n) await tok.connect(client).approve(escrowAddr, approve);
+    return escrow.connect(client).createJob(freelancer.address, await tok.getAddress(), "ipfs://spec", items, fundNow);
   };
 
-  it("pulls the tokens into escrow and records the token", async () => {
-    await fund();
-    expect(await token.balanceOf(await escrow.getAddress())).to.equal(AMOUNT);
-    const job = await escrow.jobs(1);
+  it("pulls the whole total in one transfer when funding now", async () => {
+    await create([item("a", U(300)), item("b", U(200))], true, U(500));
+    expect(await token.balanceOf(escrowAddr)).to.equal(U(500));
+    const [job, ms] = await escrow.getJob(1);
     expect(job.token).to.equal(await token.getAddress());
-    expect(job.amount).to.equal(AMOUNT);
-    expect(job.status).to.equal(1n); // Funded
+    expect(ms.map((m) => m.status)).to.deep.equal([1n, 1n]);
   });
 
-  it("emits the token in JobCreated", async () => {
-    await token.connect(client).approve(await escrow.getAddress(), AMOUNT);
-    await expect(escrow.connect(client).createTokenJob(freelancer.address, deadline, "x", await token.getAddress(), AMOUNT))
-      .to.emit(escrow, "JobCreated")
-      .withArgs(1, client.address, freelancer.address, AMOUNT, deadline, await token.getAddress());
+  it("pays each milestone to the freelancer in tokens", async () => {
+    await create([item("a", U(300)), item("b", U(200))], true, U(500));
+    await escrow.connect(freelancer).submitWork(1, 0, "x");
+    await escrow.connect(client).approve(1, 0);
+    expect(await token.balanceOf(freelancer.address)).to.equal(U(300));
+    expect(await token.balanceOf(escrowAddr)).to.equal(U(200));
+    await expect(escrow.connect(client).approve(1, 0)).to.be.revertedWithCustomError(escrow, "WrongStatus");
   });
 
-  it("pays the freelancer in tokens on approval", async () => {
-    await fund();
-    await escrow.connect(freelancer).submitWork(1, "ipfs://work");
-    await escrow.connect(client).approve(1);
-    expect(await token.balanceOf(freelancer.address)).to.equal(AMOUNT);
-    expect(await token.balanceOf(await escrow.getAddress())).to.equal(0n);
+  it("funds milestones one by one, pulling only that milestone", async () => {
+    await create([item("a", U(300)), item("b", U(200))], false);
+    expect(await token.balanceOf(escrowAddr)).to.equal(0n);
+    await token.connect(client).approve(escrowAddr, U(300));
+    await escrow.connect(client).fundMilestone(1, 0);
+    expect(await token.balanceOf(escrowAddr)).to.equal(U(300));
+    expect((await escrow.getJob(1))[1].map((m) => m.status)).to.deep.equal([1n, 0n]);
   });
 
-  it("lets the freelancer claim in tokens after the review period", async () => {
-    await fund();
-    await escrow.connect(freelancer).submitWork(1, "x");
+  it("lets the freelancer claim, the client refund and the arbiter resolve in tokens", async () => {
+    await create([item("claim", U(100)), item("refund", U(100), 1), item("dispute", U(100))], true, U(300));
+    await escrow.connect(freelancer).submitWork(1, 0, "x");
+    await escrow.connect(freelancer).submitWork(1, 2, "z");
+    await escrow.connect(client).dispute(1, 2);
     await time.increase(REVIEW);
-    await escrow.connect(freelancer).claimAfterTimeout(1);
-    expect(await token.balanceOf(freelancer.address)).to.equal(AMOUNT);
-  });
-
-  it("refunds the client in tokens after an unmet deadline", async () => {
-    await fund();
+    await escrow.connect(freelancer).claimAfterTimeout(1, 0);
+    expect(await token.balanceOf(freelancer.address)).to.equal(U(100));
     const before = await token.balanceOf(client.address);
-    await time.increaseTo(deadline + 1);
-    await escrow.connect(client).refundExpired(1);
-    expect(await token.balanceOf(client.address)).to.equal(before + AMOUNT);
+    await escrow.connect(client).refundExpired(1, 1);
+    await escrow.connect(arbiter).resolve(1, 2, false);
+    expect(await token.balanceOf(client.address)).to.equal(before + U(200));
+    expect(await token.balanceOf(escrowAddr)).to.equal(0n);
   });
 
-  it("lets the arbiter resolve a dispute in tokens either way", async () => {
-    await fund();
-    await escrow.connect(freelancer).submitWork(1, "x");
-    await escrow.connect(client).dispute(1);
-    const before = await token.balanceOf(client.address);
-    await escrow.connect(arbiter).resolve(1, false);
-    expect(await token.balanceOf(client.address)).to.equal(before + AMOUNT);
-  });
-
-  it("cannot be paid twice", async () => {
-    await fund();
-    await escrow.connect(freelancer).submitWork(1, "x");
-    await escrow.connect(client).approve(1);
-    await expect(escrow.connect(client).approve(1)).to.be.revertedWithCustomError(escrow, "WrongStatus");
-    expect(await token.balanceOf(freelancer.address)).to.equal(AMOUNT);
-  });
-
-  it("reverts without an allowance and keeps no job", async () => {
-    await expect(escrow.connect(client).createTokenJob(freelancer.address, deadline, "x", await token.getAddress(), AMOUNT)).to.be.revertedWithCustomError(
-      escrow,
-      "TransferFailed",
-    );
+  it("reverts without an allowance and creates nothing", async () => {
+    await expect(create([item("a", U(100))], true, 0n)).to.be.revertedWithCustomError(escrow, "TransferFailed");
     expect(await escrow.jobCount()).to.equal(0n);
+    await create([item("a", U(100))], false);
+    await expect(escrow.connect(client).fundMilestone(1, 0)).to.be.revertedWithCustomError(escrow, "TransferFailed");
   });
 
-  it("rejects bad input", async () => {
+  it("does not accept ETH for a token job", async () => {
     const t = await token.getAddress();
-    await expect(escrow.connect(client).createTokenJob(freelancer.address, deadline, "x", t, 0)).to.be.revertedWith("no funds");
-    await expect(escrow.connect(client).createTokenJob(freelancer.address, deadline, "x", ethers.ZeroAddress, AMOUNT)).to.be.revertedWith("bad token");
-    await expect(escrow.connect(client).createTokenJob(freelancer.address, deadline, "x", other.address, AMOUNT)).to.be.revertedWith("bad token");
-    await token.connect(client).approve(await escrow.getAddress(), AMOUNT);
-    await expect(escrow.connect(client).createTokenJob(client.address, deadline, "x", t, AMOUNT)).to.be.revertedWith("bad freelancer");
+    await token.connect(client).approve(escrowAddr, U(100));
+    await expect(escrow.connect(client).createJob(freelancer.address, t, "x", [item("a", U(100))], true, { value: 1n })).to.be.revertedWith("no ETH expected");
   });
 
-  it("rejects fee-on-transfer tokens", async () => {
+  it("rejects non-contract tokens and fee-on-transfer tokens", async () => {
+    await expect(escrow.connect(client).createJob(freelancer.address, other.address, "x", [item("a", U(1))], true)).to.be.revertedWith("bad token");
     const fee = await ethers.deployContract("MockFeeToken");
-    await fee.mint(client.address, AMOUNT);
-    await fee.connect(client).approve(await escrow.getAddress(), AMOUNT);
-    await expect(escrow.connect(client).createTokenJob(freelancer.address, deadline, "x", await fee.getAddress(), AMOUNT)).to.be.revertedWith("unsupported token");
-  });
-
-  it("ETH jobs still work and record no token", async () => {
-    await escrow.connect(client).createJob(freelancer.address, deadline, "x", { value: 1000n });
-    expect((await escrow.jobs(1)).token).to.equal(ethers.ZeroAddress);
-    await escrow.connect(freelancer).submitWork(1, "x");
-    await expect(escrow.connect(client).approve(1)).to.changeEtherBalance(freelancer, 1000n);
+    await fee.mint(client.address, U(500));
+    await fee.connect(client).approve(escrowAddr, U(500));
+    await expect(escrow.connect(client).createJob(freelancer.address, await fee.getAddress(), "x", [item("a", U(100))], true)).to.be.revertedWith("unsupported token");
+    await escrow.connect(client).createJob(freelancer.address, await fee.getAddress(), "x", [item("a", U(100))], false);
+    await expect(escrow.connect(client).fundMilestone(1, 0)).to.be.revertedWith("unsupported token");
   });
 });

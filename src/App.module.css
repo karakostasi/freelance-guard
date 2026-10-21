@@ -20,8 +20,8 @@
 .disputed { --c: #ff8a3d; }
 .paid { --c: #3ecf8e; }
 .refunded { --c: #ff5c5c; }
-.badge.funded, .badge.submitted, .badge.disputed, .badge.paid, .badge.refunded { color: var(--c); background: color-mix(in srgb, var(--c) 18%, transparent); border: 1px solid var(--c); }
-.card.funded, .card.submitted, .card.disputed, .card.paid, .card.refunded { border-left: 4px solid var(--c); }
+.badge.unfunded, .badge.funded, .badge.submitted, .badge.disputed, .badge.paid, .badge.refunded { color: var(--c); background: color-mix(in srgb, var(--c) 18%, transparent); border: 1px solid var(--c); }
+.card.unfunded, .card.funded, .card.submitted, .card.disputed, .card.paid, .card.refunded { border-left: 4px solid var(--c); }
 .action { display: flex; flex-direction: column; gap: .25rem; align-items: flex-start; }
 .walletBar { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .5rem .75rem; border: 1px solid #333; border-radius: 12px; background: #181b22; }
 .walletInfo { display: flex; align-items: center; gap: .75rem; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
@@ -51,3 +51,33 @@
 .navActive { background: #4f7cff; border-color: #4f7cff; color: #fff; }
 .brandLink { color: inherit; text-decoration: none; }
 .amountRow { display: grid; grid-template-columns: 1fr 110px; gap: .5rem; }
+.unfunded { --c: #8a8fa0; }
+
+.milestones { display: flex; flex-direction: column; gap: .75rem; margin-top: .25rem; }
+.milestone { display: flex; flex-direction: column; align-items: flex-start; gap: .35rem; padding: .85rem 1rem; border-radius: 10px; border: 1px solid #2a2f3b; border-left: 4px solid var(--c, #8a8fa0); background: #181b22; }
+.milestoneHead { display: flex; align-items: center; justify-content: space-between; gap: .75rem; width: 100%; }
+.segments { display: flex; gap: 3px; width: 100%; }
+.segment { flex: 1; height: 6px; border-radius: 3px; background: var(--c, #8a8fa0); }
+.presets { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.chipButton { display: inline-flex; align-items: center; gap: .3rem; padding: .25rem .7rem; border-radius: 999px; border: 1px solid #444; background: none; color: inherit; font: inherit; font-size: .85rem; cursor: pointer; }
+.chipButton:hover:not(:disabled) { border-color: #4f7cff; }
+.chipButton:disabled { opacity: .4; cursor: not-allowed; }
+.milestoneRow { display: grid; grid-template-columns: 1fr 90px 110px 32px; gap: .5rem; align-items: center; }
+.milestoneAmount { grid-column: 1 / -1; margin-top: -.25rem; }
+.iconButton { border: 0; background: none; color: inherit; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: .25rem; opacity: .7; }
+.iconButton:hover:not(:disabled) { opacity: 1; }
+.iconButton:disabled { opacity: .25; cursor: not-allowed; }
+
+.formGroup { display: flex; flex-direction: column; gap: .5rem; padding: 1rem 0; border-top: 1px solid #2a2f3b; }
+.formGroup:first-of-type { border-top: 0; padding-top: 0; }
+.groupTitle { margin: 0; font-size: .8rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; opacity: .6; }
+.optionCards { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+.optionCard { display: flex; align-items: flex-start; gap: .6rem; padding: .85rem 1rem; border-radius: 10px; border: 1px solid #333; background: #181b22; cursor: pointer; transition: border-color .15s; }
+.optionCard:hover { border-color: #555; }
+.optionCard > span { display: flex; flex-direction: column; gap: .25rem; }
+.optionCard input { margin-top: .2rem; accent-color: #4f7cff; }
+.optionCardActive { border-color: #4f7cff; box-shadow: 0 0 0 1px #4f7cff; background: rgba(79, 124, 255, .08); }
+@media (max-width: 560px) { .optionCards { grid-template-columns: 1fr; } }
+.chipActive { border-color: #4f7cff; background: rgba(79, 124, 255, .16); color: #b4c6ff; cursor: default; }
+.optionCardDisabled { opacity: .5; cursor: not-allowed; }
+.drawerForm { display: flex; flex-direction: column; }

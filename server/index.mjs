@@ -3,7 +3,7 @@ import { createServer } from "node:http";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { db, flush, save } from "./db.mjs";
 import { watchEscrow, ESCROW_ADDRESS, RPC_URL } from "./chain.mjs";
-import { bankReceived, createRun, fail, onChainEvent, onThisContract, publicRun, subscribe } from "./pipeline.mjs";
+import { bankReceived, createRun, fail, milestonePlan, onChainEvent, onThisContract, publicRun, subscribe } from "./pipeline.mjs";
 import { EUR_PER_ETH } from "./providers.mjs";
 
 const PORT = Number(process.env.PORT ?? 8787);
@@ -68,7 +68,7 @@ function validatePayment(b) {
   if (b.payer.toLowerCase() === b.freelancer.toLowerCase()) throw fieldError("freelancer must differ from payer");
   if (!(Number(b.amount) > 0)) throw fieldError("amount must be greater than 0");
   if (b.token !== undefined && !["eth", "eurc"].includes(b.token)) throw fieldError("token must be eth or eurc");
-  if (!(Number(b.days) > 0)) throw fieldError("days must be greater than 0");
+  milestonePlan(b);
 }
 
 function stream(req, res, run) {

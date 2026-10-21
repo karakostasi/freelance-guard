@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { useAccount, useConnect } from "wagmi";
 import { Briefcase, Workflow } from "lucide-react";
-import { CreateJob } from "./components/CreateJob";
+import { HireForm } from "./components/HireForm";
 import { FlowPage } from "./components/FlowPage";
 import { JobPanel } from "./components/JobPanel";
 import { Landing } from "./components/Landing";
 import { MyJobs } from "./components/MyJobs";
 import { WalletBar } from "./components/WalletBar";
 import { navigate, useHashRoute } from "./hooks/useHashRoute";
+import { setPendingPayment } from "./lib/pendingPayment";
 import logo from "./assets/logo.svg";
 import styles from "./App.module.css";
 
@@ -44,7 +45,12 @@ export default function App() {
       {isConnected && route.page === "flow" && <FlowPage jobId={route.jobId} />}
       {isConnected && route.page === "jobs" && (
         <div className={styles.narrow}>
-          <CreateJob />
+          <HireForm
+            onBank={(form) => {
+              setPendingPayment(form);
+              navigate("/flow");
+            }}
+          />
           <MyJobs selected={selected} onSelect={setSelected} />
           {selected && <JobPanel id={selected} onClose={() => setSelected("")} />}
         </div>

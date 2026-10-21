@@ -1,12 +1,22 @@
 import { useAccount, useWriteContract } from "wagmi";
 import { useQueryClient } from "@tanstack/react-query";
 import { getBlock, readContract, waitForTransactionReceipt } from "wagmi/actions";
-import { parseEther, parseEventLogs, type Abi } from "viem";
+import { parseEther, parseEventLogs, zeroAddress, type Abi } from "viem";
 import { config, escrowAbi, escrowAddress } from "../wagmi";
 import { EUR_PER_ETH, FUNDING_STAGES, stepKey, type FlowContext, type PayoutRoute } from "../lib/fiatFlow";
 import { useFlowRun } from "./useFlowRun";
 
-export type FundingForm = { freelancer: string; amount: string; days: string; description: string; route?: PayoutRoute; token?: "eth" | "eurc" };
+export type FundingMilestone = { title: string; amount: string; days: string };
+
+/** A payment made by bank transfer. `amount` is the total, split over the milestones. */
+export type FundingForm = {
+  freelancer: string;
+  amount: string;
+  description: string;
+  milestones: FundingMilestone[];
+  route?: PayoutRoute;
+  token?: "eth" | "eurc";
+};
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -45,7 +55,8 @@ export function useFiatFunding(onFunded: (jobId: number) => void) {
         address: escrowAddress,
         abi: escrowAbi,
         functionName: "createJob",
-        args: [form.freelancer, BigInt(Math.floor(Date.now() / 1000) + Number(form.days) * 86400), form.description],
+        // Every milestone is funded right away: a bank transfer is one payment for the total.
+        args: [form.freelancer, zeroAddress, form.description, form.milestones.map((m) => ({ title: m.title, amount: parseEther(m.amount), duration: Math.round(Number(m.days) * 86400) })), true],
         value: parseEther(form.amount),
       });
       finish(2, 1, {
@@ -63,7 +74,7 @@ export function useFiatFunding(onFunded: (jobId: number) => void) {
       finish(2, 2, {
         chain: "Base Sepolia (84532)",
         contract: escrowAddress,
-        function: "createJob (depositMilestone)",
+        function: "createJob",
         jobId: id,
         txHash: hash,
         blockNumber: Number(receipt.blockNumber),
@@ -76,8 +87,8 @@ export function useFiatFunding(onFunded: (jobId: number) => void) {
       let status = 0;
       for (let attempt = 0; attempt < 8 && status !== 1; attempt++) {
         if (attempt) await wait(1000);
-        const job = (await readContract(config, { address: escrowAddress, abi: escrowAbi as Abi, functionName: "jobs", args: [BigInt(id)] })) as readonly unknown[];
-        status = job[5] as number;
+        const [, milestones] = (await readContract(config, { address: escrowAddress, abi: escrowAbi as Abi, functionName: "getJob", args: [BigInt(id)] })) as readonly [unknown, readonly { status: number }[]];
+        status = milestones[0].status;
       }
       if (status !== 1) throw new Error("Deposit confirmed, but the escrow doesn't show FUNDED yet");
       finish(3, 0, { contract: escrowAddress, jobId: id, status: "FUNDED" });

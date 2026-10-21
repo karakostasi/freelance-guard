@@ -30,16 +30,16 @@ export const USDC: Token = {
 
 export const TOKENS: Token[] = [ETH, EURC, USDC];
 
-/** Which token a job is paid in. Jobs from the older ETH-only contract have no token field. */
+/** Which token a job is paid in. */
 export function tokenOf(job: Job): Token {
-  const address = job[8];
+  const address = job.token;
   if (!address || address === zeroAddress) return ETH;
   return TOKENS.find((t) => t.address?.toLowerCase() === address.toLowerCase()) ?? { symbol: "TOKEN", decimals: 18, address: address as `0x${string}`, eurPer: 0 };
 }
 
-export const formatAmount = (job: Job) => {
-  const token = tokenOf(job);
-  return `${formatUnits(job[2], token.decimals)} ${token.symbol}`;
-};
+export const formatUnitsOf = (token: Token, units: bigint) => `${formatUnits(units, token.decimals)} ${token.symbol}`;
+
+/** An amount in the job's token, e.g. "500 EURC". */
+export const formatAmount = (job: Job, units: bigint) => formatUnitsOf(tokenOf(job), units);
 
 export const toEur = (token: Token, units: bigint) => Number(formatUnits(units, token.decimals)) * token.eurPer;

@@ -11,7 +11,7 @@
 .nextActions input, .nextActions select, .nextActions button { box-sizing: border-box; min-height: 2.4rem; }
 
 .drawerOverlay { position: fixed; inset: 0; background: rgba(0, 0, 0, .5); display: flex; justify-content: flex-end; z-index: 20; }
-.drawer { width: 100%; max-width: 420px; height: 100%; padding: 1.5rem; display: flex; flex-direction: column; gap: .75rem; background: #12141a; border-left: 1px solid #333; overflow-y: auto; }
+.drawer { width: 100%; max-width: 560px; height: 100%; padding: 1.5rem; display: flex; flex-direction: column; gap: .75rem; background: #12141a; border-left: 1px solid #333; overflow-y: auto; }
 .drawerHeader { display: flex; align-items: center; justify-content: space-between; }
 .drawerHeader h3 { margin: 0; }
 .iconButton { border: 0; background: none; color: inherit; cursor: pointer; display: inline-flex; padding: .25rem; }

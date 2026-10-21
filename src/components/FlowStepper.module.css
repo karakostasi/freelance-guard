@@ -62,3 +62,8 @@
 .tagBackend { color: #3ecf8e; background: rgba(62, 207, 142, .14); }
 .tagSandbox { color: #f5b942; background: rgba(245, 185, 66, .14); }
 .pillLive { font-size: .75rem; padding: .1rem .5rem; border-radius: 999px; color: #3ecf8e; background: rgba(62, 207, 142, .14); }
+
+/* the Simple / Detailed switch, directly above the steps it changes */
+.viewBar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: .75rem; }
+.viewTitle { margin: 0; font-size: .8rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; opacity: .8; }
+.viewHint { margin: .2rem 0 0; font-size: .85rem; opacity: .6; }

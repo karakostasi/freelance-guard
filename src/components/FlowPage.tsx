@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useWatchContractEvent } from "wagmi";
 import type { Abi } from "viem";
-import { Check, Code, Eye, Plus, RotateCcw } from "lucide-react";
+import { Check, Plus, RotateCcw } from "lucide-react";
 import { FlowStepper, type FlowMode } from "./FlowStepper";
 import { NextStep } from "./NextStep";
 import { JobList } from "./JobList";
@@ -94,18 +94,7 @@ export function FlowPage({ jobId: routeJobId }: { jobId?: string }) {
             {backendError ? ` (${backendError})` : ""}
           </span>
         )}
-        <div className={flow.toggle} role="group" aria-label="View mode" title={mode === "simple" ? "Plain-language steps" : "Technical names, transaction hashes and raw data"}>
-          <button className={mode === "simple" ? flow.toggleOn : ""} onClick={() => setMode("simple")}>
-            <Eye size={14} /> Simple
-          </button>
-          <button className={mode === "detailed" ? flow.toggleOn : ""} onClick={() => setMode("detailed")}>
-            <Code size={14} /> Detailed
-          </button>
-        </div>
       </div>
-      <p className={`${flow.muted} ${page.viewHint}`}>
-        {mode === "simple" ? "Simple: plain-language steps, one stage open at a time." : "Detailed: technical step names, transaction hashes and the raw data behind every step."}
-      </p>
 
       <button className={page.fab} disabled={live.running} onClick={() => setDrawerOpen(true)}>
         <Plus size={18} /> Fund a job
@@ -131,11 +120,11 @@ export function FlowPage({ jobId: routeJobId }: { jobId?: string }) {
               </div>
             </div>
             <div className={`${page.stepperRow} ${page.block}`}>
-              <FlowStepper stages={journeyStages("sepa")} state={live.state} mode={mode} timer />
+              <FlowStepper stages={journeyStages("sepa")} state={live.state} mode={mode} onModeChange={setMode} timer />
             </div>
           </>
         ) : selected ? (
-          <JobJourney key={selected.id} id={selected.id} job={selected.job} mode={mode} />
+          <JobJourney key={selected.id} id={selected.id} job={selected.job} mode={mode} onModeChange={setMode} />
         ) : (
           <div className={page.top}>
             <p className={flow.muted}>{mine.length > 0 ? "Pick a job from the list." : "Nothing to show yet."}</p>
@@ -146,7 +135,7 @@ export function FlowPage({ jobId: routeJobId }: { jobId?: string }) {
   );
 }
 
-function JobJourney({ id, job, mode }: { id: number; job: Job; mode: FlowMode }) {
+function JobJourney({ id, job, mode, onModeChange }: { id: number; job: Job; mode: FlowMode; onModeChange: (mode: FlowMode) => void }) {
   const [picked, setPicked] = useState<number | null>(null);
   const index = picked ?? currentMilestone(job);
   const ms = job.milestones[index];
@@ -228,7 +217,7 @@ function JobJourney({ id, job, mode }: { id: number; job: Job; mode: FlowMode })
 
       <div className={`${page.stepperRow} ${page.block}`}>
         {status === 0 && <p className={flow.muted}>These steps start once the milestone is funded.</p>}
-        <FlowStepper stages={stages} state={journey} mode={mode} timer={payoutState.status !== "idle"} />
+        <FlowStepper stages={stages} state={journey} mode={mode} onModeChange={onModeChange} timer={payoutState.status !== "idle"} />
       </div>
     </>
   );

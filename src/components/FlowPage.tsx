@@ -6,6 +6,7 @@ import { Check, Code, Eye, Plus, RotateCcw } from "lucide-react";
 import { FlowStepper, type FlowMode } from "./FlowStepper";
 import { NextStep } from "./NextStep";
 import { JobList } from "./JobList";
+import { WalletCard } from "./WalletCard";
 import { MilestoneDetails } from "./MilestoneDetails";
 import { PayDrawer } from "./PayDrawer";
 import { useBackendFunding } from "../hooks/useBackendFunding";
@@ -115,6 +116,7 @@ export function FlowPage({ jobId: routeJobId }: { jobId?: string }) {
       )}
 
       <div className={page.layout}>
+        <WalletCard className={page.wallet} />
         <JobList jobs={mine} selectedId={id} onSelect={setSelectedId} emptyText={'No jobs for this account yet. Use "Fund a job" to create one.'} />
         {showingLive ? (
           <>

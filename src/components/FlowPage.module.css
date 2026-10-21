@@ -48,7 +48,8 @@
 .linkButton:disabled { opacity: .6; cursor: default; }
 
 /* Jobs down the left beside the job's details and banner. The journey keeps the full page width underneath. */
-.layout { display: grid; grid-template-columns: 280px minmax(0, 1fr); grid-template-areas: "side top" "stepper stepper"; gap: 1.25rem 1.5rem; align-items: start; }
+.layout { display: grid; grid-template-columns: 280px minmax(0, 1fr) 320px; grid-template-areas: "side top wallet" "stepper stepper stepper"; gap: 1.25rem 1.5rem; align-items: start; }
+.wallet { grid-area: wallet; }
 .top { grid-area: top; display: flex; flex-direction: column; gap: .75rem; min-width: 0; }
 .stepperRow { grid-area: stepper; min-width: 0; }
 .sidebar { grid-area: side; align-self: stretch; position: relative; min-height: 260px; }
@@ -65,13 +66,18 @@
 
 
 /* The Jobs page: the same list, with the selected job or the hire form beside it. */
-.jobsLayout { display: grid; grid-template-columns: 280px minmax(0, 1fr); grid-template-areas: "side top"; gap: 1.5rem; align-items: start; }
+.jobsLayout { display: grid; grid-template-columns: 280px minmax(0, 1fr) 320px; grid-template-areas: "side top wallet"; gap: 1.5rem; align-items: start; }
 .formWrap { max-width: 680px; }
 .formWrap > section { margin: 0; }
 
+/* Narrower screens: the wallet card drops under the details, then everything stacks. */
+@media (max-width: 1200px) {
+  .layout { grid-template-columns: 280px minmax(0, 1fr); grid-template-areas: "side top" "side wallet" "stepper stepper"; }
+  .jobsLayout { grid-template-columns: 280px minmax(0, 1fr); grid-template-areas: "side top" "side wallet"; }
+}
 @media (max-width: 900px) {
-  .jobsLayout { grid-template-columns: 1fr; grid-template-areas: "side" "top"; }
-  .layout { grid-template-columns: 1fr; grid-template-areas: "side" "top" "stepper"; }
+  .jobsLayout { grid-template-columns: 1fr; grid-template-areas: "side" "top" "wallet"; }
+  .layout { grid-template-columns: 1fr; grid-template-areas: "side" "top" "wallet" "stepper"; }
   .sidebar { min-height: 0; }
   .sidebarInner { position: static; max-height: 280px; }
 }

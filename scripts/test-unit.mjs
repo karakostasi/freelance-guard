@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { privateKeyToAccount } from "viem/accounts";
 import { buildDescription, deliverableUrl, formatBytes, jobTitle, parseDeliverable, parseDescription, parseDoc, serializeDoc, signInMessage as frontendMessage } from "../src/lib/documents.ts";
 import { formatBalance } from "../src/lib/format.ts";
+import { ETH_GAS_BUFFER, checkSend, maxSendable, parseAmount } from "../src/lib/send.ts";
 import { SESSION_MS, createSession, signInMessage, verifyToken } from "../server/auth.mjs";
 import { fsBlobStore, pgBlobStore } from "../server/blobs.mjs";
 
@@ -68,6 +69,23 @@ check(formatBalance(1n, 6) === "0.000001" && formatBalance(5n, 6) === "0.000005"
 check(formatBalance(1n, 18) === "< 0.000001" && formatBalance(999_999_999_999n, 18) === "< 0.000001", "ETH dust below 6 decimals is shown as less than 0.000001, not 0");
 check(formatBalance(42n, 0) === "42" && formatBalance(0n, 0) === "0", "a token with no decimals");
 check(formatBalance(1_000_001n, 6) === "1.000001" && formatBalance(10_000_000n, 6) === "10", "no stray zeros or lost digits");
+
+console.log("\nSending funds");
+check(parseAmount("1.5", 6) === 1_500_000n && parseAmount("0.000001", 6) === 1n && parseAmount("7", 18) === 7n * 10n ** 18n && parseAmount(".5", 6) === 500_000n && parseAmount("5.", 6) === null, "amounts become base units");
+check(["", " ", ".", "abc", "-1", "1e3", "1,5", "0.0000001", "1.2.3", "0x10"].every((t) => parseAmount(t, 6) === null), "anything that isn't a plain amount in that precision is refused");
+const me = "0x" + "1".repeat(40);
+const you = "0x" + "2".repeat(40);
+const base = { to: you, from: me, amountText: "5", decimals: 6, symbol: "EURC", balance: 10_000_000n, isNative: false };
+check(checkSend(base).error === null && checkSend(base).units === 5_000_000n, "a normal send passes and gives the exact units");
+check(checkSend({ ...base, to: "" }).error !== null && checkSend({ ...base, to: "0x123" }).error !== null && checkSend({ ...base, to: "z".repeat(42) }).error !== null, "a missing or malformed address is refused");
+check(checkSend({ ...base, to: me.toUpperCase().replace("0X", "0x") }).error === "That's your own address.", "sending to yourself is refused, whatever the letter case");
+check(checkSend({ ...base, amountText: "0" }).error !== null && checkSend({ ...base, amountText: "" }).error !== null && checkSend({ ...base, amountText: "1.0000001" }).error !== null, "zero, empty and too-precise amounts are refused");
+check(checkSend({ ...base, amountText: "10.000001" }).error !== null && checkSend({ ...base, amountText: "10" }).error === null, "more than the balance is refused, exactly the balance is fine for a token");
+check(checkSend({ ...base, balance: undefined }).error === "Loading your balance…", "nothing is sent before the balance is known");
+const eth = { ...base, symbol: "ETH", decimals: 18, balance: 10n ** 18n, isNative: true, amountText: "1" };
+check(checkSend(eth).error !== null && checkSend({ ...eth, amountText: "0.5" }).error === null, "for ETH the whole balance can't be sent, so the fee can be paid");
+check(maxSendable(10n ** 18n, true) === 10n ** 18n - ETH_GAS_BUFFER && maxSendable(ETH_GAS_BUFFER, true) === 0n && maxSendable(123n, false) === 123n, "max keeps a fee buffer for ETH only");
+check(checkSend({ ...eth, amountText: "0.999950000000000000" }).error === null && checkSend({ ...eth, amountText: "0.99996" }).error !== null, "the buffer boundary is exact");
 
 console.log("\nSign-in sessions");
 const account = privateKeyToAccount("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80");

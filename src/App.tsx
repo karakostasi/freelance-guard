@@ -6,7 +6,7 @@ import { FlowPage } from "./components/FlowPage";
 import { JobPanel } from "./components/JobPanel";
 import { Landing } from "./components/Landing";
 import { MyJobs } from "./components/MyJobs";
-import { WalletBar } from "./components/WalletBar";
+import { ProfileMenu } from "./components/ProfileMenu";
 import { navigate, useHashRoute } from "./hooks/useHashRoute";
 import { setPendingPayment } from "./lib/pendingPayment";
 import logo from "./assets/logo.svg";
@@ -25,22 +25,27 @@ export default function App() {
           <img src={logo} alt="" className={styles.logo} />
           <h1>Freelance Guard</h1>
         </a>
-        <nav className={styles.nav}>
-          <button className={`${styles.navLink} ${route.page === "jobs" ? styles.navActive : ""}`} onClick={() => navigate("/jobs")}>
-            <Briefcase size={16} /> Jobs
-          </button>
-          <button className={`${styles.navLink} ${route.page === "flow" ? styles.navActive : ""}`} onClick={() => navigate("/flow")}>
-            <Workflow size={16} /> Payment flow
-          </button>
-        </nav>
+        <div className={styles.headerRight}>
+          <nav className={styles.nav}>
+            <button className={`${styles.navLink} ${route.page === "jobs" ? styles.navActive : ""}`} onClick={() => navigate("/jobs")}>
+              <Briefcase size={16} /> Jobs
+            </button>
+            <button className={`${styles.navLink} ${route.page === "flow" ? styles.navActive : ""}`} onClick={() => navigate("/flow")}>
+              <Workflow size={16} /> Payment flow
+            </button>
+          </nav>
+          <ProfileMenu />
+        </div>
       </header>
       {route.page === "home" && <Landing />}
-      {isConnected && route.page !== "home" && <WalletBar />}
       {!isConnected && route.page !== "home" && (
-        <>
-          <button className={styles.button} onClick={() => connect({ connector: connectors[0] })}>Connect wallet</button>
+        <div className={styles.connectPrompt}>
+          <p>Connect your wallet to continue.</p>
+          <button className={styles.button} onClick={() => connect({ connector: connectors[0] })}>
+            Connect wallet
+          </button>
           {connectError && <p className={styles.error}>{connectError.message.split("\n")[0]}</p>}
-        </>
+        </div>
       )}
       {isConnected && route.page === "flow" && <FlowPage jobId={route.jobId} />}
       {isConnected && route.page === "jobs" && (

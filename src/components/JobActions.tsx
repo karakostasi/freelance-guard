@@ -6,7 +6,7 @@ import { useEscrowConfig } from "../hooks/useEscrowConfig";
 import { useNow } from "../hooks/useNow";
 import { useRefreshOnConfirm } from "../hooks/useRefreshOnConfirm";
 import { ensureAllowance } from "../lib/erc20";
-import { STATUS, formatDuration, type Job } from "../lib/jobs";
+import { STATUS, formatDuration, milestoneName, type Job } from "../lib/jobs";
 import { tokenOf } from "../lib/tokens";
 import styles from "../App.module.css";
 
@@ -28,6 +28,8 @@ export function JobActions({ id, index, job }: { id: string; index: number; job:
   const isFreelancer = me === job.freelancer.toLowerCase();
   const isArbiter = !!me && arbiter?.toLowerCase() === me;
   const status = STATUS[ms.status];
+  // For multi-milestone jobs the buttons name the step, e.g. "Submit draft".
+  const name = milestoneName(job, index);
   const n = BigInt(id || 0);
   const m = BigInt(index);
 
@@ -66,23 +68,23 @@ export function JobActions({ id, index, job }: { id: string; index: number; job:
 
   return (
     <>
-      {status === "Unfunded" && isClient && action("Fund this milestone", fund)}
+      {status === "Unfunded" && isClient && action(name ? `Fund ${name}` : "Fund this milestone", fund)}
       {status === "Unfunded" && !isClient && <p className={styles.muted}>Waiting for the client to fund this milestone.</p>}
       {isFreelancer && status === "Funded" && (
         <>
-          <input className={styles.input} placeholder="Deliverable link" value={deliverable} onChange={(e) => setDeliverable(e.target.value)} />
-          {action("Submit work", () => send("submitWork", [n, m, deliverable]), now > deadline ? "Deadline passed" : !deliverable ? "Add a deliverable link" : "")}
+          <input className={styles.input} placeholder={name ? `Link to your ${name}` : "Deliverable link"} value={deliverable} onChange={(e) => setDeliverable(e.target.value)} />
+          {action(name ? `Submit ${name}` : "Submit work", () => send("submitWork", [n, m, deliverable]), now > deadline ? "Deadline passed" : !deliverable ? "Add a deliverable link" : "")}
         </>
       )}
       {isFreelancer && status === "Submitted" &&
-        action("Claim payment", () => send("claimAfterTimeout", [n, m]), reviewEnd === undefined || now < reviewEnd ? `Available in ${formatDuration((reviewEnd ?? now) - now)}` : "")}
+        action(name ? `Claim ${name} payment` : "Claim payment", () => send("claimAfterTimeout", [n, m]), reviewEnd === undefined || now < reviewEnd ? `Available in ${formatDuration((reviewEnd ?? now) - now)}` : "")}
       {isClient && status === "Submitted" && (
         <>
-          {action("Approve & pay", () => send("approve", [n, m]))}
+          {action(name ? `Approve ${name} & pay` : "Approve & pay", () => send("approve", [n, m]))}
           {action("Dispute", () => send("dispute", [n, m]), reviewEnd !== undefined && now >= reviewEnd ? "Review period ended" : "")}
         </>
       )}
-      {isClient && status === "Funded" && action("Refund", () => send("refundExpired", [n, m]), now <= deadline ? `Available in ${formatDuration(deadline - now + 1n)}` : "")}
+      {isClient && status === "Funded" && action(name ? `Refund ${name}` : "Refund", () => send("refundExpired", [n, m]), now <= deadline ? `Available in ${formatDuration(deadline - now + 1n)}` : "")}
       {status === "Disputed" && isArbiter && (
         <>
           {action("Pay freelancer", () => send("resolve", [n, m, true]))}

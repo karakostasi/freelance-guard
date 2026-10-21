@@ -39,6 +39,17 @@ export const currentMilestone = (job: Job) => {
   return index === -1 ? job.milestones.length - 1 : index;
 };
 
+/**
+ * What to call a milestone in button text, e.g. "draft" for a milestone titled "Draft".
+ * Empty for a single-payment job, so its buttons keep the generic wording ("Submit work").
+ */
+export function milestoneName(job: Job, index: number) {
+  if (job.milestones.length < 2) return "";
+  const title = job.milestones[index].title.trim().toLowerCase();
+  if (!title) return `milestone ${index + 1}`;
+  return title.length > 22 ? `${title.slice(0, 21)}…` : title;
+}
+
 export type Role = { label: string; className: string; amountLabel: string };
 
 /** Which side of the job `me` is on. Anyone who is neither party is the arbiter. */

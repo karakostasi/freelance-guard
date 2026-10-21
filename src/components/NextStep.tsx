@@ -3,7 +3,7 @@ import { RotateCcw } from "lucide-react";
 import { JobActions } from "./JobActions";
 import { useEscrowConfig } from "../hooks/useEscrowConfig";
 import { useNow } from "../hooks/useNow";
-import { STATUS, STATUS_CLASS, euro, formatDuration, type Job } from "../lib/jobs";
+import { STATUS, STATUS_CLASS, euro, formatDuration, milestoneName, type Job } from "../lib/jobs";
 import type { FlowState, PayoutRoute } from "../lib/fiatFlow";
 import styles from "../App.module.css";
 import page from "./FlowPage.module.css";
@@ -31,6 +31,8 @@ export function NextStep({ id, index, job, payout }: { id: number; index: number
   const isFreelancer = me === job.freelancer.toLowerCase();
   const isArbiter = !!me && arbiter?.toLowerCase() === me;
   const status = STATUS[ms.status];
+  const name = milestoneName(job, index);
+  const the = name ? `the ${name}` : "";
 
   const deadline = ms.deadline;
   const reviewEnd = reviewPeriod !== undefined ? ms.submittedAt + reviewPeriod : undefined;
@@ -39,13 +41,13 @@ export function NextStep({ id, index, job, payout }: { id: number; index: number
   let title = "";
   let detail = "";
   if (status === "Unfunded") {
-    title = isClient ? "Your turn: fund this milestone" : "Waiting for the client to fund this milestone";
+    title = isClient ? `Your turn: fund ${the || "this milestone"}` : `Waiting for the client to fund ${the || "this milestone"}`;
     detail = "The freelancer's clock starts once it's funded.";
   } else if (status === "Funded") {
-    title = isFreelancer ? "Your turn: deliver the work" : "Waiting for the freelancer to deliver";
+    title = isFreelancer ? `Your turn: deliver ${the || "the work"}` : `Waiting for the freelancer to deliver${name ? ` ${the}` : ""}`;
     detail = now > deadline ? (isClient ? "The deadline passed. You can take a refund." : "The deadline passed.") : `Due ${left(deadline)}.`;
   } else if (status === "Submitted") {
-    title = isClient ? "Your turn: review the work" : "Waiting for the client's review";
+    title = isClient ? `Your turn: review ${the || "the work"}` : `Waiting for the client's review${name ? ` of ${the}` : ""}`;
     detail = reviewEnd === undefined ? "" : isFreelancer && now >= reviewEnd ? "The review period ended. You can claim your payment." : `Review period ${left(reviewEnd)}.`;
   } else if (status === "Disputed") {
     title = isArbiter ? "Your turn: resolve the dispute" : "Waiting for the arbiter";

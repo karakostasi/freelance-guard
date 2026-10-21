@@ -115,7 +115,7 @@ export function FlowPage({ jobId: routeJobId }: { jobId?: string }) {
       )}
 
       <div className={page.layout}>
-        <JobList jobs={mine} selectedId={id} onSelect={setSelectedId} />
+        <JobList jobs={mine} selectedId={id} onSelect={setSelectedId} emptyText={'No jobs for this account yet. Use "Fund a job" to create one.'} />
         {showingLive ? (
           <>
             <div className={page.top}>

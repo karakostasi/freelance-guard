@@ -1,4 +1,3 @@
-import { Plus } from "lucide-react";
 import { useAccount } from "wagmi";
 import { jobTitle } from "../lib/documents";
 import { STATUS_CLASS, jobSummary, jobTotal, roleOf, type Job } from "../lib/jobs";
@@ -7,24 +6,17 @@ import styles from "../App.module.css";
 import page from "./FlowPage.module.css";
 
 /** The account's jobs as a list down the side. The selected one is highlighted. */
-export function JobList({ jobs, selectedId, onSelect, onNew, creating }: { jobs: { id: number; job: Job }[]; selectedId: string; onSelect: (id: string) => void; onNew?: () => void; creating?: boolean }) {
+export function JobList({ jobs, selectedId, onSelect, emptyText }: { jobs: { id: number; job: Job }[]; selectedId: string; onSelect: (id: string) => void; emptyText: string }) {
   const { address } = useAccount();
   const me = address?.toLowerCase();
 
   return (
     <aside className={page.sidebar} aria-label="Your jobs">
       <div className={page.sidebarInner}>
-      <div className={page.sidebarTitleRow}>
-        <h3 className={page.sidebarTitle}>
-          Your jobs <span className={styles.muted}>{jobs.length}</span>
-        </h3>
-        {onNew && (
-          <button className={`${styles.chipButton} ${creating ? styles.chipActive : ""}`} onClick={onNew} aria-pressed={creating}>
-            <Plus size={12} /> New job
-          </button>
-        )}
-      </div>
-      {jobs.length === 0 && <p className={styles.muted}>{onNew ? "No jobs yet." : 'No jobs for this account yet. Use "Fund a job" to create one.'}</p>}
+      <h3 className={page.sidebarTitle}>
+        Your jobs <span className={styles.muted}>{jobs.length}</span>
+      </h3>
+      {jobs.length === 0 && <p className={styles.muted}>{emptyText}</p>}
       <ul className={page.jobList}>
         {jobs.map(({ id, job }) => {
           const { paid, label, tone } = jobSummary(job);

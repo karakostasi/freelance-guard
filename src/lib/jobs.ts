@@ -107,5 +107,6 @@ export function timeInfo(m: Milestone, reviewPeriod: bigint | undefined, now: bi
 export { deliverableUrl } from "./documents";
 
 export const txUrl = (hash: string) => `https://sepolia.basescan.org/tx/${hash}`;
+export const addressUrl = (address: string) => `https://sepolia.basescan.org/address/${address}`;
 
 export const euro = (n: number) => `€${n.toLocaleString("en-IE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;

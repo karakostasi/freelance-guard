@@ -18,7 +18,7 @@ const TxLink = ({ tx }: { tx?: TxInfo }) =>
   ) : null;
 
 /** Everything known about one milestone: amount, timeline, deliverable and how it ended. */
-export function MilestoneDetails({ job, index, trace }: { job: Job; index: number; trace: JobTrace | undefined }) {
+export function MilestoneDetails({ job, index, trace, onRetry, loading }: { job: Job; index: number; trace: JobTrace | undefined; onRetry?: () => void; loading?: boolean }) {
   const { reviewPeriod } = useEscrowConfig();
   const now = useNow();
   const ms = job.milestones[index];
@@ -62,6 +62,17 @@ export function MilestoneDetails({ job, index, trace }: { job: Job; index: numbe
           </span>
         )}
       </div>
+
+      {trace?.unavailable && (
+        <p className={page.traceNotice}>
+          Transaction links are unavailable{trace.error ? `: ${trace.error}` : ""}.{" "}
+          {onRetry && (
+            <button className={page.linkButton} onClick={onRetry} disabled={loading}>
+              {loading ? "Retrying…" : "Retry"}
+            </button>
+          )}
+        </p>
+      )}
 
       <dl className={page.facts}>
         {status === "Unfunded" ? (

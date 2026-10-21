@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useWatchContractEvent } from "wagmi";
-import { formatEther, type Abi } from "viem";
+import type { Abi } from "viem";
 import { Briefcase, Code, Plus, RotateCcw } from "lucide-react";
 import { FlowStepper, type FlowMode } from "./FlowStepper";
 import { NextStep } from "./NextStep";
@@ -14,8 +14,9 @@ import { useFlowRun } from "../hooks/useFlowRun";
 import { useJobTrace } from "../hooks/useJobTrace";
 import { useMyJobs } from "../hooks/useMyJobs";
 import { deriveJourney, simulatedPayloads } from "../lib/chainFlow";
-import { EUR_PER_ETH, FUNDING_STAGES, ROUTING_STAGE, journeyStages, type FlowState, type PayoutRoute } from "../lib/fiatFlow";
+import { FUNDING_STAGES, ROUTING_STAGE, journeyStages, type FlowState, type PayoutRoute } from "../lib/fiatFlow";
 import { STATUS_CLASS, STATUS_LABEL, euro, type Job } from "../lib/jobs";
+import { formatAmount, toEur, tokenOf } from "../lib/tokens";
 import { escrowAbi, escrowAddress } from "../wagmi";
 import styles from "../App.module.css";
 import flow from "./FlowStepper.module.css";
@@ -121,7 +122,7 @@ export function FlowPage({ jobId: routeJobId }: { jobId?: string }) {
             <select className={styles.input} value={id} onChange={(e) => setSelectedId(e.target.value)}>
               {mine.map(({ id: jid, job }) => (
                 <option key={jid} value={jid}>
-                  Job #{jid} · {formatEther(job[2])} ETH · {STATUS_LABEL[job[5]]}
+                  Job #{jid} · {formatAmount(job)} · {STATUS_LABEL[job[5]]}
                 </option>
               ))}
             </select>
@@ -136,7 +137,7 @@ export function FlowPage({ jobId: routeJobId }: { jobId?: string }) {
 function JobJourney({ id, job, mode }: { id: number; job: Job; mode: FlowMode }) {
   const status = job[5];
   const { data: trace } = useJobTrace(id, status);
-  const amountEur = Number(formatEther(job[2])) * EUR_PER_ETH;
+  const amountEur = toEur(tokenOf(job), job[2]);
   const sim = useMemo(() => simulatedPayloads(FUNDING_STAGES, { jobId: String(id), amountEur }), [id, amountEur]);
 
   const [localRoute, setRoute] = useState<PayoutRoute>("sepa");
@@ -170,7 +171,7 @@ function JobJourney({ id, job, mode }: { id: number; job: Job; mode: FlowMode })
       <div className={page.summary}>
         <strong>Job #{id}</strong>
         <span className={`${styles.badge} ${STATUS_CLASS[status]}`}>{STATUS_LABEL[status]}</span>
-        <span>{formatEther(job[2])} ETH</span>
+        <span>{formatAmount(job)}</span>
         <span className={flow.muted}>≈ {euro(amountEur)}</span>
       </div>
 

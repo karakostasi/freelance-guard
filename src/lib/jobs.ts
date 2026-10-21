@@ -1,6 +1,7 @@
 import styles from "../App.module.css";
 
-export type Job = readonly [string, string, bigint, bigint, bigint, number, string, string];
+// The last field (token) is missing on jobs from the older ETH-only contract.
+export type Job = readonly [string, string, bigint, bigint, bigint, number, string, string, string?];
 
 export const STATUS = ["None", "Funded", "Submitted", "Disputed", "Paid", "Refunded"];
 

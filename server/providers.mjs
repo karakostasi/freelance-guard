@@ -9,6 +9,15 @@ const hex = (n) => randomBytes(n).toString("hex");
 
 export const EUR_PER_ETH = 2500;
 
+/** Tokens the payment flow accepts besides ETH. Addresses are Base Sepolia test tokens; override with env. */
+export const TOKENS = {
+  eurc: {
+    symbol: "EURC",
+    decimals: 6,
+    address: process.env.EURC_ADDRESS || "0x808456652fdb597867f38412077A9182bf77359F",
+  },
+};
+
 export const aml = {
   async screen({ payer, amountEur }) {
     await wait(700);
@@ -17,9 +26,12 @@ export const aml = {
 };
 
 export const fx = {
-  async lock({ amountEur }) {
+  async lock({ amountEur, token = "eth" }) {
     await wait(500);
-    return { source: "sandbox", pair: "EUR/ETH", eurPerEth: EUR_PER_ETH, amountEur, lockedUntil: new Date(Date.now() + 15 * 60_000).toISOString() };
+    const lockedUntil = new Date(Date.now() + 15 * 60_000).toISOString();
+    return token === "eth"
+      ? { source: "sandbox", pair: "EUR/ETH", eurPerEth: EUR_PER_ETH, amountEur, lockedUntil }
+      : { source: "sandbox", pair: "EUR/EURC", rate: 1, amountEur, lockedUntil };
   },
 };
 
@@ -31,11 +43,14 @@ export const reserves = {
 };
 
 export const mint = {
-  async mint({ amountEur }) {
+  async mint({ amountEur, token = "eth" }) {
     await wait(700);
     return {
       source: "sandbox",
-      note: "No EURC is minted yet: the escrow holds ETH, so this step only records the conversion.",
+      note:
+        token === "eth"
+          ? "No token is minted: the escrow holds ETH, so this step only records the conversion."
+          : "No new EURC is minted. The escrow pulls EURC the payer already holds in their wallet.",
       amountEur,
       reference: `mint_${hex(6)}`,
     };

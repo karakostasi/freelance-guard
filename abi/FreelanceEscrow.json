@@ -99,6 +99,12 @@
           "internalType": "uint64",
           "name": "deliveryDeadline",
           "type": "uint64"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
         }
       ],
       "name": "JobCreated",
@@ -226,6 +232,45 @@
     {
       "inputs": [
         {
+          "internalType": "address",
+          "name": "freelancer",
+          "type": "address"
+        },
+        {
+          "internalType": "uint64",
+          "name": "deliveryDeadline",
+          "type": "uint64"
+        },
+        {
+          "internalType": "string",
+          "name": "description",
+          "type": "string"
+        },
+        {
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "createTokenJob",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "id",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
           "internalType": "uint256",
           "name": "id",
           "type": "uint256"
@@ -298,6 +343,11 @@
           "internalType": "string",
           "name": "deliverable",
           "type": "string"
+        },
+        {
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
         }
       ],
       "stateMutability": "view",

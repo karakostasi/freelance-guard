@@ -50,3 +50,4 @@
 .navLink:hover { border-color: #4f7cff; }
 .navActive { background: #4f7cff; border-color: #4f7cff; color: #fff; }
 .brandLink { color: inherit; text-decoration: none; }
+.amountRow { display: grid; grid-template-columns: 1fr 110px; gap: .5rem; }

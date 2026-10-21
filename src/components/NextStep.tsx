@@ -20,24 +20,28 @@ export type PayoutControls = {
 };
 
 /** Plain-language "what happens next" for a job, with the real action buttons for whoever has to act. */
-export function NextStep({ id, job, payout }: { id: number; job: Job; payout: PayoutControls }) {
+export function NextStep({ id, index, job, payout }: { id: number; index: number; job: Job; payout: PayoutControls }) {
   const { address } = useAccount();
   const { reviewPeriod, arbiter } = useEscrowConfig();
   const now = useNow();
 
   const me = address?.toLowerCase();
-  const isClient = me === job[0].toLowerCase();
-  const isFreelancer = me === job[1].toLowerCase();
+  const ms = job.milestones[index];
+  const isClient = me === job.client.toLowerCase();
+  const isFreelancer = me === job.freelancer.toLowerCase();
   const isArbiter = !!me && arbiter?.toLowerCase() === me;
-  const status = STATUS[job[5]];
+  const status = STATUS[ms.status];
 
-  const deadline = job[3];
-  const reviewEnd = reviewPeriod !== undefined ? job[4] + reviewPeriod : undefined;
+  const deadline = ms.deadline;
+  const reviewEnd = reviewPeriod !== undefined ? ms.submittedAt + reviewPeriod : undefined;
   const left = (to: bigint) => (now >= to ? "ended" : `in ${formatDuration(to - now)}`);
 
   let title = "";
   let detail = "";
-  if (status === "Funded") {
+  if (status === "Unfunded") {
+    title = isClient ? "Your turn: fund this milestone" : "Waiting for the client to fund this milestone";
+    detail = "The freelancer's clock starts once it's funded.";
+  } else if (status === "Funded") {
     title = isFreelancer ? "Your turn: deliver the work" : "Waiting for the freelancer to deliver";
     detail = now > deadline ? (isClient ? "The deadline passed. You can take a refund." : "The deadline passed.") : `Due ${left(deadline)}.`;
   } else if (status === "Submitted") {
@@ -59,7 +63,7 @@ export function NextStep({ id, job, payout }: { id: number; job: Job; payout: Pa
   }
 
   return (
-    <div className={`${page.next} ${STATUS_CLASS[job[5]]}`}>
+    <div className={`${page.next} ${STATUS_CLASS[ms.status]}`}>
       <div>
         <strong>{title}</strong>
         {detail && <p className={styles.muted}>{detail}</p>}
@@ -83,7 +87,7 @@ export function NextStep({ id, job, payout }: { id: number; job: Job; payout: Pa
             )}
           </>
         ) : (
-          <JobActions id={String(id)} job={job} />
+          <JobActions id={String(id)} index={index} job={job} />
         )}
       </div>
     </div>

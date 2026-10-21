@@ -18,6 +18,11 @@
     },
     {
       "inputs": [],
+      "name": "NoSuchMilestone",
+      "type": "error"
+    },
+    {
+      "inputs": [],
       "name": "NotAllowed",
       "type": "error"
     },
@@ -49,6 +54,12 @@
           "internalType": "uint256",
           "name": "id",
           "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "milestone",
+          "type": "uint256"
         }
       ],
       "name": "Approved",
@@ -61,6 +72,12 @@
           "indexed": true,
           "internalType": "uint256",
           "name": "id",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "milestone",
           "type": "uint256"
         }
       ],
@@ -90,21 +107,21 @@
         },
         {
           "indexed": false,
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "indexed": false,
           "internalType": "uint256",
-          "name": "amount",
+          "name": "total",
           "type": "uint256"
         },
         {
           "indexed": false,
-          "internalType": "uint64",
-          "name": "deliveryDeadline",
-          "type": "uint64"
-        },
-        {
-          "indexed": false,
-          "internalType": "address",
-          "name": "token",
-          "type": "address"
+          "internalType": "uint256",
+          "name": "milestoneCount",
+          "type": "uint256"
         }
       ],
       "name": "JobCreated",
@@ -118,6 +135,43 @@
           "internalType": "uint256",
           "name": "id",
           "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "milestone",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint64",
+          "name": "deadline",
+          "type": "uint64"
+        }
+      ],
+      "name": "MilestoneFunded",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "id",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "milestone",
+          "type": "uint256"
         }
       ],
       "name": "Refunded",
@@ -130,6 +184,12 @@
           "indexed": true,
           "internalType": "uint256",
           "name": "id",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "milestone",
           "type": "uint256"
         },
         {
@@ -152,6 +212,12 @@
           "type": "uint256"
         },
         {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "milestone",
+          "type": "uint256"
+        },
+        {
           "indexed": false,
           "internalType": "string",
           "name": "deliverable",
@@ -162,10 +228,28 @@
       "type": "event"
     },
     {
+      "inputs": [],
+      "name": "MAX_MILESTONES",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
       "inputs": [
         {
           "internalType": "uint256",
           "name": "id",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "m",
           "type": "uint256"
         }
       ],
@@ -193,6 +277,11 @@
           "internalType": "uint256",
           "name": "id",
           "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "m",
+          "type": "uint256"
         }
       ],
       "name": "claimAfterTimeout",
@@ -208,14 +297,41 @@
           "type": "address"
         },
         {
-          "internalType": "uint64",
-          "name": "deliveryDeadline",
-          "type": "uint64"
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
         },
         {
           "internalType": "string",
           "name": "description",
           "type": "string"
+        },
+        {
+          "components": [
+            {
+              "internalType": "string",
+              "name": "title",
+              "type": "string"
+            },
+            {
+              "internalType": "uint256",
+              "name": "amount",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint32",
+              "name": "duration",
+              "type": "uint32"
+            }
+          ],
+          "internalType": "struct FreelanceEscrow.MilestoneInput[]",
+          "name": "items",
+          "type": "tuple[]"
+        },
+        {
+          "internalType": "bool",
+          "name": "fundNow",
+          "type": "bool"
         }
       ],
       "name": "createJob",
@@ -232,40 +348,37 @@
     {
       "inputs": [
         {
-          "internalType": "address",
-          "name": "freelancer",
-          "type": "address"
-        },
-        {
-          "internalType": "uint64",
-          "name": "deliveryDeadline",
-          "type": "uint64"
-        },
-        {
-          "internalType": "string",
-          "name": "description",
-          "type": "string"
-        },
-        {
-          "internalType": "address",
-          "name": "token",
-          "type": "address"
+          "internalType": "uint256",
+          "name": "id",
+          "type": "uint256"
         },
         {
           "internalType": "uint256",
-          "name": "amount",
+          "name": "m",
           "type": "uint256"
         }
       ],
-      "name": "createTokenJob",
-      "outputs": [
+      "name": "dispute",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
         {
           "internalType": "uint256",
           "name": "id",
           "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "m",
+          "type": "uint256"
         }
       ],
-      "stateMutability": "nonpayable",
+      "name": "fundMilestone",
+      "outputs": [],
+      "stateMutability": "payable",
       "type": "function"
     },
     {
@@ -276,9 +389,79 @@
           "type": "uint256"
         }
       ],
-      "name": "dispute",
-      "outputs": [],
-      "stateMutability": "nonpayable",
+      "name": "getJob",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "address",
+              "name": "client",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "freelancer",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "token",
+              "type": "address"
+            },
+            {
+              "internalType": "string",
+              "name": "description",
+              "type": "string"
+            }
+          ],
+          "internalType": "struct FreelanceEscrow.Job",
+          "name": "job",
+          "type": "tuple"
+        },
+        {
+          "components": [
+            {
+              "internalType": "string",
+              "name": "title",
+              "type": "string"
+            },
+            {
+              "internalType": "uint256",
+              "name": "amount",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint32",
+              "name": "duration",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint64",
+              "name": "deadline",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint64",
+              "name": "submittedAt",
+              "type": "uint64"
+            },
+            {
+              "internalType": "enum FreelanceEscrow.Status",
+              "name": "status",
+              "type": "uint8"
+            },
+            {
+              "internalType": "string",
+              "name": "deliverable",
+              "type": "string"
+            }
+          ],
+          "internalType": "struct FreelanceEscrow.Milestone[]",
+          "name": "milestones",
+          "type": "tuple[]"
+        }
+      ],
+      "stateMutability": "view",
       "type": "function"
     },
     {
@@ -315,39 +498,14 @@
           "type": "address"
         },
         {
-          "internalType": "uint256",
-          "name": "amount",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint64",
-          "name": "deliveryDeadline",
-          "type": "uint64"
-        },
-        {
-          "internalType": "uint64",
-          "name": "submittedAt",
-          "type": "uint64"
-        },
-        {
-          "internalType": "enum FreelanceEscrow.Status",
-          "name": "status",
-          "type": "uint8"
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
         },
         {
           "internalType": "string",
           "name": "description",
           "type": "string"
-        },
-        {
-          "internalType": "string",
-          "name": "deliverable",
-          "type": "string"
-        },
-        {
-          "internalType": "address",
-          "name": "token",
-          "type": "address"
         }
       ],
       "stateMutability": "view",
@@ -361,6 +519,30 @@
           "type": "uint256"
         }
       ],
+      "name": "milestoneCount",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "id",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "m",
+          "type": "uint256"
+        }
+      ],
       "name": "refundExpired",
       "outputs": [],
       "stateMutability": "nonpayable",
@@ -371,6 +553,11 @@
         {
           "internalType": "uint256",
           "name": "id",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "m",
           "type": "uint256"
         },
         {
@@ -402,6 +589,11 @@
         {
           "internalType": "uint256",
           "name": "id",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "m",
           "type": "uint256"
         },
         {

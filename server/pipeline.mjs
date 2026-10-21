@@ -51,7 +51,42 @@ export function assetOf(run) {
 
 const ZERO = "0x0000000000000000000000000000000000000000";
 
-export function createRun({ payer, freelancer, amount, token, days, description, route }) {
+const badRequest = (msg) => Object.assign(new Error(msg), { status: 400 });
+
+const unitsFor = (kind, amount) => (kind === "eurc" ? parseUnits(amount, providers.TOKENS.eurc.decimals) : parseEther(amount));
+
+/**
+ * Validates and normalises the milestones of a payment. Without a list, the payment is one milestone.
+ * The milestone amounts must add up to the total exactly.
+ */
+export function milestonePlan({ token, amount, days, milestones }) {
+  const kind = token === "eurc" ? "eurc" : "eth";
+  const list = milestones ?? [{ title: "Payment", amount, days }];
+  if (!Array.isArray(list) || list.length < 1 || list.length > 20) throw badRequest("milestones must have 1 to 20 items");
+  let sum = 0n;
+  const plan = list.map((m, i) => {
+    let units;
+    try {
+      units = unitsFor(kind, String(m.amount));
+    } catch {
+      throw badRequest(`milestone ${i + 1}: invalid amount`);
+    }
+    if (units <= 0n) throw badRequest(`milestone ${i + 1}: amount must be greater than 0`);
+    if (!(Number(m.days) > 0)) throw badRequest(`milestone ${i + 1}: days must be greater than 0`);
+    sum += units;
+    return { title: String(m.title ?? "").trim() || `Milestone ${i + 1}`, amount: String(m.amount), days: Number(m.days) };
+  });
+  let total;
+  try {
+    total = unitsFor(kind, String(amount));
+  } catch {
+    throw badRequest("invalid total amount");
+  }
+  if (sum !== total) throw badRequest("milestone amounts must add up to the total");
+  return plan;
+}
+
+export function createRun({ payer, freelancer, amount, token, milestones, days, description, route }) {
   const id = randomUUID().slice(0, 8);
   const kind = token === "eurc" ? "eurc" : "eth";
   const run = {
@@ -63,7 +98,7 @@ export function createRun({ payer, freelancer, amount, token, days, description,
     token: kind,
     amount: String(amount),
     amountEur: Math.round(Number(amount) * (kind === "eth" ? providers.EUR_PER_ETH : 1) * 100) / 100,
-    days: Number(days),
+    milestones: milestonePlan({ token, amount, days, milestones }),
     description: description ?? "",
     route: route === "eurc" ? "eurc" : "sepa",
     status: "awaiting_bank",
@@ -108,12 +143,11 @@ export function bankReceived(run, { amountEur }) {
     });
 
     // The server builds the exact call the user's wallet has to sign.
-    const deadline = Math.floor(Date.now() / 1000) + run.days * 86400;
+    // Every milestone is funded right away: a bank transfer is a single payment for the total.
+    const items = run.milestones.map((m) => ({ title: m.title, amount: unitsFor(run.token, m.amount), duration: Math.round(m.days * 86400) }));
     const asset = assetOf(run);
     const isToken = asset.address !== ZERO;
-    const data = isToken
-      ? encodeFunctionData({ abi, functionName: "createTokenJob", args: [run.freelancer, BigInt(deadline), run.description, asset.address, asset.units] })
-      : encodeFunctionData({ abi, functionName: "createJob", args: [run.freelancer, BigInt(deadline), run.description] });
+    const data = encodeFunctionData({ abi, functionName: "createJob", args: [run.freelancer, asset.address, run.description, items, true] });
     run.tx = { to: ESCROW_ADDRESS, data, value: isToken ? "0" : asset.units.toString() };
     // A token job needs the escrow to be allowed to pull the tokens first.
     run.approval = isToken
@@ -125,11 +159,12 @@ export function bankReceived(run, { amountEur }) {
     await step(run, "escrow", "userop", async () => ({
       source: "backend",
       to: ESCROW_ADDRESS,
-      function: isToken ? "approve + createTokenJob" : "createJob",
+      function: isToken ? "approve + createJob" : "createJob",
       callData: data,
       asset: asset.symbol,
       amountUnits: asset.units.toString(),
-      deadline: new Date(deadline * 1000).toISOString(),
+      milestones: items.length,
+      milestoneTitles: run.milestones.map((m) => m.title),
     }));
 
     run.status = "awaiting_deposit";
@@ -180,7 +215,8 @@ export async function onChainEvent(log) {
         r.payer.toLowerCase() === args.client.toLowerCase() &&
         r.freelancer.toLowerCase() === args.freelancer.toLowerCase() &&
         asset.address.toLowerCase() === args.token.toLowerCase() &&
-        asset.units === args.amount
+        args.milestoneCount === BigInt(r.milestones.length) &&
+        asset.units === args.total
       );
     });
     if (!run) return;
@@ -195,15 +231,15 @@ export async function onChainEvent(log) {
     });
     await step(run, "escrow", "deposit", async () => ({
       ...tx,
-      function: run.token === "eth" ? "createJob" : "createTokenJob",
+      function: "createJob",
       jobId: run.jobId,
       asset: assetOf(run).symbol,
-      amountUnits: args.amount.toString(),
+      amountUnits: args.total.toString(),
     }));
 
     await step(run, "activated", "funded", async () => {
-      const job = await client.readContract({ address: ESCROW_ADDRESS, abi, functionName: "jobs", args: [args.id] });
-      return { source: "chain", contract: ESCROW_ADDRESS, jobId: run.jobId, status: ["NONE", "FUNDED", "SUBMITTED", "DISPUTED", "PAID", "REFUNDED"][job[5]] };
+      const [, milestones] = await client.readContract({ address: ESCROW_ADDRESS, abi, functionName: "getJob", args: [args.id] });
+      return { source: "chain", contract: ESCROW_ADDRESS, jobId: run.jobId, status: ["UNFUNDED", "FUNDED", "SUBMITTED", "DISPUTED", "PAID", "REFUNDED"][milestones[0].status] };
     });
     await step(run, "activated", "notify", async () => ({ source: "backend", ...(await notify(run, "job.funded")) }));
     await step(run, "activated", "dashboard", async () => {
@@ -217,6 +253,8 @@ export async function onChainEvent(log) {
 
   const run = byJob(args.id);
   if (!run) return;
+  // Payment runs only ever cover the first (and only) milestone of the job they created.
+  if (args.milestone !== undefined && args.milestone !== 0n) return;
 
   if (eventName === "WorkSubmitted" && run.status === "funded") {
     run.status = "work";

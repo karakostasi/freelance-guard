@@ -15,19 +15,19 @@ export type JobTrace = {
 const PAID = 4;
 const FALLBACK_WINDOW = 9000n;
 
-/** Real on-chain transactions behind a job: the funding tx and, once paid, the release tx. */
-export function useJobTrace(id: number | undefined, status: number | undefined) {
+/** Real on-chain transactions behind one milestone: its funding tx and, once paid, the release tx. */
+export function useJobTrace(id: number | undefined, milestone: number | undefined, status: number | undefined) {
   const client = usePublicClient();
   return useQuery<JobTrace>({
-    queryKey: ["jobTrace", id, status],
-    enabled: !!client && id !== undefined && !!status,
+    queryKey: ["jobTrace", id, milestone, status],
+    enabled: !!client && id !== undefined && milestone !== undefined && !!status,
     retry: false,
     queryFn: async () => {
-      if (!client || id === undefined) return {};
+      if (!client || id === undefined || milestone === undefined) return {};
       try {
         const latest = await client.getBlockNumber();
         const fromBlock = escrowDeployBlock ?? (latest > FALLBACK_WINDOW ? latest - FALLBACK_WINDOW : 0n);
-        const args = { id: BigInt(id) };
+        const args = { id: BigInt(id), milestone: BigInt(milestone) };
         const find = (eventName: string) =>
           client.getContractEvents({ address: escrowAddress, abi: escrowAbi as Abi, eventName, args, fromBlock });
 
@@ -40,7 +40,7 @@ export function useJobTrace(id: number | undefined, status: number | undefined) 
         };
 
         const [created, submitted, approved, resolved] = await Promise.all([
-          find("JobCreated"),
+          find("MilestoneFunded"),
           (status ?? 0) >= 2 ? find("WorkSubmitted") : [],
           status === PAID ? find("Approved") : [],
           status === PAID ? find("Resolved") : [],

@@ -30,13 +30,22 @@ npm run dev             # terminal 2: frontend
 
 Connect MetaMask to `http://127.0.0.1:8545` (chain id 31337).
 
-## Paying with tokens
+## Milestones and tokens
 
-`createJob` takes ETH. `createTokenJob` takes an ERC-20: the client approves the escrow for the amount, then the escrow pulls it, and pays out or refunds in the same token. The Jobs page asks for the approval and the deposit as two wallet confirmations. The payment flow offers ETH or EURC (1 EURC = EUR 1, so the euro amounts are real).
+A job has 1 to 20 milestones, each with a title, an amount and the number of days the freelancer has to deliver. Every milestone is funded, delivered, approved and paid (or refunded) on its own, so a dispute on one milestone doesn't block the others.
+
+- `createJob(freelancer, token, description, milestones, fundNow)` creates the job. With `fundNow` every milestone is funded in the same transaction (send the total as ETH, or approve the total for a token). Without it, the client funds milestones one at a time with `fundMilestone(id, index)`.
+- The freelancer's deadline for a milestone starts when that milestone is funded, not when the job is created.
+- `token` is `address(0)` for ETH, or an ERC-20 address. A job uses one token. The client approves the escrow first, and payouts and refunds are in the same token. Fee-on-transfer tokens are rejected.
+- All actions take the job id and the milestone index: `submitWork`, `approve`, `claimAfterTimeout`, `dispute`, `resolve`, `refundExpired`.
+
+One form hires a freelancer, on the Jobs page and in the "Fund a job" drawer of the Payment flow page. It has a split builder (1 payment, 50 / 50, 30 / 40 / 30, or custom shares) and a choice of how to pay:
+- **From my wallet:** an on-chain transaction, with ETH, EURC or USDC, funding everything now or milestone by milestone.
+- **Bank transfer in euros:** the backend runs the live payment flow (sandbox bank steps, then a real deposit signed in the wallet). It pays everything at once, with ETH or EURC, and the live steps follow the first milestone. Other milestones show the real on-chain data.
 
 On Base Sepolia the app uses Circle's test EURC and USDC. Get free test tokens at faucet.circle.com. Verify the addresses against Circle's docs, or override them with `VITE_EURC_ADDRESS`, `VITE_USDC_ADDRESS` and `EURC_ADDRESS`. On a local chain, `npm run deploy:local` also deploys a mock EURC and prints its address.
 
-**Upgrading an existing deployment:** the contract changed (a `token` field on jobs, a new `JobCreated` event and `createTokenJob`), so it needs a new deployment. Order matters:
+**Upgrading an existing deployment:** the contract changed (milestones, a new `createJob` signature and new events), so it needs a new deployment. Order matters:
 1. `npm run deploy:base-sepolia`, then note the new address and deploy block.
 2. Set the new address in Vercel (`VITE_ESCROW_ADDRESS`, `VITE_ESCROW_DEPLOY_BLOCK`), Render (`ESCROW_ADDRESS`) and your local `.env`.
 3. Merge and redeploy. Jobs on the old contract no longer show, and the backend ignores their payment runs.

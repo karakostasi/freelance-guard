@@ -2,12 +2,14 @@ import { useEffect } from "react";
 import { useAccount, useReadContract } from "wagmi";
 import { escrowAbi, escrowAddress } from "../wagmi";
 import { formatAmount } from "../lib/tokens";
-import { STATUS, STATUS_CLASS, STATUS_LABEL, formatDate, formatDuration, roleOf, type Job } from "../lib/jobs";
+import { STATUS, STATUS_CLASS, STATUS_LABEL, formatDate, formatDuration, jobTotal, roleOf, timeInfo, type Job, type Milestone } from "../lib/jobs";
 import { navigate } from "../hooks/useHashRoute";
 import { JobActions } from "./JobActions";
 import { useEscrowConfig } from "../hooks/useEscrowConfig";
 import { useNow } from "../hooks/useNow";
 import styles from "../App.module.css";
+
+type RawJob = readonly [Omit<Job, "milestones">, readonly Milestone[]];
 
 export function JobPanel({ id, onClose }: { id: string; onClose: () => void }) {
   const { address } = useAccount();
@@ -21,75 +23,84 @@ export function JobPanel({ id, onClose }: { id: string; onClose: () => void }) {
   const { data, isLoading, error: readError } = useReadContract({
     address: escrowAddress,
     abi: escrowAbi,
-    functionName: "jobs",
+    functionName: "getJob",
     args: [BigInt(id || 0)],
   });
-  const job = data as Job | undefined;
+  const raw = data as RawJob | undefined;
+  const job: Job | undefined = raw && { ...raw[0], milestones: [...raw[1]] };
 
   const { reviewPeriod } = useEscrowConfig();
   const now = useNow();
 
   const me = address?.toLowerCase();
-  const isClient = job && me === job[0].toLowerCase();
-  const isFreelancer = job && me === job[1].toLowerCase();
-  const status = job ? STATUS[job[5]] : "";
-
-  const deadline = job?.[3] ?? 0n;
-  const reviewEnd = job && reviewPeriod !== undefined ? job[4] + reviewPeriod : undefined;
+  const isClient = job && me === job.client.toLowerCase();
+  const isFreelancer = job && me === job.freelancer.toLowerCase();
+  const exists = !!job && job.milestones.length > 0;
 
   return (
     <div className={styles.overlay} onClick={onClose}>
-    <section className={styles.modal} onClick={(e) => e.stopPropagation()}>
-      <button className={styles.close} onClick={onClose} aria-label="Close">×</button>
-      <div className={styles.modalHeader}>
-        <h2>Job #{id}</h2>
-        {job && status !== "None" && <span className={`${styles.role} ${roleOf(job, me).className}`}>{roleOf(job, me).label}</span>}
-      </div>
-      {isLoading && <p>Loading…</p>}
-      {readError && <p className={styles.error}>{readError.message.split("\n")[0]}</p>}
-      {job && status !== "None" && (
-        <>
-          <p>
-            Client: {job[0]} {isClient && <span className={`${styles.role} ${styles.roleClient}`}>You</span>}
-          </p>
-          <p>
-            Freelancer: {job[1]} {isFreelancer && <span className={`${styles.role} ${styles.roleFreelancer}`}>You</span>}
-          </p>
-          <p>
-            {roleOf(job, me).amountLabel}: {formatAmount(job)}
-          </p>
-          <p>Status: <span className={`${styles.badge} ${STATUS_CLASS[job[5]]}`}>{STATUS_LABEL[job[5]]}</span></p>
-          <p>Spec: {job[6]}</p>
-          {status === "Funded" && (
+      <section className={styles.modal} onClick={(e) => e.stopPropagation()}>
+        <button className={styles.close} onClick={onClose} aria-label="Close">×</button>
+        <div className={styles.modalHeader}>
+          <h2>Job #{id}</h2>
+          {job && exists && <span className={`${styles.role} ${roleOf(job, me).className}`}>{roleOf(job, me).label}</span>}
+        </div>
+        {isLoading && <p>Loading…</p>}
+        {readError && <p className={styles.error}>{readError.message.split("\n")[0]}</p>}
+        {job && exists && (
+          <>
             <p>
-              Deadline: {formatDate(deadline)}{" "}
-              <span className={styles.muted}>({now > deadline ? "overdue" : `in ${formatDuration(deadline - now)}`})</span>
+              Client: {job.client} {isClient && <span className={`${styles.role} ${styles.roleClient}`}>You</span>}
             </p>
-          )}
-          {job[4] > 0n && <p>Submitted: {formatDate(job[4])}</p>}
-          {status === "Submitted" && reviewEnd !== undefined && (
             <p>
-              Review ends: {formatDate(reviewEnd)}{" "}
-              <span className={styles.muted}>({now >= reviewEnd ? "ended" : `in ${formatDuration(reviewEnd - now)}`})</span>
+              Freelancer: {job.freelancer} {isFreelancer && <span className={`${styles.role} ${styles.roleFreelancer}`}>You</span>}
             </p>
-          )}
-          {job[7] && <p>Deliverable: {job[7]}</p>}
+            <p>
+              {roleOf(job, me).amountLabel}: {formatAmount(job, jobTotal(job))} in {job.milestones.length} milestone{job.milestones.length > 1 ? "s" : ""}
+            </p>
+            {job.description && <p>Spec: {job.description}</p>}
 
-          <JobActions id={id} job={job} />
-        </>
-      )}
-      {job && status !== "None" && (
-        <button
-          className={styles.ghostButton}
-          onClick={() => {
-            onClose();
-            navigate(`/flow/${id}`);
-          }}
-        >
-          View payment flow
-        </button>
-      )}
-    </section>
+            <div className={styles.milestones}>
+              {job.milestones.map((ms, i) => {
+                const hint = timeInfo(ms, reviewPeriod, now);
+                return (
+                  <div key={i} className={`${styles.milestone} ${STATUS_CLASS[ms.status]}`}>
+                    <div className={styles.milestoneHead}>
+                      <strong>
+                        {i + 1}. {ms.title || "Milestone"}
+                      </strong>
+                      <span className={`${styles.badge} ${STATUS_CLASS[ms.status]}`}>{STATUS_LABEL[ms.status]}</span>
+                    </div>
+                    <span>{formatAmount(job, ms.amount)}</span>
+                    <span className={styles.muted}>
+                      {STATUS[ms.status] === "Unfunded"
+                        ? `${formatDuration(BigInt(ms.duration))} to deliver once funded`
+                        : STATUS[ms.status] === "Funded"
+                          ? `Deadline ${formatDate(ms.deadline)}`
+                          : ms.submittedAt > 0n
+                            ? `Submitted ${formatDate(ms.submittedAt)}`
+                            : ""}
+                      {hint && STATUS[ms.status] !== "Unfunded" ? ` · ${hint}` : ""}
+                    </span>
+                    {ms.deliverable && <span className={styles.muted}>Deliverable: {ms.deliverable}</span>}
+                    <JobActions id={id} index={i} job={job} />
+                  </div>
+                );
+              })}
+            </div>
+
+            <button
+              className={styles.ghostButton}
+              onClick={() => {
+                onClose();
+                navigate(`/flow/${id}`);
+              }}
+            >
+              View payment flow
+            </button>
+          </>
+        )}
+      </section>
     </div>
   );
 }

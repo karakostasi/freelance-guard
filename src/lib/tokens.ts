@@ -42,4 +42,6 @@ export const formatUnitsOf = (token: Token, units: bigint) => `${formatUnits(uni
 /** An amount in the job's token, e.g. "500 EURC". */
 export const formatAmount = (job: Job, units: bigint) => formatUnitsOf(tokenOf(job), units);
 
+export { formatBalance } from "./format";
+
 export const toEur = (token: Token, units: bigint) => Number(formatUnits(units, token.decimals)) * token.eurPer;

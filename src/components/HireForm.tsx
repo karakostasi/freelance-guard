@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useAccount, useReadContract, useWriteContract } from "wagmi";
+import { useAccount, useBalance, useReadContract, useWriteContract } from "wagmi";
 import { erc20Abi, formatUnits, isAddress, parseUnits, zeroAddress } from "viem";
 import { Check, Plus, X } from "lucide-react";
 import { escrowAbi, escrowAddress } from "../wagmi";
@@ -12,7 +12,7 @@ import { uploadDoc, uploadFile } from "../lib/files";
 import { FileDrop } from "./FileDrop";
 import type { PayoutRoute } from "../lib/fiatFlow";
 import { euro } from "../lib/jobs";
-import { ETH, TOKENS, formatUnitsOf, toEur } from "../lib/tokens";
+import { ETH, TOKENS, formatBalance, formatUnitsOf, toEur } from "../lib/tokens";
 import styles from "../App.module.css";
 
 type Row = { title: string; percent: string; days: string };
@@ -90,13 +90,17 @@ export function HireForm({ variant = "page", onBank, onCreated }: { variant?: "p
   // Clear the form only once the job exists on-chain, so a rejected tx keeps the input.
   const confirming = useRefreshOnConfirm(txHash, reset);
 
-  const { data: balance } = useReadContract({
+  const { data: native } = useBalance({ address });
+  const { data: tokenBalance } = useReadContract({
     address: token.address,
     abi: erc20Abi,
     functionName: "balanceOf",
     args: address ? [address] : undefined,
     query: { enabled: !!token.address && !!address },
   });
+
+  // What the wallet holds of the chosen asset. Either way the deposit itself is made from this wallet.
+  const balance = token.address ? tokenBalance : native?.value;
 
   const totalUnits = /^\d*\.?\d+$/.test(total) && Number(total) > 0 ? parseUnits(total, token.decimals) : 0n;
   const percents = rows.map((r) => (/^\d+$/.test(r.percent) ? BigInt(r.percent) : 0n));
@@ -106,8 +110,8 @@ export function HireForm({ variant = "page", onBank, onCreated }: { variant?: "p
   if (rows.length > 0) amounts[rows.length - 1] = totalUnits - amounts.slice(0, -1).reduce((a, b) => a + b, 0n);
 
   const rowsValid = rows.length > 0 && percentSum === 100n && percents.every((p) => p > 0n) && rows.every((r) => Number(r.days) > 0 && r.title.trim());
-  // Paying from the wallet needs the tokens at hand, a bank transfer doesn't.
-  const short = !bank && fundNow && !!token.address && balance !== undefined && totalUnits > balance;
+  // The deposit is signed in this wallet for both ways of paying, so it needs the funds at hand.
+  const short = fundNow && balance !== undefined && totalUnits > balance;
   const valid = isAddress(freelancer) && title.trim().length > 0 && totalUnits > 0n && rowsValid && !short;
   const busy = !!working || confirming;
   // The split matches a preset until the rows are edited, then it is a custom split.
@@ -193,10 +197,10 @@ export function HireForm({ variant = "page", onBank, onCreated }: { variant?: "p
             {token.symbol === "ETH" && " (demo rate)"}
           </span>
         )}
-        {!bank && token.address && balance !== undefined && (
+        {balance !== undefined && (
           <span className={styles.muted}>
-            Your balance: {formatUnits(balance, token.decimals)} {token.symbol}
-            {balance === 0n && " · get free test tokens at faucet.circle.com"}
+            Your balance: {formatBalance(balance, token.decimals)} {token.symbol}
+            {balance === 0n && (token.address ? " · get free test tokens at faucet.circle.com" : " · you need some Base Sepolia ETH, from any Base Sepolia faucet")}
           </span>
         )}
         {short && <span className={styles.error}>Not enough {token.symbol} in this wallet for the full amount.</span>}

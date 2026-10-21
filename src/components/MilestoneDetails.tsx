@@ -1,4 +1,4 @@
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, LoaderCircle } from "lucide-react";
 import { STATUS, STATUS_CLASS, STATUS_LABEL, euro, formatDate, formatDuration, jobTotal, txUrl, type Job } from "../lib/jobs";
 import { formatAmount, formatUnitsOf, tokenOf, toEur } from "../lib/tokens";
 import type { JobTrace, TxInfo } from "../hooks/useJobTrace";
@@ -11,12 +11,21 @@ import page from "./FlowPage.module.css";
 // Tiny amounts would round to "€0.00", which looks like a bug.
 const approxEuro = (n: number) => (n > 0 && n < 0.01 ? "< €0.01" : `≈ ${euro(n)}`);
 
-const TxLink = ({ tx }: { tx?: TxInfo }) =>
-  tx ? (
-    <a className={page.txLink} href={txUrl(tx.txHash)} target="_blank" rel="noreferrer noopener">
-      transaction <ExternalLink size={12} />
-    </a>
+/** The link to a transaction, or a small spinner while it is still being looked up on the blockchain. */
+const TxLink = ({ tx, pending }: { tx?: TxInfo; pending?: boolean }) => {
+  if (tx) {
+    return (
+      <a className={page.txLink} href={txUrl(tx.txHash)} target="_blank" rel="noreferrer noopener">
+        transaction <ExternalLink size={12} />
+      </a>
+    );
+  }
+  return pending ? (
+    <span className={page.txPending} title="Looking this up on the blockchain. It can take a few seconds.">
+      <LoaderCircle size={12} className={page.spin} /> finding transaction…
+    </span>
   ) : null;
+};
 
 /** Everything known about one milestone: amount, timeline, deliverable and how it ended. */
 export function MilestoneDetails({ job, index, trace, onRetry, loading, compact }: { job: Job; index: number; trace: JobTrace | undefined; onRetry?: () => void; loading?: boolean; compact?: boolean }) {
@@ -65,6 +74,12 @@ export function MilestoneDetails({ job, index, trace, onRetry, loading, compact 
         </div>
       )}
 
+      {loading && !trace && (
+        <p className={page.traceInfo} role="status">
+          <LoaderCircle size={14} className={page.spin} /> Looking up this milestone&apos;s transactions on the blockchain. This can take a few seconds.
+        </p>
+      )}
+
       {!!trace?.issues?.length && (
         <p className={page.traceNotice}>
           Some transaction links couldn&apos;t be loaded ({trace.issues.join("; ")}).{" "}
@@ -86,7 +101,7 @@ export function MilestoneDetails({ job, index, trace, onRetry, loading, compact 
           <>
             <dt>Funded</dt>
             <dd>
-              {formatDate(fundedAt)} <TxLink tx={trace?.created} />
+              {formatDate(fundedAt)} <TxLink tx={trace?.created} pending={loading && !trace?.created} />
             </dd>
             <dt>Deadline</dt>
             <dd>
@@ -102,7 +117,7 @@ export function MilestoneDetails({ job, index, trace, onRetry, loading, compact 
             <dd>
               {ms.submittedAt > 0n ? (
                 <>
-                  {formatDate(ms.submittedAt)} <TxLink tx={trace?.submitted} />
+                  {formatDate(ms.submittedAt)} <TxLink tx={trace?.submitted} pending={loading && !trace?.submitted} />
                 </>
               ) : (
                 <span className={page.factLabel}>Not delivered yet</span>
@@ -138,7 +153,7 @@ export function MilestoneDetails({ job, index, trace, onRetry, loading, compact 
             <dt>{status === "Paid" ? "Paid" : "Refunded"}</dt>
             <dd>
               {outcome}
-              {outcomeTx && <span className={page.factLabel}> · {formatDate(BigInt(outcomeTx.blockTime))}</span>} <TxLink tx={outcomeTx} />
+              {outcomeTx && <span className={page.factLabel}> · {formatDate(BigInt(outcomeTx.blockTime))}</span>} <TxLink tx={outcomeTx} pending={loading && !outcomeTx} />
             </dd>
           </>
         )}

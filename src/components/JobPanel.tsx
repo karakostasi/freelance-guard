@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useAccount, useReadContract } from "wagmi";
 import { escrowAbi, escrowAddress } from "../wagmi";
 import { formatAmount } from "../lib/tokens";
-import { STATUS, STATUS_CLASS, STATUS_LABEL, formatDate, formatDuration, jobTotal, roleOf, timeInfo, type Job, type Milestone } from "../lib/jobs";
+import { STATUS, STATUS_CLASS, STATUS_LABEL, deliverableUrl, formatDate, formatDuration, jobTotal, roleOf, timeInfo, type Job, type Milestone } from "../lib/jobs";
 import { navigate } from "../hooks/useHashRoute";
 import { JobActions } from "./JobActions";
 import { useEscrowConfig } from "../hooks/useEscrowConfig";
@@ -82,7 +82,18 @@ export function JobPanel({ id, onClose }: { id: string; onClose: () => void }) {
                             : ""}
                       {hint && STATUS[ms.status] !== "Unfunded" ? ` · ${hint}` : ""}
                     </span>
-                    {ms.deliverable && <span className={styles.muted}>Deliverable: {ms.deliverable}</span>}
+                    {ms.deliverable && (
+                      <span className={styles.muted}>
+                        Deliverable:{" "}
+                        {deliverableUrl(ms.deliverable) ? (
+                          <a href={deliverableUrl(ms.deliverable)!} target="_blank" rel="noreferrer noopener">
+                            {ms.deliverable}
+                          </a>
+                        ) : (
+                          ms.deliverable
+                        )}
+                      </span>
+                    )}
                     <JobActions id={id} index={i} job={job} />
                   </div>
                 );

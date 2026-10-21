@@ -89,4 +89,17 @@ export function timeInfo(m: Milestone, reviewPeriod: bigint | undefined, now: bi
   return "";
 }
 
+/**
+ * A link for a deliverable, or null when it isn't a web or IPFS address. The deliverable is text the
+ * freelancer typed, so only http(s) and ipfs links are ever turned into a clickable href.
+ */
+export function deliverableUrl(value: string): string | null {
+  const text = value.trim();
+  if (/^https?:\/\/\S+$/i.test(text)) return text;
+  const ipfs = text.match(/^ipfs:\/\/(?:ipfs\/)?(\S+)$/i);
+  return ipfs ? `https://ipfs.io/ipfs/${ipfs[1]}` : null;
+}
+
+export const txUrl = (hash: string) => `https://sepolia.basescan.org/tx/${hash}`;
+
 export const euro = (n: number) => `€${n.toLocaleString("en-IE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;

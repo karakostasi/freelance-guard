@@ -3,16 +3,19 @@ import { usePublicClient } from "wagmi";
 import type { Abi } from "viem";
 import { escrowAbi, escrowAddress, escrowDeployBlock } from "../wagmi";
 
-export type TxInfo = { txHash: `0x${string}`; blockNumber: bigint; gasUsed: bigint; blockTime: number };
+export type TxInfo = { txHash: `0x${string}`; blockNumber: bigint; gasUsed: bigint; blockTime: number; /** Who sent the transaction. */ from: string };
 export type JobTrace = {
   created?: TxInfo;
   submitted?: TxInfo;
   released?: TxInfo & { kind: "Approved" | "Resolved" };
+  /** For a refunded milestone: the refund, and whether the arbiter decided it. */
+  refunded?: TxInfo & { viaArbiter: boolean };
   /** Event lookup failed (usually an RPC log-range limit). */
   unavailable?: boolean;
 };
 
 const PAID = 4;
+const REFUNDED = 5;
 const FALLBACK_WINDOW = 9000n;
 
 /** Real on-chain transactions behind one milestone: its funding tx and, once paid, the release tx. */
@@ -36,21 +39,23 @@ export function useJobTrace(id: number | undefined, milestone: number | undefine
             client.getTransactionReceipt({ hash: log.transactionHash }),
             client.getBlock({ blockNumber: log.blockNumber }),
           ]);
-          return { txHash: log.transactionHash, blockNumber: log.blockNumber, gasUsed: receipt.gasUsed, blockTime: Number(block.timestamp) };
+          return { txHash: log.transactionHash, blockNumber: log.blockNumber, gasUsed: receipt.gasUsed, blockTime: Number(block.timestamp), from: receipt.from };
         };
 
-        const [created, submitted, approved, resolved] = await Promise.all([
+        const [created, submitted, approved, resolved, refunded] = await Promise.all([
           find("MilestoneFunded"),
           (status ?? 0) >= 2 ? find("WorkSubmitted") : [],
           status === PAID ? find("Approved") : [],
-          status === PAID ? find("Resolved") : [],
+          status === PAID || status === REFUNDED ? find("Resolved") : [],
+          status === REFUNDED ? find("Refunded") : [],
         ]);
 
         const trace: JobTrace = {};
         if (created[0]) trace.created = await toInfo(created[0]);
         if (submitted[0]) trace.submitted = await toInfo(submitted[0]);
-        const release = approved[0] ?? resolved[0];
+        const release = approved[0] ?? (status === PAID ? resolved[0] : undefined);
         if (release) trace.released = { ...(await toInfo(release)), kind: approved[0] ? "Approved" : "Resolved" };
+        if (status === REFUNDED && refunded[0]) trace.refunded = { ...(await toInfo(refunded[0])), viaArbiter: !!resolved[0] };
         if (!trace.created) trace.unavailable = true;
         return trace;
       } catch {

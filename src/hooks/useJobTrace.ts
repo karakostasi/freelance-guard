@@ -11,8 +11,9 @@ export type JobTrace = {
   released?: TxInfo & { kind: "Approved" | "Resolved" };
   /** For a refunded milestone: the refund, and whether the arbiter decided it. */
   refunded?: TxInfo & { viaArbiter: boolean };
-  /** Event lookup failed (usually an RPC log-range limit). */
+  /** The lookup failed (usually the RPC refusing or rate-limiting requests), with the reason. */
   unavailable?: boolean;
+  error?: string;
 };
 
 const PAID = 4;
@@ -31,15 +32,28 @@ async function blockAtTimestamp(client: PublicClient, timestamp: number): Promis
   const cached = blockCache.get(key);
   if (cached !== undefined) return cached;
 
+  const timeAt = async (blockNumber: bigint) => Number((await client.getBlock({ blockNumber })).timestamp);
   const latest = await client.getBlock();
-  // Blocks are at least a second apart, so the target is at most this many blocks back. Widen if not.
-  let span = BigInt(Math.max(Number(latest.timestamp) - timestamp, 0)) + 10n;
-  let lo = latest.number > span ? latest.number - span : 0n;
-  while (lo > 0n && Number((await client.getBlock({ blockNumber: lo })).timestamp) >= timestamp) {
-    span *= 2n;
-    lo = latest.number > span ? latest.number - span : 0n;
+  const elapsed = Math.max(Number(latest.timestamp) - timestamp, 0);
+
+  // Estimate where the block is from the chain's recent block time, then bracket it and bisect. That is
+  // about ten requests instead of one per halving of the whole chain, which matters on a rate-limited RPC.
+  const sample = latest.number > 1000n ? 1000n : latest.number;
+  const blockTime = sample > 0n ? Math.max((Number(latest.timestamp) - (await timeAt(latest.number - sample))) / Number(sample), 0.1) : 1;
+  const estimate = latest.number - BigInt(Math.round(elapsed / blockTime));
+  const clamp = (n: bigint) => (n < 0n ? 0n : n > latest.number ? latest.number : n);
+
+  let width = 64n;
+  let lo = clamp(estimate - width);
+  while (lo > 0n && (await timeAt(lo)) >= timestamp) {
+    width *= 4n;
+    lo = clamp(estimate - width);
   }
-  let hi = latest.number;
+  let hi = clamp(estimate + width);
+  while (hi < latest.number && (await timeAt(hi)) < timestamp) {
+    width *= 4n;
+    hi = clamp(estimate + width);
+  }
   while (lo < hi) {
     const mid = (lo + hi) / 2n;
     if (Number((await client.getBlock({ blockNumber: mid })).timestamp) < timestamp) lo = mid + 1n;
@@ -114,8 +128,9 @@ export function useJobTrace(id: number | undefined, milestone: number | undefine
 
         if (!trace.created) trace.unavailable = true;
         return trace;
-      } catch {
-        return { unavailable: true };
+      } catch (e) {
+        const error = e as { shortMessage?: string; message?: string };
+        return { unavailable: true, error: (error.shortMessage ?? error.message ?? "unknown error").split("\n")[0] };
       }
     },
   });

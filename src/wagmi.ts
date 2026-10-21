@@ -15,7 +15,8 @@ export const config = createConfig({
   chains: [baseSepolia, hardhat, sepolia],
   connectors: [injected({ target: "metaMask" })],
   transports: {
-    [baseSepolia.id]: http(),
+    // The public RPC is shared and rate-limited. Set VITE_BASE_SEPOLIA_RPC_URL to your own (Alchemy, Infura, QuickNode...).
+    [baseSepolia.id]: http((import.meta.env.VITE_BASE_SEPOLIA_RPC_URL as string | undefined) || undefined),
     [hardhat.id]: http(),
     [sepolia.id]: http(),
   },

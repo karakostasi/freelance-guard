@@ -43,3 +43,6 @@
 .txLink { display: inline-flex; align-items: center; gap: .25rem; color: #8fa8ff; text-decoration: none; }
 .txLink:hover { text-decoration: underline; }
 @media (max-width: 560px) { .facts { grid-template-columns: 1fr; gap: 0; } .facts dd { margin-bottom: .5rem; } }
+.traceNotice { margin: 0; padding: .5rem .75rem; border-radius: 8px; background: rgba(245, 185, 66, .1); color: #f5b942; font-size: .85rem; overflow-wrap: anywhere; }
+.linkButton { border: 0; background: none; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; padding: 0; }
+.linkButton:disabled { opacity: .6; cursor: default; }

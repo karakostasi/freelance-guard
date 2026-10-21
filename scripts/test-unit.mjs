@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { privateKeyToAccount } from "viem/accounts";
 import { buildDescription, deliverableUrl, formatBytes, jobTitle, parseDeliverable, parseDescription, parseDoc, serializeDoc, signInMessage as frontendMessage } from "../src/lib/documents.ts";
+import { formatBalance } from "../src/lib/format.ts";
 import { SESSION_MS, createSession, signInMessage, verifyToken } from "../server/auth.mjs";
 import { fsBlobStore, pgBlobStore } from "../server/blobs.mjs";
 
@@ -56,6 +57,17 @@ check(parseDoc(JSON.stringify({ ...doc, files: Array(21).fill(doc.files[0]) })) 
 check(parseDoc(JSON.stringify({ ...doc, text: "x".repeat(20_001) })) === null, "an oversized text is rejected");
 check(parseDoc(JSON.stringify({ ...doc, files: [{ ...doc.files[0], size: -1 }] })) === null, "a negative size is rejected");
 check(formatBytes(512) === "512 B" && formatBytes(2048) === "2.0 KB" && formatBytes(5 * 1024 * 1024) === "5.0 MB", "file sizes are readable");
+
+console.log("\nBalances");
+const ONE_ETH = 10n ** 18n;
+check(formatBalance(0n, 18) === "0" && formatBalance(5n * ONE_ETH, 18) === "5", "zero and whole amounts");
+check(formatBalance(12300000000000000n, 18) === "0.0123", "ETH is trimmed, not shown with 18 digits");
+check(formatBalance(1234567890123456789n, 18) === "1.234567", "long balances stop at 6 decimals");
+check(formatBalance(1_500_000n, 6) === "1.5" && formatBalance(500_000_000n, 6) === "500", "6-decimal tokens (EURC, USDC)");
+check(formatBalance(1n, 6) === "0.000001" && formatBalance(5n, 6) === "0.000005", "the smallest token unit is still shown exactly");
+check(formatBalance(1n, 18) === "< 0.000001" && formatBalance(999_999_999_999n, 18) === "< 0.000001", "ETH dust below 6 decimals is shown as less than 0.000001, not 0");
+check(formatBalance(42n, 0) === "42" && formatBalance(0n, 0) === "0", "a token with no decimals");
+check(formatBalance(1_000_001n, 6) === "1.000001" && formatBalance(10_000_000n, 6) === "10", "no stray zeros or lost digits");
 
 console.log("\nSign-in sessions");
 const account = privateKeyToAccount("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80");

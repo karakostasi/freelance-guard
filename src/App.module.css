@@ -40,7 +40,7 @@
 .navLink:hover { border-color: #4f7cff; }
 .navActive { background: var(--gradient); border-color: transparent; color: #fff; }
 .brandLink { color: inherit; text-decoration: none; }
-.amountRow { display: grid; grid-template-columns: 1fr 110px; gap: .5rem; }
+.amountRow { display: grid; grid-template-columns: 1fr 130px; gap: .5rem; }
 .unfunded { --c: #8a8fa0; }
 
 .milestones { display: flex; flex-direction: column; gap: .75rem; margin-top: .25rem; }
@@ -115,3 +115,15 @@ a.chipButton { text-decoration: none; }
 .partyText { display: flex; align-items: center; gap: .4rem; flex: 1; min-width: 0; flex-wrap: wrap; }
 .partyAddress { font-family: ui-monospace, monospace; font-weight: 600; }
 a.iconButton { color: inherit; text-decoration: none; }
+
+/* dropdowns: our own arrow, with space on the right and centred vertically */
+select.input {
+  appearance: none;
+  padding-right: 2.5rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none' stroke='%239aa3b8' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 1rem center;
+  background-size: 12px 8px;
+  cursor: pointer;
+}
+select.input:disabled { cursor: not-allowed; }

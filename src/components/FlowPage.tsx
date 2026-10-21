@@ -7,7 +7,7 @@ import { FlowStepper, type FlowMode } from "./FlowStepper";
 import { NextStep } from "./NextStep";
 import { PayDrawer } from "./PayDrawer";
 import { useBackendFunding } from "../hooks/useBackendFunding";
-import { useBackendOnline } from "../hooks/useBackend";
+import { useBackendStatus } from "../hooks/useBackend";
 import { useBackendRun } from "../hooks/useBackendRun";
 import { useFiatFunding, type FundingForm } from "../hooks/useFiatFunding";
 import { useFlowRun } from "../hooks/useFlowRun";
@@ -39,7 +39,7 @@ export function FlowPage({ jobId: routeJobId }: { jobId?: string }) {
   useLiveEscrowEvents();
 
   // Once a new payment lands on-chain, hand over from the live run to that job's own journey.
-  const backendOnline = useBackendOnline();
+  const { online: backendOnline, url: backendUrl, error: backendError } = useBackendStatus();
   const [liveMode, setLiveMode] = useState<"backend" | "local">("local");
   const resetLive = useRef<() => void>(() => {});
   const onFunded = (newId: number) => {
@@ -72,6 +72,12 @@ export function FlowPage({ jobId: routeJobId }: { jobId?: string }) {
       <div className={flow.header}>
         <h2 className={page.title}>Payment flow</h2>
         <span className={backendOnline ? flow.pillLive : flow.demo}>{backendOnline ? "Live backend" : "Offline demo"}</span>
+        {!backendOnline && (
+          <span className={flow.muted}>
+            Can&apos;t reach {backendUrl}
+            {backendError ? ` (${backendError})` : ""}
+          </span>
+        )}
         <div className={flow.toggle} role="group" aria-label="View mode">
           <button className={mode === "simple" ? flow.toggleOn : ""} onClick={() => setMode("simple")}>
             <Briefcase size={14} /> Business

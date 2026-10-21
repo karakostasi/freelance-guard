@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Check, ChevronDown, Circle, CircleX, Clock, Coins, Landmark, LoaderCircle, Route, Send, ShieldCheck, Timer, type LucideIcon } from "lucide-react";
+import { Check, ChevronDown, Circle, CircleX, Clock, Code, Coins, Eye, Landmark, LoaderCircle, Route, Send, ShieldCheck, Timer, type LucideIcon } from "lucide-react";
 import { stepKey, type FlowState, type Stage } from "../lib/fiatFlow";
 import styles from "./FlowStepper.module.css";
 
@@ -33,7 +33,7 @@ function useElapsed(state: FlowState) {
  * Horizontal journey: stage boxes in one row grouped by phase. Only the active stage shows its
  * sub-steps (all of them in Detailed mode); any stage can be expanded or collapsed by clicking it.
  */
-export function FlowStepper({ stages, state, mode, timer = false }: { stages: Stage[]; state: FlowState; mode: FlowMode; timer?: boolean }) {
+export function FlowStepper({ stages, state, mode, onModeChange, timer = false }: { stages: Stage[]; state: FlowState; mode: FlowMode; onModeChange?: (mode: FlowMode) => void; timer?: boolean }) {
   const elapsed = useElapsed(state);
   const [toggled, setToggled] = useState<Record<number, boolean>>({});
   const total = stages.reduce((n, s) => n + s.steps.length, 0);
@@ -48,6 +48,24 @@ export function FlowStepper({ stages, state, mode, timer = false }: { stages: St
 
   return (
     <div>
+      {onModeChange && (
+        <div className={styles.viewBar}>
+          <div>
+            <h3 className={styles.viewTitle}>Payment steps</h3>
+            <p className={styles.viewHint}>
+              {mode === "simple" ? "Simple: plain-language steps, one stage open at a time." : "Detailed: technical step names, transaction hashes and the raw data behind every step."}
+            </p>
+          </div>
+          <div className={styles.toggle} role="group" aria-label="How much detail to show">
+            <button className={mode === "simple" ? styles.toggleOn : ""} onClick={() => onModeChange("simple")} aria-pressed={mode === "simple"}>
+              <Eye size={14} /> Simple
+            </button>
+            <button className={mode === "detailed" ? styles.toggleOn : ""} onClick={() => onModeChange("detailed")} aria-pressed={mode === "detailed"}>
+              <Code size={14} /> Detailed
+            </button>
+          </div>
+        </div>
+      )}
       <div className={styles.meta}>
         <span className={styles.legend}>
           <span className={`${styles.tag} ${styles.tagReal}`}>On-chain</span>

@@ -23,10 +23,7 @@
 .badge.unfunded, .badge.funded, .badge.submitted, .badge.disputed, .badge.paid, .badge.refunded { color: var(--c); background: color-mix(in srgb, var(--c) 18%, transparent); border: 1px solid var(--c); }
 .card.unfunded, .card.funded, .card.submitted, .card.disputed, .card.paid, .card.refunded { border-left: 4px solid var(--c); }
 .action { display: flex; flex-direction: column; gap: .25rem; align-items: flex-start; }
-.walletBar { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .5rem .75rem; border: 1px solid #333; border-radius: 12px; background: #181b22; }
-.walletInfo { display: flex; align-items: center; gap: .75rem; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .avatar { width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0; }
-.walletText { display: flex; flex-direction: column; }
 .walletAddress { font-weight: 600; font-family: ui-monospace, monospace; }
 .ghostButton { padding: .4rem .9rem; border-radius: 999px; border: 1px solid #444; background: none; color: inherit; cursor: pointer; }
 .ghostButton:hover { border-color: #ff5c5c; color: #ff5c5c; }
@@ -81,3 +78,15 @@
 .chipActive { border-color: #4f7cff; background: rgba(79, 124, 255, .16); color: #b4c6ff; cursor: default; }
 .optionCardDisabled { opacity: .5; cursor: not-allowed; }
 .drawerForm { display: flex; flex-direction: column; }
+.headerRight { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.profileButton { width: 38px; height: 38px; padding: 0; border-radius: 50%; border: 2px solid #2a2f3b; cursor: pointer; transition: border-color .15s; }
+.profileButton:hover, .profileButton[aria-expanded="true"] { border-color: #4f7cff; }
+.menuBackdrop { position: fixed; inset: 0; z-index: 30; }
+.menu { position: fixed; z-index: 31; min-width: 240px; display: flex; flex-direction: column; gap: .15rem; padding: .5rem; border-radius: 12px; border: 1px solid #333; background: #181b22; box-shadow: 0 12px 32px rgba(0, 0, 0, .5); }
+.menuAccount { display: flex; align-items: center; gap: .75rem; padding: .5rem .5rem .75rem; margin-bottom: .25rem; border-bottom: 1px solid #2a2f3b; }
+.menuText { display: flex; flex-direction: column; }
+.menuItem { display: flex; align-items: center; gap: .6rem; padding: .55rem .6rem; border: 0; border-radius: 8px; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.menuItem:hover { background: #232733; }
+.menuDanger:hover { color: #ff6b6b; }
+.connectPrompt { display: flex; flex-direction: column; align-items: flex-start; gap: .75rem; padding: 2rem 0; }
+.connectPrompt p { margin: 0; }

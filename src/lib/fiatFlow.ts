@@ -18,7 +18,7 @@ export type SubStep = {
   durationMs: number;
   /** True when the step is backed by the real escrow contract rather than simulated. */
   real?: boolean;
-  /** Raw data shown in "Auditor / Dev Mode". */
+  /** Raw data shown in the Detailed view. */
   payload: (ctx: FlowContext) => Record<string, unknown>;
 };
 

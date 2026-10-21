@@ -3,7 +3,7 @@ import { Check, ChevronDown, Circle, CircleX, Clock, Coins, Landmark, LoaderCirc
 import { stepKey, type FlowState, type Stage } from "../lib/fiatFlow";
 import styles from "./FlowStepper.module.css";
 
-export type FlowMode = "simple" | "auditor";
+export type FlowMode = "simple" | "detailed";
 
 const ICONS: Record<Stage["icon"], LucideIcon> = {
   landmark: Landmark,
@@ -31,7 +31,7 @@ function useElapsed(state: FlowState) {
 
 /**
  * Horizontal journey: stage boxes in one row grouped by phase. Only the active stage shows its
- * sub-steps (all of them in Auditor mode); any stage can be expanded or collapsed by clicking it.
+ * sub-steps (all of them in Detailed mode); any stage can be expanded or collapsed by clicking it.
  */
 export function FlowStepper({ stages, state, mode, timer = false }: { stages: Stage[]; state: FlowState; mode: FlowMode; timer?: boolean }) {
   const elapsed = useElapsed(state);
@@ -76,7 +76,7 @@ export function FlowStepper({ stages, state, mode, timer = false }: { stages: St
                   const stageDone = doneCount === stage.steps.length;
                   const active = state.current?.stage === si && state.status !== "done";
                   const failed = active && state.status === "error";
-                  const expanded = toggled[si] ?? (active || mode === "auditor");
+                  const expanded = toggled[si] ?? (active || mode === "detailed");
                   const Icon = ICONS[stage.icon];
                   const status = stageDone ? "Done" : active ? (state.waiting ? "Up next" : "In progress") : doneCount > 0 ? `${doneCount}/${stage.steps.length}` : "Locked";
                   return (
@@ -113,7 +113,7 @@ export function FlowStepper({ stages, state, mode, timer = false }: { stages: St
                                 <span className={styles.stepBody}>
                                   <span>{mode === "simple" ? step.simple : step.label}</span>
                                   <StepTag real={!!step.real} source={done?.payload.source as string | undefined} txHash={done?.payload.txHash as string | undefined} />
-                                  {mode === "auditor" && done && <AuditDetails payload={done.payload} />}
+                                  {mode === "detailed" && done && <AuditDetails payload={done.payload} />}
                                 </span>
                               </li>
                             );

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useWatchContractEvent } from "wagmi";
 import type { Abi } from "viem";
-import { Briefcase, Code, Plus, RotateCcw } from "lucide-react";
+import { Code, Eye, Plus, RotateCcw } from "lucide-react";
 import { FlowStepper, type FlowMode } from "./FlowStepper";
 import { NextStep } from "./NextStep";
 import { PayDrawer } from "./PayDrawer";
@@ -91,15 +91,18 @@ export function FlowPage({ jobId: routeJobId }: { jobId?: string }) {
             {backendError ? ` (${backendError})` : ""}
           </span>
         )}
-        <div className={flow.toggle} role="group" aria-label="View mode">
+        <div className={flow.toggle} role="group" aria-label="View mode" title={mode === "simple" ? "Plain-language steps" : "Technical names, transaction hashes and raw data"}>
           <button className={mode === "simple" ? flow.toggleOn : ""} onClick={() => setMode("simple")}>
-            <Briefcase size={14} /> Business
+            <Eye size={14} /> Simple
           </button>
-          <button className={mode === "auditor" ? flow.toggleOn : ""} onClick={() => setMode("auditor")}>
-            <Code size={14} /> Auditor
+          <button className={mode === "detailed" ? flow.toggleOn : ""} onClick={() => setMode("detailed")}>
+            <Code size={14} /> Detailed
           </button>
         </div>
       </div>
+      <p className={`${flow.muted} ${page.viewHint}`}>
+        {mode === "simple" ? "Simple: plain-language steps, one stage open at a time." : "Detailed: technical step names, transaction hashes and the raw data behind every step."}
+      </p>
 
       <button className={page.fab} disabled={live.running} onClick={() => setDrawerOpen(true)}>
         <Plus size={18} /> Fund a job

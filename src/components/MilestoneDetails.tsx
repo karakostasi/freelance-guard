@@ -63,9 +63,9 @@ export function MilestoneDetails({ job, index, trace, onRetry, loading }: { job:
         )}
       </div>
 
-      {trace?.unavailable && (
+      {!!trace?.issues?.length && (
         <p className={page.traceNotice}>
-          Transaction links are unavailable{trace.error ? `: ${trace.error}` : ""}.{" "}
+          Some transaction links couldn&apos;t be loaded ({trace.issues.join("; ")}).{" "}
           {onRetry && (
             <button className={page.linkButton} onClick={onRetry} disabled={loading}>
               {loading ? "Retrying…" : "Retry"}

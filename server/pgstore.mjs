@@ -8,6 +8,9 @@ export async function createPgStore(pool) {
     data jsonb not null,
     updated_at timestamptz not null default now()
   )`);
+  // Supabase exposes public tables through its REST API. Row Level Security with no policies
+  // closes that door; the backend's direct Postgres connection bypasses RLS and keeps working.
+  await pool.query("alter table app_state enable row level security");
   return {
     async read() {
       const { rows } = await pool.query("select data from app_state where id = 1");

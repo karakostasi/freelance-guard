@@ -5,6 +5,7 @@ import type { Abi } from "viem";
 import { Check, Code, Eye, Plus, RotateCcw } from "lucide-react";
 import { FlowStepper, type FlowMode } from "./FlowStepper";
 import { NextStep } from "./NextStep";
+import { JobList } from "./JobList";
 import { MilestoneDetails } from "./MilestoneDetails";
 import { PayDrawer } from "./PayDrawer";
 import { useBackendFunding } from "../hooks/useBackendFunding";
@@ -17,8 +18,8 @@ import { useJobTrace } from "../hooks/useJobTrace";
 import { useMyJobs } from "../hooks/useMyJobs";
 import { deriveJourney, simulatedPayloads } from "../lib/chainFlow";
 import { FUNDING_STAGES, ROUTING_STAGE, journeyStages, type FlowState, type PayoutRoute } from "../lib/fiatFlow";
-import { STATUS_CLASS, STATUS_LABEL, currentMilestone, jobTotal, type Job } from "../lib/jobs";
-import { formatAmount, toEur, tokenOf } from "../lib/tokens";
+import { STATUS_CLASS, STATUS_LABEL, currentMilestone, type Job } from "../lib/jobs";
+import { toEur, tokenOf } from "../lib/tokens";
 import { escrowAbi, escrowAddress } from "../wagmi";
 import styles from "../App.module.css";
 import flow from "./FlowStepper.module.css";
@@ -113,35 +114,32 @@ export function FlowPage({ jobId: routeJobId }: { jobId?: string }) {
         <PayDrawer onClose={() => setDrawerOpen(false)} onBank={startPayment} />
       )}
 
-      {showingLive ? (
-        <section className={page.block}>
-          <div className={flow.blockHeader}>
-            <h3 className={page.subtitle}>New payment</h3>
-            {!live.running && (
-              <button className={styles.ghostButton} onClick={live.reset}>
-                <RotateCcw size={14} /> Dismiss
-              </button>
-            )}
+      <div className={page.layout}>
+        <JobList jobs={mine} selectedId={id} onSelect={setSelectedId} />
+        {showingLive ? (
+          <>
+            <div className={page.top}>
+              <div className={flow.blockHeader}>
+                <h3 className={page.subtitle}>New payment</h3>
+                {!live.running && (
+                  <button className={styles.ghostButton} onClick={live.reset}>
+                    <RotateCcw size={14} /> Dismiss
+                  </button>
+                )}
+              </div>
+            </div>
+            <div className={`${page.stepperRow} ${page.block}`}>
+              <FlowStepper stages={journeyStages("sepa")} state={live.state} mode={mode} timer />
+            </div>
+          </>
+        ) : selected ? (
+          <JobJourney key={selected.id} id={selected.id} job={selected.job} mode={mode} />
+        ) : (
+          <div className={page.top}>
+            <p className={flow.muted}>{mine.length > 0 ? "Pick a job from the list." : "Nothing to show yet."}</p>
           </div>
-          <FlowStepper stages={journeyStages("sepa")} state={live.state} mode={mode} timer />
-        </section>
-      ) : (
-        <section className={styles.section}>
-          {mine.length > 0 && (
-            <label className={page.pickerRow}>
-              <span className={page.pickerLabel}>Job</span>
-            <select className={styles.input} value={id} onChange={(e) => setSelectedId(e.target.value)}>
-              {mine.map(({ id: jid, job }) => (
-                <option key={jid} value={jid}>
-                  Job #{jid} · {formatAmount(job, jobTotal(job))} · {job.milestones.filter((m) => m.status === 4).length}/{job.milestones.length} paid
-                </option>
-              ))}
-            </select>
-            </label>
-          )}
-          {selected ? <JobJourney key={selected.id} id={selected.id} job={selected.job} mode={mode} /> : <p className={flow.muted}>No jobs for this account yet. Use "Fund a job" to create one.</p>}
-        </section>
-      )}
+        )}
+      </div>
     </div>
   );
 }
@@ -186,44 +184,47 @@ function JobJourney({ id, job, mode }: { id: number; job: Job; mode: FlowMode })
 
   return (
     <>
-      {multi && (
-        <div className={page.msTabs} role="tablist" aria-label="Milestones">
-          {job.milestones.map((m, i) => (
-            <button
-              key={i}
-              role="tab"
-              aria-selected={i === index}
-              className={`${page.msTab} ${STATUS_CLASS[m.status]} ${i === index ? page.msTabActive : ""}`}
-              onClick={() => setPicked(i)}
-              title={`${m.title || "Untitled"}: ${STATUS_LABEL[m.status]}`}
-            >
-              <span className={page.msDot} />
-              <span className={page.msNum}>{i + 1}</span>
-              <span className={page.msTitle}>{m.title || "Untitled"}</span>
-              {m.status === 4 && <Check size={13} />}
-            </button>
-          ))}
-        </div>
-      )}
+      <div className={page.top}>
+        {multi && (
+          <div className={page.msTabs} role="tablist" aria-label="Milestones">
+            {job.milestones.map((m, i) => (
+              <button
+                key={i}
+                role="tab"
+                aria-selected={i === index}
+                className={`${page.msTab} ${STATUS_CLASS[m.status]} ${i === index ? page.msTabActive : ""}`}
+                onClick={() => setPicked(i)}
+                title={`${m.title || "Untitled"}: ${STATUS_LABEL[m.status]}`}
+              >
+                <span className={page.msDot} />
+                <span className={page.msNum}>{i + 1}</span>
+                <span className={page.msTitle}>{m.title || "Untitled"}</span>
+                {m.status === 4 && <Check size={13} />}
+              </button>
+            ))}
+          </div>
+        )}
 
-      <MilestoneDetails job={job} index={index} trace={trace} onRetry={() => refetch()} loading={isFetching} />
+        <MilestoneDetails job={job} index={index} trace={trace} onRetry={() => refetch()} loading={isFetching} />
 
-      <NextStep
-        id={id}
-        index={index}
-        job={job}
-        payout={{
-          state: payout.state,
-          route,
-          setRoute,
-          start: () => localPayout.start(stages, { jobId: String(id), amountEur, route }, ROUTING_STAGE),
-          reset: localPayout.reset,
-          amountEur,
-          auto: !!backend,
-        }}
-      />
+        <NextStep
+          id={id}
+          index={index}
+          job={job}
+          payout={{
+            state: payout.state,
+            route,
+            setRoute,
+            start: () => localPayout.start(stages, { jobId: String(id), amountEur, route }, ROUTING_STAGE),
+            reset: localPayout.reset,
+            amountEur,
+            auto: !!backend,
+          }}
+        />
 
-      <div className={page.block}>
+      </div>
+
+      <div className={`${page.stepperRow} ${page.block}`}>
         {status === 0 && <p className={flow.muted}>These steps start once the milestone is funded.</p>}
         <FlowStepper stages={stages} state={journey} mode={mode} timer={payoutState.status !== "idle"} />
       </div>

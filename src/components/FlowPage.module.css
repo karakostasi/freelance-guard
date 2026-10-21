@@ -46,3 +46,33 @@
 .traceNotice { margin: 0; padding: .5rem .75rem; border-radius: 8px; background: rgba(245, 185, 66, .1); color: #f5b942; font-size: .85rem; overflow-wrap: anywhere; }
 .linkButton { border: 0; background: none; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; padding: 0; }
 .linkButton:disabled { opacity: .6; cursor: default; }
+
+/* Jobs down the left beside the job's details and banner. The journey keeps the full page width underneath. */
+.layout { display: grid; grid-template-columns: 280px minmax(0, 1fr); grid-template-areas: "side top" "stepper stepper"; gap: 1.25rem 1.5rem; align-items: start; }
+.top { grid-area: top; display: flex; flex-direction: column; gap: .75rem; min-width: 0; }
+.stepperRow { grid-area: stepper; min-width: 0; }
+.sidebar { grid-area: side; align-self: stretch; position: relative; min-height: 260px; }
+/* Absolutely placed, so the list scrolls inside the sidebar instead of stretching the row. */
+.sidebarInner { position: absolute; inset: 0; display: flex; flex-direction: column; gap: .75rem; padding: 1rem; border-radius: 12px; border: 1px solid #2a2f3b; background: #12141a; overflow-y: auto; }
+.sidebarTitle { display: flex; align-items: center; justify-content: space-between; margin: 0; font-size: .8rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; opacity: .8; }
+.jobList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .5rem; }
+.jobItem { display: flex; flex-direction: column; align-items: flex-start; gap: .3rem; width: 100%; padding: .7rem .8rem; border-radius: 10px; border: 1px solid #262b38; border-left: 4px solid var(--c, #8a8fa0); background: #171a22; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: border-color .15s, background .15s; }
+.jobItem:hover { border-color: var(--c, #555); }
+.jobItemActive { background: color-mix(in srgb, var(--c, #4f7cff) 14%, #171a22); border-color: var(--c, #4f7cff); box-shadow: 0 0 0 1px var(--c, #4f7cff); }
+.jobItemTop { display: flex; align-items: center; justify-content: space-between; gap: .5rem; width: 100%; min-width: 0; }
+.jobItemBottom { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.jobItem > span:last-child { width: 100%; }
+
+.sidebarTitleRow { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+
+/* The Jobs page: the same list, with the selected job or the hire form beside it. */
+.jobsLayout { display: grid; grid-template-columns: 280px minmax(0, 1fr); grid-template-areas: "side top"; gap: 1.5rem; align-items: start; }
+.formWrap { max-width: 680px; }
+.formWrap > section { margin: 0; }
+
+@media (max-width: 900px) {
+  .jobsLayout { grid-template-columns: 1fr; grid-template-areas: "side" "top"; }
+  .layout { grid-template-columns: 1fr; grid-template-areas: "side" "top" "stepper"; }
+  .sidebar { min-height: 0; }
+  .sidebarInner { position: static; max-height: 280px; }
+}

@@ -1,21 +1,16 @@
-import { useState } from "react";
 import { useAccount, useConnect } from "wagmi";
 import { Briefcase, Workflow } from "lucide-react";
-import { HireForm } from "./components/HireForm";
 import { FlowPage } from "./components/FlowPage";
-import { JobPanel } from "./components/JobPanel";
+import { JobsPage } from "./components/JobsPage";
 import { Landing } from "./components/Landing";
-import { MyJobs } from "./components/MyJobs";
 import { ProfileMenu } from "./components/ProfileMenu";
 import { navigate, useHashRoute } from "./hooks/useHashRoute";
-import { setPendingPayment } from "./lib/pendingPayment";
 import logo from "./assets/logo.svg";
 import styles from "./App.module.css";
 
 export default function App() {
   const { isConnected } = useAccount();
   const { connect, connectors, error: connectError } = useConnect();
-  const [selected, setSelected] = useState("");
   const route = useHashRoute();
 
   return (
@@ -48,18 +43,7 @@ export default function App() {
         </div>
       )}
       {isConnected && route.page === "flow" && <FlowPage jobId={route.jobId} />}
-      {isConnected && route.page === "jobs" && (
-        <div className={styles.narrow}>
-          <HireForm
-            onBank={(form) => {
-              setPendingPayment(form);
-              navigate("/flow");
-            }}
-          />
-          <MyJobs selected={selected} onSelect={setSelected} />
-          {selected && <JobPanel id={selected} onClose={() => setSelected("")} />}
-        </div>
-      )}
+      {isConnected && route.page === "jobs" && <JobsPage />}
     </main>
   );
 }

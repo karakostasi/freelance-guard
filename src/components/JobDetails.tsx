@@ -1,24 +1,20 @@
-import { useEffect } from "react";
 import { useAccount, useReadContract } from "wagmi";
 import { escrowAbi, escrowAddress } from "../wagmi";
 import { formatAmount } from "../lib/tokens";
-import { STATUS, STATUS_CLASS, STATUS_LABEL, deliverableUrl, formatDate, formatDuration, jobTotal, roleOf, timeInfo, type Job, type Milestone } from "../lib/jobs";
+import { STATUS, STATUS_CLASS, STATUS_LABEL, formatDate, formatDuration, jobTotal, roleOf, timeInfo, type Job, type Milestone } from "../lib/jobs";
 import { navigate } from "../hooks/useHashRoute";
+import { DeliverableView, SpecView } from "./DocView";
 import { JobActions } from "./JobActions";
+import { jobTitle } from "../lib/documents";
 import { useEscrowConfig } from "../hooks/useEscrowConfig";
 import { useNow } from "../hooks/useNow";
 import styles from "../App.module.css";
 
 type RawJob = readonly [Omit<Job, "milestones">, readonly Milestone[]];
 
-export function JobPanel({ id, onClose }: { id: string; onClose: () => void }) {
+/** One job in full: its parties, spec and every milestone with the actions available to you. */
+export function JobDetails({ id }: { id: string }) {
   const { address } = useAccount();
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
 
   const { data, isLoading, error: readError } = useReadContract({
     address: escrowAddress,
@@ -38,11 +34,11 @@ export function JobPanel({ id, onClose }: { id: string; onClose: () => void }) {
   const exists = !!job && job.milestones.length > 0;
 
   return (
-    <div className={styles.overlay} onClick={onClose}>
-      <section className={styles.modal} onClick={(e) => e.stopPropagation()}>
-        <button className={styles.close} onClick={onClose} aria-label="Close">×</button>
+    <>
+      <section className={styles.panel}>
         <div className={styles.modalHeader}>
-          <h2>Job #{id}</h2>
+          <h2 className={styles.modalTitle}>{job ? jobTitle(job.description, id) : `Job #${id}`}</h2>
+          <span className={styles.muted}>Job #{id}</span>
           {job && exists && <span className={`${styles.role} ${roleOf(job, me).className}`}>{roleOf(job, me).label}</span>}
         </div>
         {isLoading && <p>Loading…</p>}
@@ -58,7 +54,7 @@ export function JobPanel({ id, onClose }: { id: string; onClose: () => void }) {
             <p>
               {roleOf(job, me).amountLabel}: {formatAmount(job, jobTotal(job))} in {job.milestones.length} milestone{job.milestones.length > 1 ? "s" : ""}
             </p>
-            {job.description && <p>Spec: {job.description}</p>}
+            <SpecView description={job.description} />
 
             <div className={styles.milestones}>
               {job.milestones.map((ms, i) => {
@@ -83,16 +79,10 @@ export function JobPanel({ id, onClose }: { id: string; onClose: () => void }) {
                       {hint && STATUS[ms.status] !== "Unfunded" ? ` · ${hint}` : ""}
                     </span>
                     {ms.deliverable && (
-                      <span className={styles.muted}>
-                        Deliverable:{" "}
-                        {deliverableUrl(ms.deliverable) ? (
-                          <a href={deliverableUrl(ms.deliverable)!} target="_blank" rel="noreferrer noopener">
-                            {ms.deliverable}
-                          </a>
-                        ) : (
-                          ms.deliverable
-                        )}
-                      </span>
+                      <div className={styles.deliverableRow}>
+                        <span className={styles.muted}>Deliverable</span>
+                        <DeliverableView value={ms.deliverable} />
+                      </div>
                     )}
                     <JobActions id={id} index={i} job={job} />
                   </div>
@@ -102,16 +92,13 @@ export function JobPanel({ id, onClose }: { id: string; onClose: () => void }) {
 
             <button
               className={styles.ghostButton}
-              onClick={() => {
-                onClose();
-                navigate(`/flow/${id}`);
-              }}
+              onClick={() => navigate(`/flow/${id}`)}
             >
               View payment flow
             </button>
           </>
         )}
       </section>
-    </div>
+    </>
   );
 }

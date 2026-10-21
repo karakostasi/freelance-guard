@@ -1,7 +1,8 @@
 import { ExternalLink } from "lucide-react";
-import { STATUS, STATUS_CLASS, STATUS_LABEL, deliverableUrl, euro, formatDate, formatDuration, jobTotal, txUrl, type Job } from "../lib/jobs";
+import { STATUS, STATUS_CLASS, STATUS_LABEL, euro, formatDate, formatDuration, jobTotal, txUrl, type Job } from "../lib/jobs";
 import { formatAmount, formatUnitsOf, tokenOf, toEur } from "../lib/tokens";
 import type { JobTrace, TxInfo } from "../hooks/useJobTrace";
+import { DeliverableView } from "./DocView";
 import { useEscrowConfig } from "../hooks/useEscrowConfig";
 import { useNow } from "../hooks/useNow";
 import styles from "../App.module.css";
@@ -32,7 +33,6 @@ export function MilestoneDetails({ job, index, trace, onRetry, loading }: { job:
   // The contract sets deadline = time funded + duration, so the funding time is recoverable from it.
   const fundedAt = funded ? ms.deadline - BigInt(ms.duration) : 0n;
   const reviewEnd = reviewPeriod !== undefined && ms.submittedAt > 0n ? ms.submittedAt + reviewPeriod : undefined;
-  const link = ms.deliverable ? deliverableUrl(ms.deliverable) : null;
   const releaser = trace?.released?.from.toLowerCase();
 
   const outcome = (() => {
@@ -112,13 +112,7 @@ export function MilestoneDetails({ job, index, trace, onRetry, loading }: { job:
           <>
             <dt>Deliverable</dt>
             <dd className={page.wrap}>
-              {link ? (
-                <a className={page.txLink} href={link} target="_blank" rel="noreferrer noopener">
-                  {ms.deliverable} <ExternalLink size={12} />
-                </a>
-              ) : (
-                ms.deliverable
-              )}
+              <DeliverableView value={ms.deliverable} />
             </dd>
           </>
         )}

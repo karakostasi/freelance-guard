@@ -5,9 +5,11 @@ import { execFileSync, spawn } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createHash } from "node:crypto";
 import { createPublicClient, createWalletClient, http, parseEther, parseUnits } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { hardhat } from "viem/chains";
+import { signInMessage } from "../server/auth.mjs";
 
 const CHAIN_PORT = process.env.TEST_CHAIN_PORT ?? "8645";
 const API_PORT = process.env.TEST_API_PORT ?? "8799";
@@ -78,6 +80,8 @@ async function main() {
       ESCROW_ADDRESS: escrow,
       EURC_ADDRESS: eurc,
       DB_FILE: join(dir, "db.json"),
+      FILES_DIR: join(dir, "files"),
+      UPLOADS_PER_DAY: "8", // small, so the quota can be tested
       DATABASE_URL: "", // always the file store, even if a developer's .env points at Postgres
       NOTIFY_WEBHOOK_URL: "",
       WEBHOOK_SECRET: "test-secret",
@@ -153,6 +157,55 @@ async function run({ escrow, eurc }) {
   check((await bad({ milestones: [{ title: "a", amount: "1000", days: 0 }] })).status === 400, "a milestone with zero days is rejected");
   check((await bad({ milestones: [{ title: "a", amount: "abc", days: 3 }] })).status === 400, "a garbage amount is rejected");
   check((await post("/api/payments", { ...base, amount: "1", token: "dai", milestones: [{ title: "a", amount: "1", days: 1 }] })).status === 400, "an unknown token is rejected");
+
+  console.log("\nFile uploads");
+  {
+    const send = (path, init) => fetch(API + path, init);
+    const sha = (bytes) => createHash("sha256").update(bytes).digest("hex");
+    const login = async (account = client, issuedAt = new Date().toISOString()) => {
+      const signature = await account.signMessage({ message: signInMessage(account.address, issuedAt) });
+      return send("/api/auth", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ address: account.address, issuedAt, signature }) });
+    };
+    const put = (token, bytes, name, type = "application/octet-stream") =>
+      send("/api/files", { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": type, "x-file-name": encodeURIComponent(name) }, body: bytes });
+
+    check((await send("/api/files", { method: "POST", body: "x" })).status === 401, "uploading without signing in is refused (401)");
+    check((await send("/api/files", { method: "POST", headers: { authorization: "Bearer nope" }, body: "x" })).status === 401, "a made-up token is refused (401)");
+    const wrongSigner = await send("/api/auth", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ address: client.address, issuedAt: new Date().toISOString(), signature: await freelancer.signMessage({ message: "hi" }) }) });
+    check(wrongSigner.status === 401, "signing in with a signature from another wallet is refused (401)");
+    check((await login(client, new Date(Date.now() - 3_600_000).toISOString())).status === 401, "an hour-old sign-in message is refused (401)");
+
+    const { token } = await (await login()).json();
+    const bytes = Buffer.from("the delivered draft, version 1");
+    const created = await put(token, bytes, "draft v1.pdf", "application/pdf");
+    const info = await created.json();
+    check(created.status === 201 && info.sha256 === sha(bytes) && info.size === bytes.length, "an upload is stored and its SHA-256 comes back");
+    check((await put(token, bytes, "again.pdf", "application/pdf")).status === 200, "the same bytes again are recognised, not stored twice");
+
+    const got = await send(`/api/files/${info.sha256}`);
+    check(got.status === 200 && Buffer.from(await got.arrayBuffer()).equals(bytes), "the file downloads with the same bytes");
+    check(got.headers.get("x-content-type-options") === "nosniff" && got.headers.get("content-security-policy")?.includes("sandbox"), "downloads carry nosniff and a sandbox policy");
+    check(got.headers.get("content-type") === "application/pdf" && got.headers.get("content-disposition")?.startsWith("inline"), "a PDF is shown in the browser");
+    check(got.headers.get("content-disposition")?.includes("draft%20v1.pdf"), "the file name is kept");
+
+    const page = Buffer.from("<script>alert(1)</script>");
+    const html = await (await put(token, page, "page.html", "text/html")).json();
+    const served = await send(`/api/files/${html.sha256}`);
+    check(served.headers.get("content-type") === "application/octet-stream" && served.headers.get("content-disposition")?.startsWith("attachment"), "an HTML upload is only ever offered as a download, never shown");
+    const renamed = await send(`/api/files/${info.sha256}?name=${encodeURIComponent("../../etc/passwd")}`);
+    check(!renamed.headers.get("content-disposition")?.includes("%2F") && !renamed.headers.get("content-disposition")?.includes(".."), "a path in the requested name is neutralised") ;
+
+    check((await send(`/api/files/${"0".repeat(64)}`)).status === 404, "an unknown file is a 404");
+    check((await send("/api/files/not-a-hash")).status === 404, "a path that isn't a hash is a 404");
+    check((await put(token, Buffer.alloc(0), "empty")).status === 400, "an empty file is refused (400)");
+    check((await put(token, Buffer.alloc(10 * 1024 * 1024 + 1, 1), "huge")).status === 413, "a file over 10 MB is refused (413)");
+
+    let limited = 0;
+    for (let i = 0; i < 12 && !limited; i++) if ((await put(token, Buffer.from(`filler ${i}`), `f${i}`)).status === 429) limited = i + 1;
+    check(limited > 0, `the daily upload limit stops further uploads (hit after ${limited} more)`);
+    const other = await (await login(freelancer)).json();
+    check((await put(other.token, Buffer.from("someone else's file"), "theirs")).status === 201, "another wallet has its own quota");
+  }
 
   console.log("\nETH payment, one milestone");
   {

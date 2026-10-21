@@ -50,6 +50,21 @@ export function milestoneName(job: Job, index: number) {
   return title.length > 22 ? `${title.slice(0, 21)}…` : title;
 }
 
+/** Where a job stands as a whole: its current milestone, how many are paid, and a label and color for it. */
+export function jobSummary(job: Job) {
+  const current = job.milestones[currentMilestone(job)];
+  const finished = job.milestones.every(isDone);
+  const paid = job.milestones.filter((m) => m.status === PAID).length;
+  const allPaid = paid === job.milestones.length;
+  return {
+    current,
+    finished,
+    paid,
+    label: finished ? (allPaid ? "Completed" : "Closed") : STATUS_LABEL[current.status],
+    tone: STATUS_CLASS[finished ? (allPaid ? PAID : REFUNDED) : current.status],
+  };
+}
+
 export type Role = { label: string; className: string; amountLabel: string };
 
 /** Which side of the job `me` is on. Anyone who is neither party is the arbiter. */
@@ -89,16 +104,7 @@ export function timeInfo(m: Milestone, reviewPeriod: bigint | undefined, now: bi
   return "";
 }
 
-/**
- * A link for a deliverable, or null when it isn't a web or IPFS address. The deliverable is text the
- * freelancer typed, so only http(s) and ipfs links are ever turned into a clickable href.
- */
-export function deliverableUrl(value: string): string | null {
-  const text = value.trim();
-  if (/^https?:\/\/\S+$/i.test(text)) return text;
-  const ipfs = text.match(/^ipfs:\/\/(?:ipfs\/)?(\S+)$/i);
-  return ipfs ? `https://ipfs.io/ipfs/${ipfs[1]}` : null;
-}
+export { deliverableUrl } from "./documents";
 
 export const txUrl = (hash: string) => `https://sepolia.basescan.org/tx/${hash}`;
 

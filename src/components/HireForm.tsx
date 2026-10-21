@@ -6,7 +6,10 @@ import { escrowAbi, escrowAddress } from "../wagmi";
 import { useBackendStatus } from "../hooks/useBackend";
 import type { FundingForm } from "../hooks/useFiatFunding";
 import { useRefreshOnConfirm } from "../hooks/useRefreshOnConfirm";
+import { buildDescription } from "../lib/documents";
 import { ensureAllowance } from "../lib/erc20";
+import { uploadDoc, uploadFile } from "../lib/files";
+import { FileDrop } from "./FileDrop";
 import type { PayoutRoute } from "../lib/fiatFlow";
 import { euro } from "../lib/jobs";
 import { ETH, TOKENS, formatUnitsOf, toEur } from "../lib/tokens";
@@ -35,6 +38,9 @@ const PRESETS: { label: string; rows: Row[] }[] = [
 ];
 
 const MAX_MILESTONES = 20;
+const MAX_TITLE = 80;
+// Short specs are written on-chain as they are. Longer ones, and anything with files, become a stored document.
+const INLINE_SPEC_MAX = 280;
 const DAY = 86400;
 
 const sameRows = (a: Row[], b: Row[]) => a.length === b.length && a.every((r, i) => r.title === b[i].title && r.percent === b[i].percent && r.days === b[i].days);
@@ -57,7 +63,9 @@ export function HireForm({ variant = "page", onBank, onCreated }: { variant?: "p
   const [total, setTotal] = useState("");
   const [rows, setRows] = useState<Row[]>(PRESETS[0].rows);
   const [fundNowChoice, setFundNow] = useState(true);
-  const [description, setDescription] = useState("");
+  const [title, setTitle] = useState("");
+  const [spec, setSpec] = useState("");
+  const [files, setFiles] = useState<File[]>([]);
 
   const bank = payWith === "bank";
   // A bank transfer is one payment for the total, so it always funds everything. Offline only ETH works.
@@ -74,7 +82,9 @@ export function HireForm({ variant = "page", onBank, onCreated }: { variant?: "p
     setFreelancer("");
     setTotal("");
     setRows(PRESETS[0].rows);
-    setDescription("");
+    setTitle("");
+    setSpec("");
+    setFiles([]);
   };
 
   // Clear the form only once the job exists on-chain, so a rejected tx keeps the input.
@@ -98,7 +108,7 @@ export function HireForm({ variant = "page", onBank, onCreated }: { variant?: "p
   const rowsValid = rows.length > 0 && percentSum === 100n && percents.every((p) => p > 0n) && rows.every((r) => Number(r.days) > 0 && r.title.trim());
   // Paying from the wallet needs the tokens at hand, a bank transfer doesn't.
   const short = !bank && fundNow && !!token.address && balance !== undefined && totalUnits > balance;
-  const valid = isAddress(freelancer) && totalUnits > 0n && rowsValid && !short;
+  const valid = isAddress(freelancer) && title.trim().length > 0 && totalUnits > 0n && rowsValid && !short;
   const busy = !!working || confirming;
   // The split matches a preset until the rows are edited, then it is a custom split.
   const activePreset = PRESETS.find((p) => sameRows(p.rows, rows))?.label ?? null;
@@ -106,21 +116,40 @@ export function HireForm({ variant = "page", onBank, onCreated }: { variant?: "p
 
   const setRow = (i: number, patch: Partial<Row>) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r)));
 
+  // The text recorded on-chain: the title, then the spec as text or, with files or a long spec, a pointer to a stored document.
+  const makeDescription = async () => {
+    const needsDocument = backendOnline && (files.length > 0 || spec.trim().length > INLINE_SPEC_MAX);
+    if (!needsDocument) return buildDescription(title, { text: spec });
+    setWorking("Uploading files…");
+    const uploaded = [];
+    for (const file of files) uploaded.push(await uploadFile(file, address!));
+    const ref = await uploadDoc({ version: 1, title: title.trim(), text: spec.trim(), files: uploaded }, address!);
+    return buildDescription(title, { ref });
+  };
+
   const submit = async () => {
     setError(null);
     if (bank) {
-      onBank({
-        freelancer,
-        amount: formatUnits(totalUnits, token.decimals),
-        token: token.symbol === "EURC" ? "eurc" : "eth",
-        description,
-        route,
-        milestones: rows.map((r, i) => ({ title: r.title.trim(), amount: formatUnits(amounts[i], token.decimals), days: r.days })),
-      });
-      reset();
+      try {
+        const description = await makeDescription();
+        onBank({
+          freelancer,
+          amount: formatUnits(totalUnits, token.decimals),
+          token: token.symbol === "EURC" ? "eurc" : "eth",
+          description,
+          route,
+          milestones: rows.map((r, i) => ({ title: r.title.trim(), amount: formatUnits(amounts[i], token.decimals), days: r.days })),
+        });
+        reset();
+      } catch (e) {
+        setError((e as Error).message.split("\n")[0]);
+      } finally {
+        setWorking("");
+      }
       return;
     }
     try {
+      const description = await makeDescription();
       if (fundNow && token.address) {
         await ensureAllowance(token.address, address!, totalUnits, () => setWorking("Approve the token in your wallet…"));
       }
@@ -270,7 +299,13 @@ export function HireForm({ variant = "page", onBank, onCreated }: { variant?: "p
 
       <div className={styles.formGroup}>
         <h3 className={styles.groupTitle}>Details</h3>
-        <textarea className={styles.input} placeholder="Job description or IPFS link" value={description} onChange={(e) => setDescription(e.target.value)} />
+        <input className={styles.input} placeholder="Job title" maxLength={MAX_TITLE} value={title} onChange={(e) => setTitle(e.target.value)} aria-label="Job title" />
+        <textarea className={styles.input} placeholder="What should be delivered? (optional)" rows={3} value={spec} onChange={(e) => setSpec(e.target.value)} />
+        {backendOnline ? (
+          <FileDrop files={files} onChange={setFiles} disabled={busy} />
+        ) : (
+          <span className={styles.muted}>Attaching files needs the backend, which is offline right now.</span>
+        )}
         <button className={styles.button} disabled={!valid || busy} onClick={submit}>
           {working || (bank ? `Pay by bank transfer${eur > 0 ? ` (${euro(eur)})` : ""}` : fundNow ? "Create job and fund escrow" : "Create job")}
         </button>

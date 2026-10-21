@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useAccount, useBalance, useDisconnect } from "wagmi";
 import { formatEther } from "viem";
+import { Repeat } from "lucide-react";
 import { short } from "../lib/jobs";
 import styles from "../App.module.css";
 
@@ -12,12 +13,23 @@ const avatarGradient = (address: string) => {
 };
 
 export function WalletBar() {
-  const { address, chain } = useAccount();
+  const { address, chain, connector } = useAccount();
   const { disconnect } = useDisconnect();
   const { data: balance } = useBalance({ address });
   const [copied, setCopied] = useState(false);
 
   if (!address) return null;
+
+  // MetaMask only reports accounts the site is connected to. This reopens its account picker so
+  // another account can be added, and wagmi follows the switch.
+  const switchAccount = async () => {
+    try {
+      const provider = (await connector?.getProvider()) as { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> } | undefined;
+      await provider?.request({ method: "wallet_requestPermissions", params: [{ eth_accounts: {} }] });
+    } catch {
+      // the user closed the picker
+    }
+  };
 
   const copy = async () => {
     await navigator.clipboard.writeText(address);
@@ -37,9 +49,14 @@ export function WalletBar() {
           </span>
         </span>
       </button>
-      <button className={styles.ghostButton} onClick={() => disconnect()}>
-        Disconnect
-      </button>
+      <div className={styles.walletActions}>
+        <button className={styles.ghostButton} onClick={switchAccount} title="Choose which account this site uses">
+          <Repeat size={14} /> Switch account
+        </button>
+        <button className={styles.ghostButton} onClick={() => disconnect()}>
+          Disconnect
+        </button>
+      </div>
     </div>
   );
 }

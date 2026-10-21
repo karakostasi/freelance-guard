@@ -94,7 +94,7 @@ const server = createServer(async (req, res) => {
       return res.end();
     }
 
-    if (req.method === "GET" && path === "/api/health") return send(res, 200, { ok: true, escrow: ESCROW_ADDRESS, rpc: RPC_URL, eurPerEth: EUR_PER_ETH });
+    if (req.method === "GET" && path === "/api/health") return send(res, 200, { ok: true, escrow: ESCROW_ADDRESS, rpc: RPC_URL, eurPerEth: EUR_PER_ETH, processedBlock: db.cursor });
 
     if (req.method === "POST" && path === "/api/payments") {
       const { body } = await json(req);

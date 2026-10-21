@@ -75,3 +75,6 @@
   .sidebar { min-height: 0; }
   .sidebarInner { position: static; max-height: 280px; }
 }
+
+/* The milestone facts without their own header or frame, for use inside another card. */
+.compactDetails { display: flex; flex-direction: column; gap: .6rem; width: 100%; }

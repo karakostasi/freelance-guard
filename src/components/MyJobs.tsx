@@ -1,4 +1,5 @@
 import { useAccount } from "wagmi";
+import { jobTitle } from "../lib/documents";
 import { formatAmount } from "../lib/tokens";
 import { STATUS_CLASS, STATUS_LABEL, currentMilestone, isDone, jobTotal, roleOf, short, timeInfo } from "../lib/jobs";
 import { useEscrowConfig } from "../hooks/useEscrowConfig";
@@ -21,6 +22,7 @@ export function MyJobs({ selected, onSelect }: { selected: string; onSelect: (id
         {mine.map(({ id, job }) => {
           const isClient = job.client.toLowerCase() === me;
           const role = roleOf(job, me);
+          const title = jobTitle(job.description, id);
           const current = job.milestones[currentMilestone(job)];
           const finished = job.milestones.every(isDone);
           const paid = job.milestones.filter((m) => m.status === 4).length;
@@ -30,9 +32,12 @@ export function MyJobs({ selected, onSelect }: { selected: string; onSelect: (id
           return (
             <button key={id} className={`${styles.card} ${tone} ${selected === String(id) ? styles.cardActive : ""}`} onClick={() => onSelect(String(id))}>
               <div className={styles.cardHeader}>
-                <strong>Job #{id}</strong>
+                <strong className={styles.cardTitle} title={title}>
+                  {title}
+                </strong>
                 <span className={`${styles.role} ${role.className}`}>{role.label}</span>
               </div>
+              <span className={styles.muted}>Job #{id}</span>
               <span className={`${styles.badge} ${tone}`}>{label}</span>
               <span>
                 <span className={styles.muted}>{role.amountLabel}</span> {formatAmount(job, jobTotal(job))}

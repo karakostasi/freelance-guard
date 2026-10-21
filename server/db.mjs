@@ -2,29 +2,22 @@ import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createPgStore } from "./pgstore.mjs";
+import { explainConnectionFailure, getPool } from "./pool.mjs";
 
-const empty = () => ({ cursor: null, runs: {}, ledger: [], notifications: [] });
+const empty = () => ({ cursor: null, runs: {}, ledger: [], notifications: [], files: {} });
 
 // DATABASE_URL (Postgres, e.g. Supabase) makes the state durable across restarts and redeploys.
 // Without it the state lives in a local JSON file, which is fine for development.
 async function openStore() {
-  if (process.env.DATABASE_URL) {
-    const { default: pg } = await import("pg");
-    const pool = new pg.Pool({
-      connectionString: process.env.DATABASE_URL,
-      ssl: process.env.DATABASE_SSL === "false" ? false : { rejectUnauthorized: false },
-      max: 3,
-      connectionTimeoutMillis: 10000,
-    });
+  const pool = await getPool();
+  if (pool) {
     console.log("[db] connecting to Postgres...");
     try {
       const store = await createPgStore(pool);
       console.log("[db] using Postgres");
       return store;
     } catch (e) {
-      console.error(`[db] Could not connect to Postgres (${e.code ?? e.message}).`);
-      console.error("[db] Check DATABASE_URL: use the Supabase Session pooler URI, URL-encode special characters in the password (@ becomes %40),");
-      console.error("[db] and make sure your network/VPN allows outbound connections on port 5432.");
+      explainConnectionFailure(e);
       process.exit(1);
     }
   }

@@ -5,6 +5,7 @@ import type { Abi } from "viem";
 import { Check, Code, Eye, Plus, RotateCcw } from "lucide-react";
 import { FlowStepper, type FlowMode } from "./FlowStepper";
 import { NextStep } from "./NextStep";
+import { jobTitle } from "../lib/documents";
 import { MilestoneDetails } from "./MilestoneDetails";
 import { PayDrawer } from "./PayDrawer";
 import { useBackendFunding } from "../hooks/useBackendFunding";
@@ -133,7 +134,7 @@ export function FlowPage({ jobId: routeJobId }: { jobId?: string }) {
             <select className={styles.input} value={id} onChange={(e) => setSelectedId(e.target.value)}>
               {mine.map(({ id: jid, job }) => (
                 <option key={jid} value={jid}>
-                  Job #{jid} · {formatAmount(job, jobTotal(job))} · {job.milestones.filter((m) => m.status === 4).length}/{job.milestones.length} paid
+                  Job #{jid} · {jobTitle(job.description, jid)} · {formatAmount(job, jobTotal(job))} · {job.milestones.filter((m) => m.status === 4).length}/{job.milestones.length} paid
                 </option>
               ))}
             </select>

@@ -73,10 +73,21 @@ The contract ABI is committed in `abi/` (refreshed by `npm run compile`), so nei
 
 Never upload your local `.env` (it holds the deployer key). Set variables in each dashboard instead.
 
+## Job titles, specs and files
+
+A job has a title, an optional spec and optional attachments. A milestone's deliverable can be a link, a note, or uploaded files.
+
+- **On-chain** a job's `description` is `<title>` or `<title>\n<spec>`, where the spec is plain text or a pointer `fg:<sha256>`. A deliverable is plain text or such a pointer. Nothing about the contract changed, so older jobs read as before.
+- **The pointer is to a small JSON document** (a note and a list of files with names, sizes and SHA-256 hashes) held by the backend. Because the hashes are recorded on-chain, anyone can check that a downloaded file is the one that was delivered (the **Verify** button does it).
+- **Storage:** file bytes are kept in Postgres (`file_blobs`) when `DATABASE_URL` is set, otherwise in `server/data/files/`. Short specs (up to 280 characters) without files stay entirely on-chain.
+- **Uploads need a wallet signature** (one sign-in message per hour), so the backend can't be used as free file hosting. Limits: 10 MB per file, 5 files per form, 50 uploads and 200 MB per address per day, and 300 MB in total (see `.env.example`). Files are served with `nosniff` and a sandbox policy, and only images, PDFs, text and JSON are shown in the browser. Everything else downloads.
+- Files are **not private**: anyone with a file's hash can download it. Don't upload secrets.
+
 ## Tests and CI
 
 - `npm test` runs the contract tests (Hardhat).
-- `npm run test:flow` is an end-to-end check of the payment flow. It starts its own throwaway chain and backend on ports 8645 and 8799 (override with `TEST_CHAIN_PORT` and `TEST_API_PORT`), so it never touches your dev servers. It drives real ETH and EURC payments, including a 3-milestone split, through the API and the contract, and takes about half a minute.
+- `npm run test:unit` checks the document format, sign-in sessions and file stores (no chain or network needed).
+- `npm run test:flow` is an end-to-end check of the payment flow. It starts its own throwaway chain and backend on ports 8645 and 8799 (override with `TEST_CHAIN_PORT` and `TEST_API_PORT`), so it never touches your dev servers. It drives real ETH and EURC payments, including a 3-milestone split, plus the upload, sign-in, download and quota rules, through the API and the contract, and takes about half a minute.
 - `npm run lint` and `npm run build` check the frontend.
 
 GitHub Actions runs all of them on every pull request and on pushes to `main` (`.github/workflows/ci.yml`), and also checks that the committed ABI in `abi/` matches the contract. If that check fails, run `npm run compile` and commit the result.

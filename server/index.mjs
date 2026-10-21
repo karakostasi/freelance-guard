@@ -1,6 +1,8 @@
 import "./env.mjs";
 import { createServer } from "node:http";
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import { createSession, verifyToken } from "./auth.mjs";
+import { openBlobStore } from "./blobs.mjs";
 import { db, flush, save } from "./db.mjs";
 import { watchEscrow, ESCROW_ADDRESS, RPC_URL } from "./chain.mjs";
 import { bankReceived, createRun, fail, milestonePlan, onChainEvent, onThisContract, publicRun, subscribe } from "./pipeline.mjs";
@@ -30,10 +32,69 @@ const corsFor = (req) => {
   return {
     "access-control-allow-origin": allowedOrigins.length === 0 ? "*" : allowedOrigins.includes(origin) ? origin : allowedOrigins[0],
     vary: "Origin",
-    "access-control-allow-headers": "content-type, x-signature, last-event-id",
+    "access-control-allow-headers": "content-type, x-signature, last-event-id, authorization, x-file-name",
     "access-control-allow-methods": "GET, POST, OPTIONS",
   };
 };
+
+// ---- file uploads ----
+const MB = 1024 * 1024;
+const MAX_FILE_BYTES = Number(process.env.MAX_FILE_MB ?? 10) * MB;
+const MAX_TOTAL_BYTES = Number(process.env.FILES_MAX_TOTAL_MB ?? 300) * MB; // the free database is small: cap everything we hold
+const DAILY_FILES = Number(process.env.UPLOADS_PER_DAY ?? 50);
+const DAILY_BYTES = Number(process.env.UPLOAD_MB_PER_DAY ?? 200) * MB;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const blobs = await openBlobStore();
+
+// Only these are shown in the browser. Everything else downloads, so an uploaded page can never run as ours.
+const INLINE_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp", "application/pdf", "text/plain", "application/json"]);
+
+const tooLarge = () => Object.assign(new Error(`Files can be at most ${MAX_FILE_BYTES / MB} MB`), { status: 413 });
+
+const readBuffer = (req, limit) =>
+  new Promise((resolve, reject) => {
+    if (Number(req.headers["content-length"] ?? 0) > limit) {
+      req.resume();
+      return reject(tooLarge());
+    }
+    const chunks = [];
+    let size = 0;
+    let rejected = false;
+    req.on("data", (chunk) => {
+      if (rejected) return;
+      size += chunk.length;
+      if (size > limit) {
+        rejected = true;
+        reject(tooLarge());
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on("end", () => !rejected && resolve(Buffer.concat(chunks)));
+    req.on("error", reject);
+  });
+
+const cleanName = (raw) => {
+  let name = "";
+  try {
+    name = decodeURIComponent(raw ?? "");
+  } catch {
+    name = String(raw ?? "");
+  }
+  // No control characters or path separators, and no leading dots (so never a hidden file, "." or "..").
+  const kept = Array.from(name).filter((ch) => ch.codePointAt(0) > 31 && ch.codePointAt(0) !== 127 && ch !== "/" && ch !== "\\");
+  return kept.join("").trim().replace(/^\.+/, "").slice(0, 120) || "file";
+};
+
+const bearer = (req) => verifyToken((req.headers.authorization ?? "").replace(/^Bearer /i, ""));
+
+function checkQuota(owner, size) {
+  const entries = Object.values(db.files);
+  if (entries.reduce((sum, f) => sum + f.size, 0) + size > MAX_TOTAL_BYTES) throw Object.assign(new Error("The file store is full"), { status: 507 });
+  const recent = entries.filter((f) => f.owner === owner && Date.now() - f.at < DAY_MS);
+  if (recent.length >= DAILY_FILES) throw Object.assign(new Error("Daily upload limit reached"), { status: 429 });
+  if (recent.reduce((sum, f) => sum + f.size, 0) + size > DAILY_BYTES) throw Object.assign(new Error("Daily upload size limit reached"), { status: 429 });
+}
 
 const readBody = (req) =>
   new Promise((resolve, reject) => {
@@ -95,6 +156,46 @@ const server = createServer(async (req, res) => {
     }
 
     if (req.method === "GET" && path === "/api/health") return send(res, 200, { ok: true, escrow: ESCROW_ADDRESS, rpc: RPC_URL, eurPerEth: EUR_PER_ETH, processedBlock: db.cursor });
+
+    if (req.method === "POST" && path === "/api/auth") {
+      const { body } = await json(req);
+      return send(res, 200, await createSession(body));
+    }
+
+    if (req.method === "POST" && path === "/api/files") {
+      const owner = bearer(req);
+      if (!owner) throw Object.assign(new Error("Sign in with your wallet to upload files"), { status: 401 });
+      const data = await readBuffer(req, MAX_FILE_BYTES);
+      if (data.length === 0) throw fieldError("The file is empty");
+      const sha256 = createHash("sha256").update(data).digest("hex");
+      const known = db.files[sha256];
+      if (known) return send(res, 200, { sha256, name: known.name, size: known.size, type: known.type });
+      checkQuota(owner, data.length);
+      const type = String(req.headers["content-type"] ?? "").split(";")[0].trim().toLowerCase() || "application/octet-stream";
+      await blobs.put(sha256, data);
+      db.files[sha256] = { name: cleanName(req.headers["x-file-name"]), type, size: data.length, owner, at: Date.now() };
+      save();
+      return send(res, 201, { sha256, name: db.files[sha256].name, size: data.length, type });
+    }
+
+    const fileRoute = path.match(/^\/api\/files\/([0-9a-f]{64})$/);
+    if (req.method === "GET" && fileRoute) {
+      const meta = db.files[fileRoute[1]];
+      const data = meta ? await blobs.get(fileRoute[1]) : null;
+      if (!meta || !data) throw Object.assign(new Error("File not found"), { status: 404 });
+      const inline = INLINE_TYPES.has(meta.type);
+      const name = cleanName(url.searchParams.get("name") ?? meta.name);
+      res.writeHead(200, {
+        "content-type": inline ? meta.type : "application/octet-stream",
+        "content-length": data.length,
+        "content-disposition": `${inline ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(name)}`,
+        "x-content-type-options": "nosniff",
+        "content-security-policy": "default-src 'none'; sandbox",
+        "cache-control": "public, max-age=31536000, immutable",
+        ...res.cors,
+      });
+      return res.end(data);
+    }
 
     if (req.method === "POST" && path === "/api/payments") {
       const { body } = await json(req);

@@ -5,7 +5,10 @@ import { config, escrowAbi, escrowAddress } from "../wagmi";
 import { useEscrowConfig } from "../hooks/useEscrowConfig";
 import { useNow } from "../hooks/useNow";
 import { useRefreshOnConfirm } from "../hooks/useRefreshOnConfirm";
+import { useBackendStatus } from "../hooks/useBackend";
 import { ensureAllowance } from "../lib/erc20";
+import { uploadDoc, uploadFile } from "../lib/files";
+import { FileDrop } from "./FileDrop";
 import { STATUS, formatDuration, milestoneName, type Job } from "../lib/jobs";
 import { tokenOf } from "../lib/tokens";
 import styles from "../App.module.css";
@@ -16,6 +19,8 @@ export function JobActions({ id, index, job }: { id: string; index: number; job:
   const { reviewPeriod, arbiter } = useEscrowConfig();
   const now = useNow();
   const [deliverable, setDeliverable] = useState("");
+  const [files, setFiles] = useState<File[]>([]);
+  const { online: backendOnline } = useBackendStatus();
   const [txHash, setTxHash] = useState<`0x${string}` | undefined>();
   const [working, setWorking] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -36,12 +41,25 @@ export function JobActions({ id, index, job }: { id: string; index: number; job:
   const deadline = ms.deadline;
   const reviewEnd = reviewPeriod !== undefined ? ms.submittedAt + reviewPeriod : undefined;
 
-  const send = async (functionName: string, args: unknown[], value?: bigint, prepare?: () => Promise<void>) => {
+  // What goes on-chain as the deliverable: the typed link or note as it is, or, with files, a pointer to a stored document.
+  const buildDeliverable = async () => {
+    const text = deliverable.trim();
+    if (files.length === 0) return text;
+    setWorking("Uploading files…");
+    const uploaded = [];
+    for (const file of files) uploaded.push(await uploadFile(file, address!));
+    return `fg:${await uploadDoc({ version: 1, text, files: uploaded }, address!)}`;
+  };
+
+  const send = async (functionName: string, args: unknown[] | (() => Promise<unknown[]>), value?: bigint, prepare?: () => Promise<void>) => {
     setError(null);
     try {
       await prepare?.();
+      const resolved = typeof args === "function" ? await args() : args;
       setWorking("Confirm in your wallet…");
-      setTxHash(await writeContract(config, { address: escrowAddress, abi: escrowAbi, functionName, args, value }));
+      setTxHash(await writeContract(config, { address: escrowAddress, abi: escrowAbi, functionName, args: resolved, value }));
+      setFiles([]);
+      setDeliverable("");
     } catch (e) {
       setError((e as Error).message.split("\n")[0]);
     } finally {
@@ -72,8 +90,13 @@ export function JobActions({ id, index, job }: { id: string; index: number; job:
       {status === "Unfunded" && !isClient && <p className={styles.muted}>Waiting for the client to fund this milestone.</p>}
       {isFreelancer && status === "Funded" && (
         <>
-          <input className={styles.input} placeholder={name ? `Link to your ${name}` : "Deliverable link"} value={deliverable} onChange={(e) => setDeliverable(e.target.value)} />
-          {action(name ? `Submit ${name}` : "Submit work", () => send("submitWork", [n, m, deliverable]), now > deadline ? "Deadline passed" : !deliverable ? "Add a deliverable link" : "")}
+          <input className={styles.input} placeholder={name ? `Link or note for your ${name}` : "Deliverable link or note"} value={deliverable} onChange={(e) => setDeliverable(e.target.value)} />
+          {backendOnline && <FileDrop files={files} onChange={setFiles} disabled={busy} />}
+          {action(
+            name ? `Submit ${name}` : "Submit work",
+            () => send("submitWork", async () => [n, m, await buildDeliverable()]),
+            now > deadline ? "Deadline passed" : !deliverable.trim() && files.length === 0 ? (backendOnline ? "Add a link, a note or files" : "Add a link or a note") : "",
+          )}
         </>
       )}
       {isFreelancer && status === "Submitted" &&

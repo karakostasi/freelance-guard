@@ -6,6 +6,7 @@
   "scripts": {
     "compile": "hardhat compile && node scripts/export-abi.cjs",
     "test": "hardhat test",
+    "test:unit": "node --experimental-strip-types --no-warnings scripts/test-unit.mjs",
     "test:flow": "node scripts/test-flow.mjs",
     "node": "hardhat node",
     "server": "node server/index.mjs",

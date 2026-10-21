@@ -48,6 +48,7 @@ jobs:
           cache: npm
       - run: npm ci --no-audit --no-fund
       - run: npm run lint
+      - run: npm run test:unit
       - run: npm run build
 
   flow:

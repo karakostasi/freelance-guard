@@ -1,10 +1,26 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
   <defs>
-    <linearGradient id="g" x1="8" y1="4" x2="56" y2="60" gradientUnits="userSpaceOnUse">
+    <linearGradient id="shield" x1="10" y1="4" x2="54" y2="60" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#38bdf8"/>
+      <stop offset=".5" stop-color="#4f7cff"/>
+      <stop offset="1" stop-color="#8a5cff"/>
+    </linearGradient>
+    <linearGradient id="check" x1="27" y1="35" x2="38" y2="43" gradientUnits="userSpaceOnUse">
       <stop stop-color="#4f7cff"/>
       <stop offset="1" stop-color="#8a5cff"/>
     </linearGradient>
   </defs>
-  <path d="M32 3 55 11v17c0 15-9.5 27-23 33C18.500 55 9 43 9 28V11L32 3Z" fill="url(#g)"/>
-  <path d="M21 32.500 29 40.500 44 23.500" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- shield -->
+  <path d="M32 3 55 11v17c0 15-9.500 27-23 33C18.500 55 9 43 9 28V11L32 3Z" fill="url(#shield)"/>
+  <!-- soft light on the left half for depth -->
+  <path d="M32 3 9 11v17c0 15 9.500 27 23 33V3Z" fill="#fff" fill-opacity=".14"/>
+  <!-- inner outline -->
+  <path d="M32 8 50 14v14c0 12-7.500 21.500-18 26.500C21.500 49.500 14 40 14 28V14L32 8Z" stroke="#fff" stroke-opacity=".35" stroke-width="1.500"/>
+  <g transform="translate(0 -3)">
+    <!-- padlock: funds held in escrow -->
+    <path d="M25 31v-4.500a7 7 0 0 1 14 0V31" stroke="#fff" stroke-width="3.500" stroke-linecap="round"/>
+    <rect x="20.500" y="30" width="23" height="17" rx="4.500" fill="#fff"/>
+    <!-- check: released on approval -->
+    <path d="M27 38.500 30.500 42 37.500 34.500" stroke="url(#check)" stroke-width="3.200" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
 </svg>

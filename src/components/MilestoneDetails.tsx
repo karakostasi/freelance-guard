@@ -19,7 +19,7 @@ const TxLink = ({ tx }: { tx?: TxInfo }) =>
   ) : null;
 
 /** Everything known about one milestone: amount, timeline, deliverable and how it ended. */
-export function MilestoneDetails({ job, index, trace, onRetry, loading }: { job: Job; index: number; trace: JobTrace | undefined; onRetry?: () => void; loading?: boolean }) {
+export function MilestoneDetails({ job, index, trace, onRetry, loading, compact }: { job: Job; index: number; trace: JobTrace | undefined; onRetry?: () => void; loading?: boolean; compact?: boolean }) {
   const { reviewPeriod } = useEscrowConfig();
   const now = useNow();
   const ms = job.milestones[index];
@@ -48,20 +48,22 @@ export function MilestoneDetails({ job, index, trace, onRetry, loading }: { job:
   const outcomeTx = status === "Paid" ? trace?.released : trace?.refunded;
 
   return (
-    <div className={`${page.msDetails} ${STATUS_CLASS[ms.status]}`}>
-      <div className={page.summary}>
-        <span className={`${styles.badge} ${STATUS_CLASS[ms.status]}`}>{STATUS_LABEL[ms.status]}</span>
-        {multi && <strong>{ms.title || "Untitled"}</strong>}
-        <span>
-          <span className={page.factLabel}>{multi ? "This milestone" : "Amount"}</span> <strong>{formatUnitsOf(token, ms.amount)}</strong>{" "}
-          <span className={page.factLabel}>({approxEuro(eur)})</span>
-        </span>
-        {multi && (
-          <span className={page.factLabel}>
-            Total {formatAmount(job, jobTotal(job))} · {job.milestones.filter((m) => m.status === 4).length}/{job.milestones.length} paid
+    <div className={compact ? page.compactDetails : `${page.msDetails} ${STATUS_CLASS[ms.status]}`}>
+      {!compact && (
+        <div className={page.summary}>
+          <span className={`${styles.badge} ${STATUS_CLASS[ms.status]}`}>{STATUS_LABEL[ms.status]}</span>
+          {multi && <strong>{ms.title || "Untitled"}</strong>}
+          <span>
+            <span className={page.factLabel}>{multi ? "This milestone" : "Amount"}</span> <strong>{formatUnitsOf(token, ms.amount)}</strong>{" "}
+            <span className={page.factLabel}>({approxEuro(eur)})</span>
           </span>
-        )}
-      </div>
+          {multi && (
+            <span className={page.factLabel}>
+              Total {formatAmount(job, jobTotal(job))} · {job.milestones.filter((m) => m.status === 4).length}/{job.milestones.length} paid
+            </span>
+          )}
+        </div>
+      )}
 
       {!!trace?.issues?.length && (
         <p className={page.traceNotice}>

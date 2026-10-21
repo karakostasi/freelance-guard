@@ -4,13 +4,13 @@ import { useAccount, useReadContract } from "wagmi";
 import { escrowAbi, escrowAddress } from "../wagmi";
 import { formatAmount } from "../lib/tokens";
 import { avatarGradient } from "../lib/avatar";
-import { STATUS, STATUS_CLASS, STATUS_LABEL, addressUrl, formatDate, formatDuration, jobTotal, roleOf, short, timeInfo, type Job, type Milestone } from "../lib/jobs";
+import { STATUS_CLASS, STATUS_LABEL, addressUrl, jobTotal, roleOf, short, type Job, type Milestone } from "../lib/jobs";
 import { navigate } from "../hooks/useHashRoute";
-import { DeliverableView, SpecView } from "./DocView";
+import { SpecView } from "./DocView";
+import { MilestoneDetails } from "./MilestoneDetails";
 import { JobActions } from "./JobActions";
 import { jobTitle, parseDescription } from "../lib/documents";
-import { useEscrowConfig } from "../hooks/useEscrowConfig";
-import { useNow } from "../hooks/useNow";
+import { useJobTrace } from "../hooks/useJobTrace";
 import styles from "../App.module.css";
 
 type RawJob = readonly [Omit<Job, "milestones">, readonly Milestone[]];
@@ -47,6 +47,25 @@ function Party({ label, address, you, tone }: { label: string; address: string; 
   );
 }
 
+/** One milestone of a job: its amount, the facts with links to the real transactions, and the actions available to you. */
+function MilestoneCard({ id, index, job }: { id: string; index: number; job: Job }) {
+  const ms = job.milestones[index];
+  const { data: trace, refetch, isFetching } = useJobTrace(Number(id), index, ms);
+  return (
+    <div className={`${styles.milestone} ${STATUS_CLASS[ms.status]}`}>
+      <div className={styles.milestoneHead}>
+        <strong>
+          {index + 1}. {ms.title || "Milestone"}
+        </strong>
+        <span className={`${styles.badge} ${STATUS_CLASS[ms.status]}`}>{STATUS_LABEL[ms.status]}</span>
+      </div>
+      <span>{formatAmount(job, ms.amount)}</span>
+      <MilestoneDetails compact job={job} index={index} trace={trace} onRetry={() => refetch()} loading={isFetching} />
+      <JobActions id={id} index={index} job={job} />
+    </div>
+  );
+}
+
 /** One job in full, as a card that floats over the page: its parties, spec and every milestone with the actions available to you. */
 export function JobDetails({ id, onClose }: { id: string; onClose: () => void }) {
   const { address } = useAccount();
@@ -65,9 +84,6 @@ export function JobDetails({ id, onClose }: { id: string; onClose: () => void })
   });
   const raw = data as RawJob | undefined;
   const job: Job | undefined = raw && { ...raw[0], milestones: [...raw[1]] };
-
-  const { reviewPeriod } = useEscrowConfig();
-  const now = useNow();
 
   const me = address?.toLowerCase();
   const isClient = job && me === job.client.toLowerCase();
@@ -117,37 +133,9 @@ export function JobDetails({ id, onClose }: { id: string; onClose: () => void })
 
             <h3 className={styles.groupTitle}>Milestones</h3>
             <div className={styles.milestones}>
-              {job.milestones.map((ms, i) => {
-                const hint = timeInfo(ms, reviewPeriod, now);
-                return (
-                  <div key={i} className={`${styles.milestone} ${STATUS_CLASS[ms.status]}`}>
-                    <div className={styles.milestoneHead}>
-                      <strong>
-                        {i + 1}. {ms.title || "Milestone"}
-                      </strong>
-                      <span className={`${styles.badge} ${STATUS_CLASS[ms.status]}`}>{STATUS_LABEL[ms.status]}</span>
-                    </div>
-                    <span>{formatAmount(job, ms.amount)}</span>
-                    <span className={styles.muted}>
-                      {STATUS[ms.status] === "Unfunded"
-                        ? `${formatDuration(BigInt(ms.duration))} to deliver once funded`
-                        : STATUS[ms.status] === "Funded"
-                          ? `Deadline ${formatDate(ms.deadline)}`
-                          : ms.submittedAt > 0n
-                            ? `Submitted ${formatDate(ms.submittedAt)}`
-                            : ""}
-                      {hint && STATUS[ms.status] !== "Unfunded" ? ` · ${hint}` : ""}
-                    </span>
-                    {ms.deliverable && (
-                      <div className={styles.deliverableRow}>
-                        <span className={styles.muted}>Deliverable</span>
-                        <DeliverableView value={ms.deliverable} />
-                      </div>
-                    )}
-                    <JobActions id={id} index={i} job={job} />
-                  </div>
-                );
-              })}
+              {job.milestones.map((_, i) => (
+                <MilestoneCard key={i} id={id} index={i} job={job} />
+              ))}
             </div>
 
             <button

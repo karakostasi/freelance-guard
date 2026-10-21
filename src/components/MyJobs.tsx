@@ -1,5 +1,5 @@
 import { useAccount } from "wagmi";
-import { formatEther } from "viem";
+import { formatAmount } from "../lib/tokens";
 import { STATUS_CLASS, STATUS_LABEL, roleOf, short, timeInfo } from "../lib/jobs";
 import { useEscrowConfig } from "../hooks/useEscrowConfig";
 import { useMyJobs } from "../hooks/useMyJobs";
@@ -35,7 +35,7 @@ export function MyJobs({ selected, onSelect }: { selected: string; onSelect: (id
               <span className={`${styles.badge} ${STATUS_CLASS[job[5]]}`}>{STATUS_LABEL[job[5]]}</span>
               <span>
                 <span className={styles.muted}>{role.amountLabel}</span>{" "}
-                {formatEther(job[2])} ETH
+                {formatAmount(job)}
               </span>
               <span className={styles.muted}>
                 {isClient ? "Freelancer" : "Client"}: {short(isClient ? job[1] : job[0])}

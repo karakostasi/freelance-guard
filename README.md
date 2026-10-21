@@ -30,6 +30,17 @@ npm run dev             # terminal 2: frontend
 
 Connect MetaMask to `http://127.0.0.1:8545` (chain id 31337).
 
+## Paying with tokens
+
+`createJob` takes ETH. `createTokenJob` takes an ERC-20: the client approves the escrow for the amount, then the escrow pulls it, and pays out or refunds in the same token. The Jobs page asks for the approval and the deposit as two wallet confirmations. The payment flow offers ETH or EURC (1 EURC = EUR 1, so the euro amounts are real).
+
+On Base Sepolia the app uses Circle's test EURC and USDC. Get free test tokens at faucet.circle.com. Verify the addresses against Circle's docs, or override them with `VITE_EURC_ADDRESS`, `VITE_USDC_ADDRESS` and `EURC_ADDRESS`. On a local chain, `npm run deploy:local` also deploys a mock EURC and prints its address.
+
+**Upgrading an existing deployment:** the contract changed (a `token` field on jobs, a new `JobCreated` event and `createTokenJob`), so it needs a new deployment. Order matters:
+1. `npm run deploy:base-sepolia`, then note the new address and deploy block.
+2. Set the new address in Vercel (`VITE_ESCROW_ADDRESS`, `VITE_ESCROW_DEPLOY_BLOCK`), Render (`ESCROW_ADDRESS`) and your local `.env`.
+3. Merge and redeploy. Jobs on the old contract no longer show, and the backend ignores their payment runs.
+
 ## Payment flow backend (optional)
 
 `npm run server` starts a small Node backend (default `http://localhost:8787`) that runs the fiat-to-escrow pipeline for real and streams every step to the Payment flow page:
@@ -55,6 +66,6 @@ Never upload your local `.env` (it holds the deployer key). Set variables in eac
 
 ## Known limitations
 
-- ETH only, no stablecoins yet.
+- Jobs can be paid in ETH or ERC-20 tokens (EURC and USDC are listed). Fee-on-transfer tokens are rejected, and each job is in a single token.
 - Dispute resolution is a single arbiter address, all-or-nothing (no split).
 - No marketplace listings/profiles yet, jobs are created directly with a freelancer's address.

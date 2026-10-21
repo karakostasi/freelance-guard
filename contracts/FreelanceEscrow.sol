@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+interface IERC20Minimal {
+    function balanceOf(address account) external view returns (uint256);
+}
+
 /// @title FreelanceEscrow
-/// @notice Holds a client's ETH until the freelancer delivers. If the client
+/// @notice Holds a client's ETH or ERC-20 tokens until the freelancer delivers. If the client
 ///         goes silent after delivery, the freelancer can claim after the review period.
 contract FreelanceEscrow {
     enum Status { None, Funded, Submitted, Disputed, Paid, Refunded }
@@ -16,6 +20,7 @@ contract FreelanceEscrow {
         Status status;
         string description; // URI / IPFS hash of the job spec
         string deliverable; // URI / IPFS hash of the work
+        address token; // address(0) means ETH, anything else is an ERC-20
     }
 
     address public immutable arbiter;
@@ -24,7 +29,7 @@ contract FreelanceEscrow {
     uint256 public jobCount;
     mapping(uint256 => Job) public jobs;
 
-    event JobCreated(uint256 indexed id, address indexed client, address indexed freelancer, uint256 amount, uint64 deliveryDeadline);
+    event JobCreated(uint256 indexed id, address indexed client, address indexed freelancer, uint256 amount, uint64 deliveryDeadline, address token);
     event WorkSubmitted(uint256 indexed id, string deliverable);
     event Approved(uint256 indexed id);
     event Disputed(uint256 indexed id);
@@ -42,12 +47,35 @@ contract FreelanceEscrow {
         reviewPeriod = _reviewPeriod;
     }
 
+    /// @notice Create a job funded with ETH (msg.value).
     function createJob(address freelancer, uint64 deliveryDeadline, string calldata description)
         external
         payable
         returns (uint256 id)
     {
         require(msg.value > 0, "no funds");
+        id = _create(freelancer, deliveryDeadline, description, address(0), msg.value);
+    }
+
+    /// @notice Create a job funded with an ERC-20. The client must approve this contract for `amount` first.
+    function createTokenJob(address freelancer, uint64 deliveryDeadline, string calldata description, address token, uint256 amount)
+        external
+        returns (uint256 id)
+    {
+        require(amount > 0, "no funds");
+        require(token != address(0) && token.code.length > 0, "bad token");
+        id = _create(freelancer, deliveryDeadline, description, token, amount);
+
+        // Measure what actually arrived, so fee-on-transfer tokens can't leave the job under-funded.
+        uint256 before = IERC20Minimal(token).balanceOf(address(this));
+        _pull(token, msg.sender, amount);
+        require(IERC20Minimal(token).balanceOf(address(this)) - before == amount, "unsupported token");
+    }
+
+    function _create(address freelancer, uint64 deliveryDeadline, string calldata description, address token, uint256 amount)
+        private
+        returns (uint256 id)
+    {
         require(freelancer != address(0) && freelancer != msg.sender, "bad freelancer");
         require(deliveryDeadline > block.timestamp, "bad deadline");
 
@@ -55,14 +83,15 @@ contract FreelanceEscrow {
         jobs[id] = Job({
             client: msg.sender,
             freelancer: freelancer,
-            amount: msg.value,
+            amount: amount,
             deliveryDeadline: deliveryDeadline,
             submittedAt: 0,
             status: Status.Funded,
             description: description,
-            deliverable: ""
+            deliverable: "",
+            token: token
         });
-        emit JobCreated(id, msg.sender, freelancer, msg.value, deliveryDeadline);
+        emit JobCreated(id, msg.sender, freelancer, amount, deliveryDeadline, token);
     }
 
     function submitWork(uint256 id, string calldata deliverable) external {
@@ -129,17 +158,33 @@ contract FreelanceEscrow {
 
     function _pay(Job storage j, address to) private {
         j.status = Status.Paid;
-        _send(to, j.amount);
+        _send(j.token, to, j.amount);
     }
 
     function _refund(uint256 id, Job storage j) private {
         j.status = Status.Refunded;
-        _send(j.client, j.amount);
+        _send(j.token, j.client, j.amount);
         emit Refunded(id);
     }
 
-    function _send(address to, uint256 amount) private {
-        (bool ok, ) = to.call{value: amount}("");
-        if (!ok) revert TransferFailed();
+    function _send(address token, address to, uint256 amount) private {
+        if (token == address(0)) {
+            (bool ok, ) = to.call{value: amount}("");
+            if (!ok) revert TransferFailed();
+        } else {
+            // transfer(address,uint256)
+            _callToken(token, abi.encodeWithSelector(0xa9059cbb, to, amount));
+        }
+    }
+
+    function _pull(address token, address from, uint256 amount) private {
+        // transferFrom(address,address,uint256)
+        _callToken(token, abi.encodeWithSelector(0x23b872dd, from, address(this), amount));
+    }
+
+    /// Handles tokens that return nothing (like USDT) as well as the ones that return a bool.
+    function _callToken(address token, bytes memory data) private {
+        (bool ok, bytes memory ret) = token.call(data);
+        if (!ok || (ret.length != 0 && !abi.decode(ret, (bool)))) revert TransferFailed();
     }
 }

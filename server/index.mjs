@@ -3,7 +3,7 @@ import { createServer } from "node:http";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { db, flush, save } from "./db.mjs";
 import { watchEscrow, ESCROW_ADDRESS, RPC_URL } from "./chain.mjs";
-import { bankReceived, createRun, fail, onChainEvent, publicRun, subscribe } from "./pipeline.mjs";
+import { bankReceived, createRun, fail, onChainEvent, onThisContract, publicRun, subscribe } from "./pipeline.mjs";
 import { EUR_PER_ETH } from "./providers.mjs";
 
 const PORT = Number(process.env.PORT ?? 8787);
@@ -66,7 +66,8 @@ function validatePayment(b) {
   if (!ADDRESS.test(b.payer ?? "")) throw fieldError("payer must be an address");
   if (!ADDRESS.test(b.freelancer ?? "")) throw fieldError("freelancer must be an address");
   if (b.payer.toLowerCase() === b.freelancer.toLowerCase()) throw fieldError("freelancer must differ from payer");
-  if (!(Number(b.amountEth) > 0)) throw fieldError("amountEth must be greater than 0");
+  if (!(Number(b.amount) > 0)) throw fieldError("amount must be greater than 0");
+  if (b.token !== undefined && !["eth", "eurc"].includes(b.token)) throw fieldError("token must be eth or eurc");
   if (!(Number(b.days) > 0)) throw fieldError("days must be greater than 0");
 }
 
@@ -162,7 +163,7 @@ const server = createServer(async (req, res) => {
 
     const job = path.match(/^\/api\/jobs\/(\d+)\/run$/);
     if (req.method === "GET" && job) {
-      const run = Object.values(db.runs).find((r) => r.jobId === Number(job[1]));
+      const run = Object.values(db.runs).find((r) => onThisContract(r) && r.jobId === Number(job[1]));
       return send(res, run ? 200 : 404, run ? publicRun(run) : { error: "No payment run for this job" });
     }
 

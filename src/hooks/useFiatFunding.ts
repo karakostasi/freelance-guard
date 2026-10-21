@@ -6,7 +6,7 @@ import { config, escrowAbi, escrowAddress } from "../wagmi";
 import { EUR_PER_ETH, FUNDING_STAGES, stepKey, type FlowContext, type PayoutRoute } from "../lib/fiatFlow";
 import { useFlowRun } from "./useFlowRun";
 
-export type FundingForm = { freelancer: string; amountEth: string; days: string; description: string; route?: PayoutRoute };
+export type FundingForm = { freelancer: string; amount: string; days: string; description: string; route?: PayoutRoute; token?: "eth" | "eurc" };
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -21,7 +21,7 @@ export function useFiatFunding(onFunded: (jobId: number) => void) {
   const queryClient = useQueryClient();
 
   const fund = async (form: FundingForm) => {
-    const amountEur = Number(form.amountEth) * EUR_PER_ETH;
+    const amountEur = Number(form.amount) * EUR_PER_ETH;
     const ctx: FlowContext = { jobId: "pending", amountEur };
     const start = (stage: number, step: number) => emit({ type: "step_start", stage, step, at: Date.now() });
     const finish = (stage: number, step: number, payload: Record<string, unknown>) =>
@@ -46,7 +46,7 @@ export function useFiatFunding(onFunded: (jobId: number) => void) {
         abi: escrowAbi,
         functionName: "createJob",
         args: [form.freelancer, BigInt(Math.floor(Date.now() / 1000) + Number(form.days) * 86400), form.description],
-        value: parseEther(form.amountEth),
+        value: parseEther(form.amount),
       });
       finish(2, 1, {
         signer: address,

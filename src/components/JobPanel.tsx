@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useAccount, useReadContract } from "wagmi";
-import { formatEther } from "viem";
 import { escrowAbi, escrowAddress } from "../wagmi";
+import { formatAmount } from "../lib/tokens";
 import { STATUS, STATUS_CLASS, STATUS_LABEL, formatDate, formatDuration, roleOf, type Job } from "../lib/jobs";
 import { navigate } from "../hooks/useHashRoute";
 import { JobActions } from "./JobActions";
@@ -56,7 +56,7 @@ export function JobPanel({ id, onClose }: { id: string; onClose: () => void }) {
             Freelancer: {job[1]} {isFreelancer && <span className={`${styles.role} ${styles.roleFreelancer}`}>You</span>}
           </p>
           <p>
-            {roleOf(job, me).amountLabel}: {formatEther(job[2])} ETH
+            {roleOf(job, me).amountLabel}: {formatAmount(job)}
           </p>
           <p>Status: <span className={`${styles.badge} ${STATUS_CLASS[job[5]]}`}>{STATUS_LABEL[job[5]]}</span></p>
           <p>Spec: {job[6]}</p>

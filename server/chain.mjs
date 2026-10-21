@@ -42,6 +42,11 @@ export function watchEscrow(onEvent, intervalMs = 2000) {
     busy = true;
     try {
       const latest = await client.getBlockNumber();
+      // A new contract means a new event history: start over instead of scanning from the old one.
+      if (db.cursorContract?.toLowerCase() !== ESCROW_ADDRESS.toLowerCase()) {
+        db.cursor = null;
+        db.cursorContract = ESCROW_ADDRESS;
+      }
       if (db.cursor === null) {
         db.cursor = String(process.env.START_BLOCK ? BigInt(process.env.START_BLOCK) - 1n : latest);
         save();

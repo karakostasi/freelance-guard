@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useAccount } from "wagmi";
-import { getCapabilities, getChainId, sendCalls, sendTransaction, waitForCallsStatus } from "wagmi/actions";
+import { getCapabilities, getChainId, sendCalls, sendTransaction, waitForCallsStatus, waitForTransactionReceipt } from "wagmi/actions";
 import { config } from "../wagmi";
 import { api, type ServerEvent } from "../lib/api";
 import { initialFlowState, stepIndex, stepKey, type FlowState } from "../lib/fiatFlow";
@@ -17,18 +17,22 @@ const userRejected = (e: unknown): boolean => {
 };
 
 /**
- * Sends the call the backend prepared. With a paymaster URL and a wallet that supports sponsored
- * calls (EIP-5792 + ERC-7677) the gas is sponsored; otherwise, or if that path fails, the wallet pays.
+ * Sends what the backend prepared: the call, plus a token approval first for token jobs. With a paymaster
+ * URL and a wallet that supports sponsored calls (EIP-5792 + ERC-7677) the gas is sponsored and both go
+ * in one batch; otherwise, or if that path fails, the wallet signs them one by one and pays the gas.
  */
-async function sendPrepared(tx: NonNullable<ServerEvent["tx"]>, address: `0x${string}`, runId: string) {
-  const value = BigInt(tx.value);
+async function sendPrepared(prep: { tx: NonNullable<ServerEvent["tx"]>; approval?: ServerEvent["approval"] }, address: `0x${string}`, runId: string) {
+  const calls = [
+    ...(prep.approval ? [{ to: prep.approval.to, data: prep.approval.data, value: 0n }] : []),
+    { to: prep.tx.to, data: prep.tx.data, value: BigInt(prep.tx.value) },
+  ];
   if (PAYMASTER_URL) {
     try {
       const chainId = await getChainId(config);
       const caps = (await getCapabilities(config, { account: address })) as Record<number, { paymasterService?: { supported?: boolean } } | undefined>;
       if (caps[chainId]?.paymasterService?.supported) {
         const { id } = await sendCalls(config, {
-          calls: [{ to: tx.to, data: tx.data, value }],
+          calls,
           capabilities: { paymasterService: { url: PAYMASTER_URL } },
         });
         await api.markSigned(runId, "sponsored");
@@ -41,7 +45,10 @@ async function sendPrepared(tx: NonNullable<ServerEvent["tx"]>, address: `0x${st
     }
   }
   await api.markSigned(runId, "wallet");
-  await sendTransaction(config, { to: tx.to, data: tx.data, value });
+  for (const [i, call] of calls.entries()) {
+    const hash = await sendTransaction(config, call);
+    if (i < calls.length - 1) await waitForTransactionReceipt(config, { hash });
+  }
 }
 
 /**
@@ -73,7 +80,7 @@ export function useBackendFunding(onFunded: (jobId: number) => void) {
       const key = `${runId}:${ev.seq}`;
       if (ev.type !== "action_required" || !ev.tx || handled.current.has(key)) continue;
       handled.current.add(key);
-      sendPrepared(ev.tx, address, runId).catch((e: Error) => api.cancel(runId, userRejected(e) ? "Signature rejected in the wallet" : e.message.split("\n")[0]));
+      sendPrepared({ tx: ev.tx, approval: ev.approval }, address, runId).catch((e: Error) => api.cancel(runId, userRejected(e) ? "Signature rejected in the wallet" : e.message.split("\n")[0]));
     }
   }, [events, runId, address]);
 
@@ -88,7 +95,7 @@ export function useBackendFunding(onFunded: (jobId: number) => void) {
     if (!address) return;
     setStartError(null);
     try {
-      const { run, bank } = await api.createPayment({ payer: address, ...form, route: form.route ?? "sepa" });
+      const { run, bank } = await api.createPayment({ payer: address, ...form, route: form.route ?? "sepa", token: form.token ?? "eth" });
       setRunId(run.id);
       await api.bankTransfer(bank.reference);
     } catch (e) {

@@ -7,7 +7,8 @@ export type PaymentRun = {
   ref: string;
   payer: string;
   freelancer: string;
-  amountEth: string;
+  amount: string;
+  token: "eth" | "eurc";
   amountEur: number;
   route: PayoutRoute;
   status: string;
@@ -23,6 +24,8 @@ export type ServerEvent = {
   payload?: Record<string, unknown>;
   message?: string;
   tx?: { to: `0x${string}`; data: `0x${string}`; value: string };
+  /** Token approval to sign before `tx` (token jobs only). */
+  approval?: { to: `0x${string}`; data: `0x${string}` };
 };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -36,7 +39,7 @@ const post = <T>(path: string, body: unknown) => request<T>(path, { method: "POS
 
 export const api = {
   health: () => request<{ ok: boolean; eurPerEth: number }>("/api/health"),
-  createPayment: (body: { payer: string; freelancer: string; amountEth: string; days: string; description: string; route: PayoutRoute }) =>
+  createPayment: (body: { payer: string; freelancer: string; amount: string; token: "eth" | "eurc"; days: string; description: string; route: PayoutRoute }) =>
     post<{ run: PaymentRun; bank: { reference: string; amountEur: number } }>("/api/payments", body),
   bankTransfer: (reference: string) => post<{ ok: boolean }>("/api/sandbox/bank-transfer", { reference }),
   markSigned: (id: string, gasMode: "sponsored" | "wallet") => post(`/api/payments/${id}/signed`, { gasMode }),

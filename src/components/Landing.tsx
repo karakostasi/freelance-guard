@@ -1,7 +1,8 @@
 import { useRef } from "react";
-import { useAccount, useConnect } from "wagmi";
+import { useAccount } from "wagmi";
 import { ArrowRight, Banknote, Eye, FileCheck, Lock, Scale, Send, ShieldCheck, Wallet } from "lucide-react";
 import { navigate } from "../hooks/useHashRoute";
+import { ConnectButton } from "./ConnectButton";
 import styles from "../App.module.css";
 import page from "./Landing.module.css";
 
@@ -21,13 +22,20 @@ const BENEFITS = [
 
 export function Landing() {
   const { isConnected } = useAccount();
-  const { connect, connectors, isPending, error } = useConnect();
   const how = useRef<HTMLElement>(null);
 
-  const start = () => {
-    if (isConnected) navigate("/jobs");
-    else connect({ connector: connectors[0] }, { onSuccess: () => navigate("/jobs") });
-  };
+  // Already signed in: go straight to the app. Otherwise a sign-in chooser opens, and the app follows.
+  const startButton = (
+    isConnected ? (
+      <button className={`${styles.button} ${page.primary}`} onClick={() => navigate("/jobs")}>
+        Open the app <ArrowRight size={16} />
+      </button>
+    ) : (
+      <ConnectButton className={`${styles.button} ${page.primary}`} onConnected={() => navigate("/jobs")}>
+        Sign in to start <ArrowRight size={16} />
+      </ConnectButton>
+    )
+  );
 
   return (
     <div className={page.landing}>
@@ -36,14 +44,11 @@ export function Landing() {
         <h2 className={page.headline}>Get paid for your work. Pay only for work you approve.</h2>
         <p className={page.lead}>Freelance Guard holds the payment in escrow until the work is approved.</p>
         <div className={page.cta}>
-          <button className={`${styles.button} ${page.primary}`} onClick={start} disabled={isPending}>
-            {isConnected ? "Open the app" : "Connect wallet to start"} <ArrowRight size={16} />
-          </button>
+          {startButton}
           <button className={styles.ghostButton} onClick={() => how.current?.scrollIntoView({ behavior: "smooth" })}>
             See how it works
           </button>
         </div>
-        {error && <p className={styles.error}>{error.message.split("\n")[0]}</p>}
         <p className={page.note}>Testnet demo. No real money.</p>
       </section>
 
@@ -91,9 +96,7 @@ export function Landing() {
 
       <section className={page.final}>
         <h3 className={page.title}>Ready to try it?</h3>
-        <button className={`${styles.button} ${page.primary}`} onClick={start} disabled={isPending}>
-          {isConnected ? "Open the app" : "Connect wallet to start"} <ArrowRight size={16} />
-        </button>
+        {startButton}
       </section>
     </div>
   );

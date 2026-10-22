@@ -1,12 +1,11 @@
-import { erc20Abi } from "viem";
-import { readContract, waitForTransactionReceipt, writeContract } from "wagmi/actions";
+import { erc20Abi, type Abi } from "viem";
+import { readContract } from "wagmi/actions";
 import { config, escrowAddress } from "../wagmi";
+import { callOf, type Call } from "./tx";
 
-/** Makes sure the escrow may pull `amount` of `token` from `owner`, asking for an approval only if needed. */
-export async function ensureAllowance(token: `0x${string}`, owner: `0x${string}`, amount: bigint, onApprove?: () => void) {
+/** The approval the escrow needs before it can pull `amount` of `token` from `owner`, or null if that is already allowed. */
+export async function approvalCall(token: `0x${string}`, owner: `0x${string}`, amount: bigint): Promise<Call | null> {
   const allowance = await readContract(config, { address: token, abi: erc20Abi, functionName: "allowance", args: [owner, escrowAddress] });
-  if (allowance >= amount) return;
-  onApprove?.();
-  const hash = await writeContract(config, { address: token, abi: erc20Abi, functionName: "approve", args: [escrowAddress, amount] });
-  await waitForTransactionReceipt(config, { hash });
+  if (allowance >= amount) return null;
+  return callOf({ address: token, abi: erc20Abi as Abi, functionName: "approve", args: [escrowAddress, amount] });
 }

@@ -4,7 +4,7 @@ import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { createSession, verifyToken } from "./auth.mjs";
 import { openBlobStore } from "./blobs.mjs";
 import { db, flush, save } from "./db.mjs";
-import { watchEscrow, ESCROW_ADDRESS, RPC_URL } from "./chain.mjs";
+import { client, watchEscrow, ESCROW_ADDRESS, RPC_URL } from "./chain.mjs";
 import { bankReceived, createRun, fail, milestonePlan, onChainEvent, onThisContract, publicRun, subscribe } from "./pipeline.mjs";
 import { EUR_PER_ETH } from "./providers.mjs";
 
@@ -159,7 +159,7 @@ const server = createServer(async (req, res) => {
 
     if (req.method === "POST" && path === "/api/auth") {
       const { body } = await json(req);
-      return send(res, 200, await createSession(body));
+      return send(res, 200, await createSession(body, Date.now(), (args) => client.verifyMessage(args)));
     }
 
     if (req.method === "POST" && path === "/api/files") {

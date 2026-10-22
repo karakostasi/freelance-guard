@@ -83,6 +83,19 @@ A job has a title, an optional spec and optional attachments. A milestone's deli
 - **Uploads need a wallet signature** (one sign-in message per hour), so the backend can't be used as free file hosting. Limits: 10 MB per file, 5 files per form, 50 uploads and 200 MB per address per day, and 300 MB in total (see `.env.example`). Files are served with `nosniff` and a sandbox policy, and only images, PDFs, text and JSON are shown in the browser. Everything else downloads.
 - Files are **not private**: anyone with a file's hash can download it. Don't upload secrets.
 
+## Sign in with a passkey, and free gas
+
+People without a crypto wallet sign in with a **passkey** (fingerprint or face). That creates a Base Account (formerly Coinbase Smart Wallet) for them, with no seed phrase and no extension. MetaMask still works for people who have it. The sign-in chooser is in `src/components/ConnectButton.tsx`.
+
+Network fees can be paid for the user by a **paymaster**. When `VITE_PAYMASTER_URL` is set and the wallet supports it, every action (create or fund a job, submit, approve, claim, refund...) goes out through `src/lib/tx.ts` as sponsored calls, and a token approval plus the action are sent in **one confirmation**. If sponsoring isn't available, the same code falls back to ordinary transactions, exactly as before.
+
+Setup:
+1. `npm install @base-org/account`, then commit `package.json` and `package-lock.json`. The app builds without it, but the passkey button needs it.
+2. In the Coinbase Developer Platform, open Paymaster, pick **Base Sepolia**, enable it, and copy the endpoint into `VITE_PAYMASTER_URL` (locally and on Vercel).
+3. In the paymaster policy, allow only what you want to pay for: your escrow contract (`createJob`, `fundMilestone`, `submitWork`, `approve`, `dispute`, `claimAfterTimeout`, `refundExpired`, `resolve`) and `approve` on the EURC and USDC contracts. Set a per-user and a global spend limit.
+
+Smart-wallet signatures can't be checked off-chain, so the backend confirms them with the chain (`client.verifyMessage`) when a plain signature check fails. File uploads work the same for passkey users.
+
 ## Wallet card
 
 On the Jobs and Payment flow pages a wallet card is always visible on the right: your ETH, EURC and USDC balances (with a euro estimate at the app's demo rates), **Send**, and **Receive** (your address and links to test-fund faucets). A send checks the address and amount first, shows a review with the full address, then your own wallet asks you to confirm, so the app never holds keys. There is deliberately no swap: the test tokens have no real market on Base Sepolia.

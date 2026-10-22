@@ -1,5 +1,6 @@
-import { useAccount, useConnect } from "wagmi";
+import { useAccount } from "wagmi";
 import { Briefcase, Workflow } from "lucide-react";
+import { ConnectButton } from "./components/ConnectButton";
 import { FlowPage } from "./components/FlowPage";
 import { JobsPage } from "./components/JobsPage";
 import { Landing } from "./components/Landing";
@@ -10,7 +11,6 @@ import styles from "./App.module.css";
 
 export default function App() {
   const { isConnected } = useAccount();
-  const { connect, connectors, error: connectError } = useConnect();
   const route = useHashRoute();
 
   return (
@@ -35,11 +35,8 @@ export default function App() {
       {route.page === "home" && <Landing />}
       {!isConnected && route.page !== "home" && (
         <div className={styles.connectPrompt}>
-          <p>Connect your wallet to continue.</p>
-          <button className={styles.button} onClick={() => connect({ connector: connectors[0] })}>
-            Connect wallet
-          </button>
-          {connectError && <p className={styles.error}>{connectError.message.split("\n")[0]}</p>}
+          <p>Sign in to continue.</p>
+          <ConnectButton className={styles.button}>Sign in</ConnectButton>
         </div>
       )}
       {isConnected && route.page === "flow" && <FlowPage jobId={route.jobId} />}

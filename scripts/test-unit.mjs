@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { privateKeyToAccount } from "viem/accounts";
 import { buildDescription, deliverableUrl, formatBytes, jobTitle, parseDeliverable, parseDescription, parseDoc, serializeDoc, signInMessage as frontendMessage } from "../src/lib/documents.ts";
+import { firstLine, userRejected } from "../src/lib/errors.ts";
 import { formatBalance } from "../src/lib/format.ts";
 import { ETH_GAS_BUFFER, checkSend, maxSendable, parseAmount } from "../src/lib/send.ts";
 import { SESSION_MS, createSession, signInMessage, verifyToken } from "../server/auth.mjs";
@@ -87,6 +88,15 @@ check(checkSend(eth).error !== null && checkSend({ ...eth, amountText: "0.5" }).
 check(maxSendable(10n ** 18n, true) === 10n ** 18n - ETH_GAS_BUFFER && maxSendable(ETH_GAS_BUFFER, true) === 0n && maxSendable(123n, false) === 123n, "max keeps a fee buffer for ETH only");
 check(checkSend({ ...eth, amountText: "0.999950000000000000" }).error === null && checkSend({ ...eth, amountText: "0.99996" }).error !== null, "the buffer boundary is exact");
 
+console.log("\nWallet errors");
+check(userRejected({ code: 4001 }) && userRejected({ name: "UserRejectedRequestError" }), "a refusal in the wallet is recognised");
+check(userRejected({ message: "wrapped", cause: { cause: { code: 4001 } } }), "even when wrapped in other errors");
+check(!userRejected(new Error("insufficient funds")) && !userRejected(undefined) && !userRejected("text") && !userRejected({ code: 4100 }), "real failures are not mistaken for a refusal");
+const loop = { name: "x" };
+loop.cause = loop;
+check(userRejected(loop) === false, "a self-referencing error can't hang it");
+check(firstLine(new Error("short\nlong details")) === "short" && firstLine("plain") === "plain", "the useful first line of an error");
+
 console.log("\nSign-in sessions");
 const account = privateKeyToAccount("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80");
 const other = privateKeyToAccount("0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d");
@@ -107,6 +117,18 @@ check((await rejects(createSession({ address: account.address, issuedAt, signatu
 check((await rejects(createSession({ address: account.address, issuedAt: new Date(now + 60_000).toISOString(), signature }, now)))?.status === 401, "a signature for a different time than claimed is refused");
 check((await rejects(createSession({ address: account.address, issuedAt, signature: "0x1234" }, now)))?.status === 401, "a garbage signature is refused");
 check((await rejects(createSession({ address: "nope", issuedAt, signature }, now)))?.status === 401, "a bad address is refused");
+const smartSignature = "0x" + "ab".repeat(130); // a smart wallet's signature is longer than 65 bytes
+const asked = [];
+const accept = async (a) => (asked.push(a), true);
+check((await createSession({ address: account.address, issuedAt, signature: smartSignature }, now, accept)).address === account.address.toLowerCase(), "a smart wallet signature is accepted when the chain confirms it");
+check(asked.length === 1 && asked[0].address === account.address && asked[0].message === signInMessage(account.address, issuedAt), "the chain is asked about exactly the message that was signed");
+check((await rejects(createSession({ address: account.address, issuedAt, signature: smartSignature }, now, async () => false)))?.status === 401, "a smart wallet signature the chain rejects is refused");
+check((await rejects(createSession({ address: account.address, issuedAt, signature: smartSignature }, now, async () => { throw new Error("rpc down"); })))?.status === 401, "if the chain can't be reached, it fails closed");
+check((await rejects(createSession({ address: account.address, issuedAt, signature: smartSignature }, now)))?.status === 401, "without a chain check, such a signature is refused");
+const before = asked.length;
+await createSession({ address: account.address, issuedAt, signature }, now, accept);
+check(asked.length === before, "a normal wallet's signature never needs the chain");
+check((await rejects(createSession({ address: account.address, issuedAt, signature: wrongSigner }, now, async () => false)))?.status === 401, "another wallet's plain signature is still refused");
 
 console.log("\nFile stores");
 const dir = mkdtempSync(join(tmpdir(), "fg-blobs-"));

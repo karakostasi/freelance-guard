@@ -1,54 +1,19 @@
 import { useEffect, useRef, useState } from "react";
 import { useAccount } from "wagmi";
-import { getCapabilities, getChainId, sendCalls, sendTransaction, waitForCallsStatus, waitForTransactionReceipt } from "wagmi/actions";
-import { config } from "../wagmi";
 import { api, type ServerEvent } from "../lib/api";
+import { userRejected } from "../lib/errors";
+import { sendTransactions, type Call } from "../lib/tx";
 import { initialFlowState, stepIndex, stepKey, type FlowState } from "../lib/fiatFlow";
 import { useRunEvents } from "./useRunEvents";
 import type { FundingForm } from "./useFiatFunding";
 
-const PAYMASTER_URL = import.meta.env.VITE_PAYMASTER_URL as string | undefined;
-
-const userRejected = (e: unknown): boolean => {
-  for (let err = e as { name?: string; code?: number; cause?: unknown } | undefined; err; err = err.cause as typeof err) {
-    if (err.code === 4001 || err.name === "UserRejectedRequestError") return true;
-  }
-  return false;
-};
-
-/**
- * Sends what the backend prepared: the call, plus a token approval first for token jobs. With a paymaster
- * URL and a wallet that supports sponsored calls (EIP-5792 + ERC-7677) the gas is sponsored and both go
- * in one batch; otherwise, or if that path fails, the wallet signs them one by one and pays the gas.
- */
+/** Sends what the backend prepared (the call, plus a token approval first for token jobs) and tells it how gas was paid. */
 async function sendPrepared(prep: { tx: NonNullable<ServerEvent["tx"]>; approval?: ServerEvent["approval"] }, address: `0x${string}`, runId: string) {
-  const calls = [
-    ...(prep.approval ? [{ to: prep.approval.to, data: prep.approval.data, value: 0n }] : []),
+  const calls: Call[] = [
+    ...(prep.approval ? [{ to: prep.approval.to, data: prep.approval.data }] : []),
     { to: prep.tx.to, data: prep.tx.data, value: BigInt(prep.tx.value) },
   ];
-  if (PAYMASTER_URL) {
-    try {
-      const chainId = await getChainId(config);
-      const caps = (await getCapabilities(config, { account: address })) as Record<number, { paymasterService?: { supported?: boolean } } | undefined>;
-      if (caps[chainId]?.paymasterService?.supported) {
-        const { id } = await sendCalls(config, {
-          calls,
-          capabilities: { paymasterService: { url: PAYMASTER_URL } },
-        });
-        await api.markSigned(runId, "sponsored");
-        await waitForCallsStatus(config, { id });
-        return;
-      }
-    } catch (e) {
-      if (userRejected(e)) throw e;
-      // sponsored path unavailable: fall through to a normal transaction
-    }
-  }
-  await api.markSigned(runId, "wallet");
-  for (const [i, call] of calls.entries()) {
-    const hash = await sendTransaction(config, call);
-    if (i < calls.length - 1) await waitForTransactionReceipt(config, { hash });
-  }
+  await sendTransactions(address, calls, (sponsored) => void api.markSigned(runId, sponsored ? "sponsored" : "wallet"));
 }
 
 /**

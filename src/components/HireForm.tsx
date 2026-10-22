@@ -1,14 +1,16 @@
 import { useState } from "react";
-import { useAccount, useBalance, useReadContract, useWriteContract } from "wagmi";
-import { erc20Abi, formatUnits, isAddress, parseUnits, zeroAddress } from "viem";
+import { useAccount, useBalance, useReadContract } from "wagmi";
+import { erc20Abi, formatUnits, isAddress, parseUnits, zeroAddress, type Abi } from "viem";
 import { Check, Plus, X } from "lucide-react";
 import { escrowAbi, escrowAddress } from "../wagmi";
 import { useBackendStatus } from "../hooks/useBackend";
 import type { FundingForm } from "../hooks/useFiatFunding";
 import { useRefreshOnConfirm } from "../hooks/useRefreshOnConfirm";
 import { buildDescription } from "../lib/documents";
-import { ensureAllowance } from "../lib/erc20";
+import { approvalCall } from "../lib/erc20";
+import { firstLine } from "../lib/errors";
 import { uploadDoc, uploadFile } from "../lib/files";
+import { callOf, sendTransactions, type Call } from "../lib/tx";
 import { FileDrop } from "./FileDrop";
 import type { PayoutRoute } from "../lib/fiatFlow";
 import { euro } from "../lib/jobs";
@@ -52,7 +54,6 @@ const sameRows = (a: Row[], b: Row[]) => a.length === b.length && a.every((r, i)
 export function HireForm({ variant = "page", onBank, onCreated }: { variant?: "page" | "drawer"; onBank: (form: FundingForm) => void; onCreated?: () => void }) {
   const { address } = useAccount();
   const { online: backendOnline } = useBackendStatus();
-  const { writeContractAsync } = useWriteContract();
   const [txHash, setTxHash] = useState<`0x${string}` | undefined>();
   const [working, setWorking] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -146,7 +147,7 @@ export function HireForm({ variant = "page", onBank, onCreated }: { variant?: "p
         });
         reset();
       } catch (e) {
-        setError((e as Error).message.split("\n")[0]);
+        setError(firstLine(e));
       } finally {
         setWorking("");
       }
@@ -154,23 +155,28 @@ export function HireForm({ variant = "page", onBank, onCreated }: { variant?: "p
     }
     try {
       const description = await makeDescription();
+      // A token job needs the escrow approved first. With a passkey wallet that and the job go out in one confirmation.
+      const calls: Call[] = [];
       if (fundNow && token.address) {
-        await ensureAllowance(token.address, address!, totalUnits, () => setWorking("Approve the token in your wallet…"));
+        const approval = await approvalCall(token.address, address!, totalUnits);
+        if (approval) calls.push(approval);
       }
       setWorking("Confirm in your wallet…");
       const items = rows.map((r, i) => ({ title: r.title.trim(), amount: amounts[i], duration: Math.round(Number(r.days) * DAY) }));
-      setTxHash(
-        await writeContractAsync({
+      calls.push(
+        callOf({
           address: escrowAddress,
-          abi: escrowAbi,
+          abi: escrowAbi as Abi,
           functionName: "createJob",
           args: [freelancer, token.address ?? zeroAddress, description, items, fundNow],
           value: fundNow && !token.address ? totalUnits : 0n,
         }),
       );
+      const { hash } = await sendTransactions(address!, calls);
+      setTxHash(hash);
       onCreated?.();
     } catch (e) {
-      setError((e as Error).message.split("\n")[0]);
+      setError(firstLine(e));
     } finally {
       setWorking("");
     }

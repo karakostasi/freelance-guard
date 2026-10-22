@@ -160,3 +160,13 @@ select.input:disabled { cursor: not-allowed; }
 .wpMax { position: absolute; right: .6rem; top: 50%; transform: translateY(-50%); padding: .2rem .6rem; border-radius: 999px; border: 1px solid #444; background: none; color: inherit; font: inherit; font-size: .8rem; cursor: pointer; }
 .wpMax:hover:not(:disabled) { border-color: var(--accent); }
 .wpMax:disabled { opacity: .4; cursor: not-allowed; }
+
+/* the sign-in chooser */
+.connectModal { max-width: 460px; }
+.connectOptions { display: flex; flex-direction: column; gap: .75rem; margin-top: .5rem; }
+.connectOption { display: flex; align-items: flex-start; gap: .9rem; padding: 1rem; border-radius: 12px; border: 1px solid #333; background: #181b22; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: border-color .15s; }
+.connectOption > span { display: flex; flex-direction: column; gap: .25rem; align-items: flex-start; }
+.connectOption:hover:not(:disabled) { border-color: var(--accent); }
+.connectOption:disabled { opacity: .55; cursor: not-allowed; }
+.connectRecommended { border-color: color-mix(in srgb, var(--accent) 60%, #333); background: rgba(79, 124, 255, .08); }
+.connectBadge { font-size: .72rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: #8fa8ff; }

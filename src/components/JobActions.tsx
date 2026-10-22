@@ -1,13 +1,15 @@
 import { useState } from "react";
 import { useAccount } from "wagmi";
-import { writeContract } from "wagmi/actions";
-import { config, escrowAbi, escrowAddress } from "../wagmi";
+import type { Abi } from "viem";
+import { escrowAbi, escrowAddress } from "../wagmi";
 import { useEscrowConfig } from "../hooks/useEscrowConfig";
 import { useNow } from "../hooks/useNow";
 import { useRefreshOnConfirm } from "../hooks/useRefreshOnConfirm";
 import { useBackendStatus } from "../hooks/useBackend";
-import { ensureAllowance } from "../lib/erc20";
+import { approvalCall } from "../lib/erc20";
+import { firstLine } from "../lib/errors";
 import { uploadDoc, uploadFile } from "../lib/files";
+import { callOf, sendTransactions, type Call } from "../lib/tx";
 import { FileDrop } from "./FileDrop";
 import { STATUS, formatDuration, milestoneName, type Job } from "../lib/jobs";
 import { tokenOf } from "../lib/tokens";
@@ -51,17 +53,21 @@ export function JobActions({ id, index, job }: { id: string; index: number; job:
     return `fg:${await uploadDoc({ version: 1, text, files: uploaded }, address!)}`;
   };
 
-  const send = async (functionName: string, args: unknown[] | (() => Promise<unknown[]>), value?: bigint, prepare?: () => Promise<void>) => {
+  // `before` is something that has to happen first, such as a token approval. It goes out together with the action
+  // in a single confirmation when the wallet allows, which is what lets a passkey user confirm once.
+  const send = async (functionName: string, args: unknown[] | (() => Promise<unknown[]>), value?: bigint, before?: () => Promise<Call | null>) => {
     setError(null);
     try {
-      await prepare?.();
+      const first = await before?.();
       const resolved = typeof args === "function" ? await args() : args;
       setWorking("Confirm in your wallet…");
-      setTxHash(await writeContract(config, { address: escrowAddress, abi: escrowAbi, functionName, args: resolved, value }));
+      const calls = [...(first ? [first] : []), callOf({ address: escrowAddress, abi: escrowAbi as Abi, functionName, args: resolved, value })];
+      const { hash } = await sendTransactions(address!, calls);
+      setTxHash(hash);
       setFiles([]);
       setDeliverable("");
     } catch (e) {
-      setError((e as Error).message.split("\n")[0]);
+      setError(firstLine(e));
     } finally {
       setWorking("");
     }
@@ -71,7 +77,7 @@ export function JobActions({ id, index, job }: { id: string; index: number; job:
     const token = tokenOf(job);
     if (!token.address) return send("fundMilestone", [n, m], ms.amount);
     // Tokens need the escrow to be allowed to pull them first.
-    return send("fundMilestone", [n, m], undefined, () => ensureAllowance(token.address!, address!, ms.amount, () => setWorking("Approve the token in your wallet…")));
+    return send("fundMilestone", [n, m], undefined, () => approvalCall(token.address!, address!, ms.amount));
   };
 
   // Each action is disabled (with a hint) when the contract would revert.

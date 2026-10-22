@@ -109,7 +109,7 @@ On the Jobs and Payment flow pages a wallet card is always visible on the right:
 
 GitHub Actions runs all of them on every pull request and on pushes to `main` (`.github/workflows/ci.yml`), and also checks that the committed ABI in `abi/` matches the contract. If that check fails, run `npm run compile` and commit the result.
 
-CI installs with `npm ci`, so it uses exactly the versions in `package-lock.json`. After adding or changing a dependency, run `npm install` and commit the updated lockfile, or CI will refuse it.
+CI installs with `npm ci`, so it uses exactly the versions in `package-lock.json`. It runs on Node 24 (npm 11), the same as local development: a lockfile written by npm 11 is refused by the npm 10 that ships with Node 22. After adding or changing a dependency, run `npm install` and commit the updated lockfile, or CI will refuse it.
 
 ## Known limitations
 

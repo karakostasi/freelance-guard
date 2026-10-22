@@ -13,6 +13,7 @@ import { FileDrop } from "./FileDrop";
 import type { PayoutRoute } from "../lib/fiatFlow";
 import { euro } from "../lib/jobs";
 import { ETH, TOKENS, formatBalance, formatUnitsOf, toEur } from "../lib/tokens";
+import { ReputationBadge } from "./ReputationBadge";
 import styles from "../App.module.css";
 
 type Row = { title: string; percent: string; days: string };
@@ -181,6 +182,7 @@ export function HireForm({ variant = "page", onBank, onCreated }: { variant?: "p
       <div className={styles.formGroup}>
         <h3 className={styles.groupTitle}>Who and how much</h3>
         <input className={styles.input} placeholder="Freelancer address (0x…)" value={freelancer} onChange={(e) => setFreelancer(e.target.value)} />
+        {isAddress(freelancer) && <ReputationBadge address={freelancer} role="freelancer" />}
         <div className={styles.amountRow}>
           <input className={styles.input} placeholder={`Total amount (${token.symbol})`} value={total} onChange={(e) => setTotal(e.target.value)} />
           <select className={styles.input} value={symbol} onChange={(e) => setSymbol(e.target.value)} aria-label="Asset">

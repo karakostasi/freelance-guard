@@ -30,7 +30,7 @@ export function parseDescription(description: string) {
 }
 
 /** The text a wallet signs to sign in for uploads. The backend builds the same text (server/auth.mjs) and a test keeps them equal. */
-export const signInMessage = (address: string, issuedAt: string) => ["Freelance Guard", "Sign in to upload files.", `Address: ${address}`, `Issued: ${issuedAt}`].join("\n");
+export const signInMessage = (address: string, issuedAt: string) => ["Freelance Guard", "Sign in to upload files and manage notifications.", `Address: ${address}`, `Issued: ${issuedAt}`].join("\n");
 
 export const jobTitle = (description: string, id: number | string) => parseDescription(description).title || `Job #${id}`;
 

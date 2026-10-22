@@ -99,8 +99,12 @@ export function JobActions({ id, index, job }: { id: string; index: number; job:
           )}
         </>
       )}
-      {isFreelancer && status === "Submitted" &&
-        action(name ? `Claim ${name} payment` : "Claim payment", () => send("claimAfterTimeout", [n, m]), reviewEnd === undefined || now < reviewEnd ? `Available in ${formatDuration((reviewEnd ?? now) - now)}` : "")}
+      {isFreelancer && status === "Submitted" && (
+        <>
+          {action(name ? `Claim ${name} payment` : "Claim payment", () => send("claimAfterTimeout", [n, m]), reviewEnd === undefined || now < reviewEnd ? `Available in ${formatDuration((reviewEnd ?? now) - now)}` : "")}
+          {(reviewEnd === undefined || now < reviewEnd) && <p className={styles.muted}>If the client doesn&apos;t respond, you can claim the payment once the review period ends.</p>}
+        </>
+      )}
       {isClient && status === "Submitted" && (
         <>
           {action(name ? `Approve ${name} & pay` : "Approve & pay", () => send("approve", [n, m]))}

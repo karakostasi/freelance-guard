@@ -2,9 +2,10 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAccount, useBalance, useConnect, useDisconnect } from "wagmi";
 import { formatEther } from "viem";
-import { Check, Copy, LogOut, Repeat } from "lucide-react";
+import { Check, Copy, LogOut, Mail, Repeat } from "lucide-react";
 import { avatarGradient } from "../lib/avatar";
 import { short } from "../lib/jobs";
+import { NotificationSettings } from "./NotificationSettings";
 import styles from "../App.module.css";
 
 /** The account in the header: a "Connect wallet" button, or the account avatar with a menu. */
@@ -16,6 +17,7 @@ export function ProfileMenu() {
   // Where the menu opens (under the avatar); null while it is closed.
   const [anchor, setAnchor] = useState<{ top: number; right: number } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [notifying, setNotifying] = useState(false);
 
   useEffect(() => {
     if (!anchor) return;
@@ -83,6 +85,16 @@ export function ProfileMenu() {
               <button className={styles.menuItem} onClick={copy} role="menuitem">
                 {copied ? <Check size={15} /> : <Copy size={15} />} {copied ? "Copied!" : "Copy address"}
               </button>
+              <button
+                className={styles.menuItem}
+                onClick={() => {
+                  setAnchor(null);
+                  setNotifying(true);
+                }}
+                role="menuitem"
+              >
+                <Mail size={15} /> Email notifications
+              </button>
               <button className={styles.menuItem} onClick={switchAccount} role="menuitem">
                 <Repeat size={15} /> Switch account
               </button>
@@ -100,6 +112,7 @@ export function ProfileMenu() {
           </div>,
           document.body,
         )}
+      {notifying && createPortal(<NotificationSettings onClose={() => setNotifying(false)} />, document.body)}
     </>
   );
 }

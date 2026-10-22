@@ -9,6 +9,8 @@ import { computeReputation, jobKey } from "../src/lib/reputation.ts";
 import { reminderFor } from "../src/lib/reminders.ts";
 import { formatBalance } from "../src/lib/format.ts";
 import { ETH_GAS_BUFFER, checkSend, maxSendable, parseAmount } from "../src/lib/send.ts";
+import { cleanEmail, confirmToken, messagesFor, notifyParties, readEmailToken, unsubscribeToken } from "../server/emails.mjs";
+import { sendMail } from "../server/mail.mjs";
 import { SESSION_MS, createSession, signInMessage, verifyToken } from "../server/auth.mjs";
 import { fsBlobStore, pgBlobStore } from "../server/blobs.mjs";
 
@@ -181,6 +183,66 @@ check(remind(rjob(rm(4), rm(2, { submittedAt: T0 })), C, T0)?.milestone === 1, "
 check(remind(rjob(rm(4), rm(5)), C, T0) === undefined && remind(rjob(rm(0)), C, T0) === undefined && remind(rjob(rm(3)), C, T0) === undefined, "nothing to say for finished, unfunded or disputed milestones");
 check(remind(submitted, "0xother", T0) === undefined, "nothing for someone who isn't a party");
 check(reminderFor(submitted, C, undefined, T0 + DAYS) === undefined, "nothing until the review period is known");
+
+console.log("\nEmail notifications");
+{
+const ME = "0x" + "a".repeat(40), YOU = "0x" + "b".repeat(40);
+check(cleanEmail(" a@b.co ") === "a@b.co" && cleanEmail("nope") === null && cleanEmail("a b@c.d") === null && cleanEmail("a@b") === null && cleanEmail("a".repeat(250) + "@b.co") === null, "emails are checked and trimmed");
+const T0n = 1_000_000;
+const token = confirmToken(ME, "a@b.co", T0n);
+check(readEmailToken(token, "confirm", T0n + 1000)?.email === "a@b.co" && readEmailToken(token, "confirm", T0n + 1000).address === ME, "a confirm token carries the address and email");
+check(readEmailToken(token, "confirm", T0n + 25 * 3600 * 1000) === null, "a confirm token expires after a day");
+check(readEmailToken(token, "unsub", T0n + 1000) === null, "a confirm token is not an unsubscribe token");
+check(readEmailToken(token.slice(0, -2) + "xx", "confirm", T0n + 1000) === null && readEmailToken("garbage", "confirm") === null, "a forged or broken token is refused");
+check(readEmailToken(unsubscribeToken(ME, "a@b.co", T0n), "unsub", T0n + 30 * 24 * 3600 * 1000)?.address === ME, "an unsubscribe link works for months");
+check(verifyToken(token) === null, "an email token can't be used as a sign-in session");
+
+const ARB = "0x" + "c".repeat(40);
+const escrowJob = { client: ME, freelancer: YOU };
+const opts = { reviewPeriod: 259200n, arbiter: ARB, appUrl: "https://app" };
+const to = (messages, who) => messages.find((m) => m.to === who);
+const funding = messagesFor("MilestoneFunded", { id: 4n, milestone: 0n }, escrowJob, opts);
+check(funding.length === 2 && to(funding, YOU).subject === "Job #4 has been funded" && to(funding, ME).subject === "You funded job #4", "funding tells the freelancer to start and gives the client a receipt");
+const submission = messagesFor("WorkSubmitted", { id: 4n, milestone: 1n }, escrowJob, opts);
+check(to(submission, ME).text.includes("3 days") && to(submission, ME).text.includes("https://app/#/flow/4") && to(submission, ME).text.includes("milestone 2") && to(submission, YOU).subject.includes("was submitted"), "a submission tells the client what to do, and the freelancer it is with the client");
+check(to(messagesFor("Approved", { id: 4n, milestone: 0n }, escrowJob, opts), YOU).subject === "Payment released for job #4" && messagesFor("Approved", { id: 4n, milestone: 0n }, escrowJob, opts).length === 2, "a payment release goes to both");
+const arbitrated = messagesFor("Resolved", { id: 4n, milestone: 0n, paidFreelancer: true }, escrowJob, opts);
+check(arbitrated.length === 2 && to(arbitrated, YOU).text.includes("arbiter decided"), "the arbiter paying the freelancer is announced as a payment");
+check(messagesFor("Resolved", { id: 4n, milestone: 0n, paidFreelancer: false }, escrowJob, opts).length === 0, "an arbiter refund is announced by the Refunded event, not twice");
+check(messagesFor("Refunded", { id: 4n, milestone: 0n }, escrowJob, opts).length === 2, "a refund goes to both");
+const dispute = messagesFor("Disputed", { id: 4n, milestone: 0n }, escrowJob, opts);
+check(dispute.length === 3 && to(dispute, ARB).subject.includes("needs your decision"), "a dispute also asks the arbiter to decide");
+check(messagesFor("JobCreated", { id: 4n }, escrowJob, opts).length === 0, "other events send nothing");
+
+const sent = [];
+const deps = (emails) => ({ emails, readJob: async () => escrowJob, reviewPeriod: async () => 259200n, arbiter: async () => ARB, send: async (m) => sent.push(m), appUrl: "https://app", unsubscribeUrl: (a) => `https://api/unsub/${a}`, seen: new Set() });
+const funded = { eventName: "MilestoneFunded", args: { id: 1n, milestone: 0n }, transactionHash: "0xt1" };
+const both = { [YOU]: { email: "f@x.io", verified: true }, [ME]: { email: "c@x.io", verified: true } };
+const d1 = deps(both);
+check((await notifyParties(funded, d1)) === 2 && sent.map((m) => m.to).sort().join() === "c@x.io,f@x.io" && sent[0].text.includes("https://api/unsub/"), "both people are emailed, each with an unsubscribe link");
+check((await notifyParties({ ...funded, args: { id: 1n, milestone: 1n } }, d1)) === 0 && sent.length === 2, "funding several milestones in one transaction sends one email each");
+check((await notifyParties({ ...funded, transactionHash: "0xt2" }, d1)) === 2 && sent.length === 4, "a different transaction sends again");
+const before = sent.length;
+check((await notifyParties(funded, deps({ [YOU]: { email: "f@x.io", verified: false }, [ME]: { email: "c@x.io", verified: true } }))) === 1 && sent.length === before + 1 && sent.at(-1).to === "c@x.io", "only people with a confirmed email are emailed");
+check((await notifyParties(funded, deps({}))) === 0, "nobody registered, nothing sent");
+check((await notifyParties({ eventName: "Disputed", args: { id: 1n, milestone: 0n }, transactionHash: "0xt5" }, deps({ ...both, [ARB]: { email: "a@x.io", verified: true } }))) === 3, "a dispute reaches the client, the freelancer and the arbiter");
+const flaky = deps(both);
+let first = true;
+flaky.send = async (m) => {
+  if (first) { first = false; throw new Error("boom"); }
+  sent.push(m);
+};
+const n0 = sent.length;
+check((await notifyParties({ ...funded, transactionHash: "0xt6" }, flaky)) === 1 && sent.length === n0 + 1, "one email failing doesn't stop the other");
+
+const calls = [];
+const fakeFetch = async (url, init) => (calls.push({ url, init }), { ok: calls.length !== 3, status: 422 });
+check((await sendMail({ to: "a@b.co", subject: "s", text: "t" }, { fetchImpl: fakeFetch, env: {} })).sent === false && calls.length === 0, "without an API key nothing is sent");
+const mailed = await sendMail({ to: "a@b.co", subject: "s", text: "t" }, { fetchImpl: fakeFetch, env: { RESEND_API_KEY: "k", MAIL_FROM: "Me <me@x.io>" } });
+check(mailed.sent && calls[0].url === "https://api.resend.com/emails" && calls[0].init.headers.authorization === "Bearer k" && JSON.parse(calls[0].init.body).from === "Me <me@x.io>" && JSON.parse(calls[0].init.body).to[0] === "a@b.co", "with a key the email goes to Resend");
+await sendMail({ to: "a@b.co", subject: "s", text: "t" }, { fetchImpl: fakeFetch, env: { RESEND_API_KEY: "k" } });
+check((await rejects(sendMail({ to: "a@b.co", subject: "s", text: "t" }, { fetchImpl: fakeFetch, env: { RESEND_API_KEY: "k" } })))?.message.includes("422"), "a refusal from the email service is an error");
+}
 
 console.log(failures ? `\n${failures} check(s) failed` : "\nAll checks passed");
 process.exit(failures ? 1 : 0);

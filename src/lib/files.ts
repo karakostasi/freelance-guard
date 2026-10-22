@@ -14,7 +14,7 @@ export async function sha256Hex(data: ArrayBuffer) {
 let session: { token: string; address: string; expiresAt: number } | null = null;
 
 /** Signs in once an hour, with a signature from the wallet, so the backend knows who is uploading. */
-async function sessionToken(address: string) {
+export async function sessionToken(address: string) {
   if (session && session.address === address.toLowerCase() && session.expiresAt - Date.now() > 60_000) return session.token;
   const issuedAt = new Date().toISOString();
   const signature = await signMessage(config, { message: signInMessage(address, issuedAt) });

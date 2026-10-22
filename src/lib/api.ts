@@ -49,3 +49,12 @@ export const api = {
     return res.ok ? ((await res.json()) as PaymentRun) : null;
   },
 };
+
+export type EmailStatus = { email: string | null; verified: boolean };
+
+/** The signed-in account's notification email. `token` comes from the wallet sign-in. */
+export const emailApi = {
+  get: (token: string) => request<EmailStatus>("/api/email", { headers: { authorization: `Bearer ${token}` } }),
+  set: (token: string, email: string) => request<EmailStatus>("/api/email", { method: "POST", headers: { authorization: `Bearer ${token}` }, body: JSON.stringify({ email }) }),
+  remove: (token: string) => request<EmailStatus>("/api/email", { method: "DELETE", headers: { authorization: `Bearer ${token}` } }),
+};

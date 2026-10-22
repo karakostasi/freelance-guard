@@ -21,7 +21,8 @@
 .avatar { width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0; }
 .walletAddress { font-weight: 600; font-family: ui-monospace, monospace; }
 .ghostButton { padding: .4rem .9rem; border-radius: 999px; border: 1px solid #444; background: none; color: inherit; cursor: pointer; }
-.ghostButton:hover { border-color: #ff5c5c; color: #ff5c5c; }
+.ghostButton { transition: border-color .15s, box-shadow .15s; }
+.ghostButton:hover, .ghostButton:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(79, 124, 255, .2); }
 .header { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin: -2rem -1rem 1rem; padding: 1rem; background: rgba(15, 17, 21, .85); backdrop-filter: blur(10px); /* paint the bar edge to edge on wide screens */ box-shadow: 0 0 0 100vmax rgba(15, 17, 21, .85); clip-path: inset(0 -100vmax); }
 .brand { display: flex; align-items: center; gap: .75rem; }
 .brand h1 { margin: 0; font-size: 1.4rem; background: linear-gradient(135deg, #fff, #b4c6ff); -webkit-background-clip: text; background-clip: text; color: transparent; }
@@ -54,8 +55,8 @@
 .chipButton:disabled { opacity: .4; cursor: not-allowed; }
 .milestoneRow { display: grid; grid-template-columns: 1fr 90px 110px 32px; gap: .5rem; align-items: center; }
 .milestoneAmount { grid-column: 1 / -1; margin-top: -.25rem; }
-.iconButton { border: 0; background: none; color: inherit; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: .25rem; opacity: .7; }
-.iconButton:hover:not(:disabled) { opacity: 1; }
+.iconButton { border: 1px solid transparent; border-radius: 8px; background: none; color: inherit; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: .25rem; opacity: .7; transition: border-color .15s, box-shadow .15s; }
+.iconButton:hover:not(:disabled), .iconButton:focus-visible { outline: none; opacity: 1; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(79, 124, 255, .2); }
 .iconButton:disabled { opacity: .25; cursor: not-allowed; }
 
 .formGroup { display: flex; flex-direction: column; gap: .5rem; padding: 1rem 0; border-top: 1px solid #2a2f3b; }
@@ -103,8 +104,8 @@ a.chipButton { text-decoration: none; }
 /* A job shown in full as a card floating over the page. */
 .overlay { position: fixed; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center; padding: 1rem; background: rgba(0, 0, 0, .6); backdrop-filter: blur(2px); }
 .modal { position: relative; width: 100%; max-width: 860px; max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column; gap: .5rem; padding: 1.5rem; border-radius: 14px; border: 1px solid #333; background: #12141a; box-shadow: 0 24px 64px rgba(0, 0, 0, .55); overflow-wrap: anywhere; }
-.close { position: absolute; top: .75rem; right: .75rem; display: inline-flex; align-items: center; justify-content: center; padding: .35rem; border: 0; border-radius: 8px; background: none; color: inherit; cursor: pointer; opacity: .7; }
-.close:hover { opacity: 1; background: #232733; }
+.close { position: absolute; top: .75rem; right: .75rem; display: inline-flex; align-items: center; justify-content: center; padding: .35rem; border: 1px solid transparent; border-radius: 8px; background: none; color: inherit; cursor: pointer; opacity: .7; transition: border-color .15s, box-shadow .15s; }
+.close:hover, .close:focus-visible { outline: none; opacity: 1; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(79, 124, 255, .2); }
 
 /* the top of a job card: who is involved, and how much */
 .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: .75rem; }

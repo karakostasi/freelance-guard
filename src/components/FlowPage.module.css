@@ -10,8 +10,9 @@
 .nextActions { display: flex; align-items: flex-start; gap: .5rem; flex-wrap: wrap; }
 .nextActions input, .nextActions select, .nextActions button { box-sizing: border-box; min-height: 2.4rem; }
 
-.drawerOverlay { position: fixed; inset: 0; background: rgba(0, 0, 0, .5); display: flex; justify-content: flex-end; z-index: 20; }
-.drawer { width: 100%; max-width: 560px; height: 100%; padding: 1.5rem; display: flex; flex-direction: column; gap: .75rem; background: #12141a; border-left: 1px solid #333; overflow-y: auto; }
+.drawerOverlay { position: fixed; inset: 0; background: rgba(0, 0, 0, .5); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); display: flex; justify-content: flex-end; z-index: 20; }
+.drawer { box-sizing: border-box; width: 100%; max-width: 560px; height: 100%; padding: 1.5rem; display: flex; flex-direction: column; gap: .75rem; background: #12141a; border-left: 1px solid #333; overflow-y: auto; }
+.drawer > * { flex-shrink: 0; }
 .drawerHeader { display: flex; align-items: center; justify-content: space-between; }
 .drawerHeader h3 { margin: 0; }
 .iconButton { border: 0; background: none; color: inherit; cursor: pointer; display: inline-flex; padding: .25rem; }
@@ -47,8 +48,9 @@
 .linkButton:disabled { opacity: .6; cursor: default; }
 
 /* Jobs down the left beside the job's details and banner. The journey keeps the full page width underneath. */
-.layout { display: grid; grid-template-columns: 280px minmax(0, 1fr) 320px; grid-template-areas: "side top wallet" "stepper stepper stepper"; gap: 1.25rem 1.5rem; align-items: start; }
-.wallet { grid-area: wallet; }
+.layout { display: grid; grid-template-columns: 280px minmax(0, 1fr) 320px; grid-template-areas: "side top wallet" "stepper stepper stepper"; gap: .625rem 1.5rem; align-items: start; }
+/* The wallet doesn't set the row height: the row follows the job details, and the card scrolls if it is taller. */
+.wallet { grid-area: wallet; align-self: stretch; contain: size; overflow-y: auto; }
 .top { grid-area: top; display: flex; flex-direction: column; gap: .75rem; min-width: 0; }
 .stepperRow { grid-area: stepper; min-width: 0; }
 .sidebar { grid-area: side; align-self: stretch; position: relative; min-height: 260px; }
@@ -71,6 +73,7 @@
 
 /* Narrower screens: the wallet card drops under the details, then everything stacks. */
 @media (max-width: 1200px) {
+  .wallet { align-self: start; contain: none; overflow-y: visible; }
   .layout { grid-template-columns: 280px minmax(0, 1fr); grid-template-areas: "side top" "side wallet" "stepper stepper"; }
   .jobsLayout { grid-template-columns: 280px minmax(0, 1fr); grid-template-areas: "side top" "side wallet"; }
 }

@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { privateKeyToAccount } from "viem/accounts";
 import { buildDescription, deliverableUrl, formatBytes, jobTitle, parseDeliverable, parseDescription, parseDoc, serializeDoc, signInMessage as frontendMessage } from "../src/lib/documents.ts";
 import { computeReputation, jobKey } from "../src/lib/reputation.ts";
+import { reminderFor } from "../src/lib/reminders.ts";
 import { formatBalance } from "../src/lib/format.ts";
 import { ETH_GAS_BUFFER, checkSend, maxSendable, parseAmount } from "../src/lib/send.ts";
 import { SESSION_MS, createSession, signInMessage, verifyToken } from "../server/auth.mjs";
@@ -160,6 +161,26 @@ check(rep([job(ms(5, false), ms(4, true), ms(4, true), ms(4, true))], C).asClien
 check(rep([job(ms(3, true))], C).asClient.disputes === 1 && rep([job(ms(3, true))], C).asClient.finished === 0, "an open dispute is counted but not yet decided");
 check(rep([job(...Array.from({ length: 9 }, () => ms(4, true)), ms(5, false))], F).asFreelancer.tier === "good", "1 bad in 10 is still Reliable");
 check(rep([job(...Array.from({ length: 8 }, () => ms(4, true)), ms(5, false), ms(5, false))], F).asFreelancer.tier === "mixed", "2 bad in 10 is a Mixed record");
+
+console.log("\nReminders");
+const RP = 259200n, DAYS = 86400n, T0 = 1_000_000n;
+const rm = (status, o = {}) => ({ title: "", amount: 1n, duration: 1, deadline: 0n, submittedAt: 0n, status, deliverable: "", ...o });
+const rjob = (...milestones) => ({ client: C, freelancer: F, token: "0x0", description: "", milestones });
+const remind = (j, who, now) => reminderFor(j, who, RP, now);
+const submitted = rjob(rm(2, { submittedAt: T0 }));
+check(remind(submitted, C, T0 + DAYS)?.text === "Review ends in 2d 0h. Approve or dispute" && remind(submitted, C, T0 + DAYS).tone === "info", "the client sees the review countdown");
+check(remind(submitted, C, T0 + 2n * DAYS + 3600n)?.tone === "warn", "under a day left turns the countdown into a warning");
+check(remind(submitted, F, T0 + DAYS)?.text === "Client review ends in 2d 0h", "the freelancer sees when the client's review ends");
+check(remind(submitted, F, T0 + RP)?.tone === "action" && remind(submitted, F, T0 + RP).text.includes("Claim your payment"), "once the review period ends the freelancer is told to claim");
+check(remind(submitted, C, T0 + RP)?.tone === "warn", "the client is warned the freelancer can now claim");
+const funded = rjob(rm(1, { deadline: T0 + 5n * DAYS }));
+check(remind(funded, F, T0)?.text === "Deliver in 5d 0h", "the freelancer sees the delivery countdown");
+check(remind(funded, C, T0 + 5n * DAYS + 1n)?.tone === "action", "after the deadline the client is told they can take a refund");
+check(remind(funded, F, T0 + 5n * DAYS + 1n)?.tone === "warn", "after the deadline the freelancer is warned");
+check(remind(rjob(rm(4), rm(2, { submittedAt: T0 })), C, T0)?.milestone === 1, "it looks at the first milestone that isn't finished");
+check(remind(rjob(rm(4), rm(5)), C, T0) === undefined && remind(rjob(rm(0)), C, T0) === undefined && remind(rjob(rm(3)), C, T0) === undefined, "nothing to say for finished, unfunded or disputed milestones");
+check(remind(submitted, "0xother", T0) === undefined, "nothing for someone who isn't a party");
+check(reminderFor(submitted, C, undefined, T0 + DAYS) === undefined, "nothing until the review period is known");
 
 console.log(failures ? `\n${failures} check(s) failed` : "\nAll checks passed");
 process.exit(failures ? 1 : 0);

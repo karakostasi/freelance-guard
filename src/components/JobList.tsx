@@ -1,6 +1,9 @@
 import { useAccount } from "wagmi";
 import { jobTitle } from "../lib/documents";
+import { useEscrowConfig } from "../hooks/useEscrowConfig";
+import { useNow } from "../hooks/useNow";
 import { STATUS_CLASS, jobSummary, jobTotal, roleOf, type Job } from "../lib/jobs";
+import { reminderFor } from "../lib/reminders";
 import { formatAmount } from "../lib/tokens";
 import styles from "../App.module.css";
 import page from "./FlowPage.module.css";
@@ -9,6 +12,8 @@ import page from "./FlowPage.module.css";
 export function JobList({ jobs, selectedId, onSelect, emptyText }: { jobs: { id: number; job: Job }[]; selectedId: string; onSelect: (id: string) => void; emptyText: string }) {
   const { address } = useAccount();
   const me = address?.toLowerCase();
+  const { reviewPeriod } = useEscrowConfig();
+  const now = useNow(30_000);
 
   return (
     <aside className={page.sidebar} aria-label="Your jobs">
@@ -22,6 +27,7 @@ export function JobList({ jobs, selectedId, onSelect, emptyText }: { jobs: { id:
           const { paid, label, tone } = jobSummary(job);
           const role = roleOf(job, me);
           const active = selectedId === String(id);
+          const reminder = reminderFor(job, me, reviewPeriod, now);
           return (
             <li key={id}>
               <button className={`${page.jobItem} ${tone} ${active ? page.jobItemActive : ""}`} onClick={() => onSelect(String(id))} aria-current={active ? "true" : undefined}>
@@ -40,6 +46,7 @@ export function JobList({ jobs, selectedId, onSelect, emptyText }: { jobs: { id:
                     {paid}/{job.milestones.length} paid
                   </span>
                 </span>
+                {reminder && <span className={`${styles.reminder} ${styles[`reminder_${reminder.tone}`]}`}>{reminder.text}</span>}
                 <span className={styles.segments}>
                   {job.milestones.map((m, i) => (
                     <span key={i} className={`${styles.segment} ${STATUS_CLASS[m.status]}`} />

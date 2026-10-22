@@ -166,3 +166,11 @@ select.input:disabled { cursor: not-allowed; }
 .badge.tier_good { color: #4ade80; background: rgba(74, 222, 128, .14); border: 1px solid #4ade80; }
 .badge.tier_mixed { color: #fbbf24; background: rgba(251, 191, 36, .14); border: 1px solid #fbbf24; }
 .badge.tier_risky { color: #f87171; background: rgba(248, 113, 113, .14); border: 1px solid #f87171; }
+
+.reminder { font-size: .8rem; font-weight: 600; }
+.reminder_info { opacity: .7; font-weight: 500; }
+.reminder_warn { color: #fbbf24; }
+.reminder_action { color: #4ade80; }
+.nudges { margin-bottom: 1rem; display: flex; flex-direction: column; gap: .5rem; }
+.nudge { text-align: left; padding: .6rem .9rem; border-radius: 8px; color: inherit; font: inherit; cursor: pointer; background: rgba(74, 222, 128, .12); border: 1px solid #4ade80; }
+.nudge:hover { background: rgba(74, 222, 128, .2); }

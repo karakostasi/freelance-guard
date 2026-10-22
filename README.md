@@ -63,6 +63,19 @@ The bank, AML, FX and off-ramp providers are **sandboxes** (`server/providers.mj
 
 Set `VITE_PAYMASTER_URL` to try sponsored gas. It only applies if the wallet supports sponsored calls (EIP-5792 + ERC-7677) and otherwise the wallet pays as usual.
 
+## Email notifications (optional)
+
+With the backend running, people can open **Email notifications** in the account menu, sign in with their wallet and give an email address. After they confirm it with the link we send, both the client and the freelancer get an email at every step of a job, worded for their side:
+- a milestone is funded,
+- work is submitted (the client is told how long they have to review it),
+- the payment is released (approved, claimed after the timeout, or decided by the arbiter),
+- the work is disputed (the arbiter is told too, if they registered an email),
+- the payment is refunded.
+
+This works for every job on the escrow, whichever way it was created. A transaction that funds several milestones sends one email to each person. Every email has an unsubscribe link, and nothing is sent to an address that hasn't been confirmed.
+
+Set `RESEND_API_KEY` (and `MAIL_FROM`, `APP_URL`, `PUBLIC_API_URL`, see `.env.example`) to send real emails through [Resend](https://resend.com). Without a key, the emails are only logged by the backend. Resend's default sender only delivers to your own account's address, so verify a domain there to email everyone. `NOTIFY_WEBHOOK_URL` still receives the events of payment runs as before.
+
 ## Deploying (free tiers)
 
 The contract ABI is committed in `abi/` (refreshed by `npm run compile`), so neither host needs Hardhat to build.

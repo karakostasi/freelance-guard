@@ -4,7 +4,9 @@ import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { createSession, verifyToken } from "./auth.mjs";
 import { openBlobStore } from "./blobs.mjs";
 import { db, flush, save } from "./db.mjs";
-import { watchEscrow, ESCROW_ADDRESS, RPC_URL } from "./chain.mjs";
+import { watchEscrow, ESCROW_ADDRESS, RPC_URL, abi, client } from "./chain.mjs";
+import { cleanEmail, confirmToken, notifyParties, readEmailToken, unsubscribeToken } from "./emails.mjs";
+import { sendMail } from "./mail.mjs";
 import { bankReceived, createRun, fail, milestonePlan, onChainEvent, onThisContract, publicRun, subscribe } from "./pipeline.mjs";
 import { EUR_PER_ETH } from "./providers.mjs";
 
@@ -33,7 +35,7 @@ const corsFor = (req) => {
     "access-control-allow-origin": allowedOrigins.length === 0 ? "*" : allowedOrigins.includes(origin) ? origin : allowedOrigins[0],
     vary: "Origin",
     "access-control-allow-headers": "content-type, x-signature, last-event-id, authorization, x-file-name",
-    "access-control-allow-methods": "GET, POST, OPTIONS",
+    "access-control-allow-methods": "GET, POST, DELETE, OPTIONS",
   };
 };
 
@@ -121,6 +123,15 @@ const json = async (req) => {
   }
 };
 
+const publicUrl = (req) => (process.env.PUBLIC_API_URL ?? `http://${req.headers.host}`).replace(/\/+$/, "");
+const PUBLIC_URL = (process.env.PUBLIC_API_URL ?? `http://localhost:${PORT}`).replace(/\/+$/, "");
+const APP_URL = (process.env.APP_URL ?? "http://localhost:5173").replace(/\/+$/, "");
+const escapeHtml = (text) => text.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const page = (res, status, message) => {
+  res.writeHead(status, { "content-type": "text/html; charset=utf-8", "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'", ...res.cors });
+  res.end(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Freelance Guard</title><body style="font:16px system-ui;background:#0f1115;color:#e8eaf0;display:grid;place-items:center;height:100vh;margin:0"><p style="max-width:28rem;padding:1rem">${escapeHtml(message)}</p><a style="color:#8fa8ff" href="${escapeHtml(APP_URL)}">Back to the app</a>`);
+};
+
 const fieldError = (msg) => Object.assign(new Error(msg), { status: 400 });
 
 function validatePayment(b) {
@@ -160,6 +171,49 @@ const server = createServer(async (req, res) => {
     if (req.method === "POST" && path === "/api/auth") {
       const { body } = await json(req);
       return send(res, 200, await createSession(body));
+    }
+
+    // ---- email notifications ----
+    if (path === "/api/email") {
+      const owner = bearer(req);
+      if (!owner) throw Object.assign(new Error("Sign in with your wallet to manage notifications"), { status: 401 });
+      if (req.method === "GET") {
+        const entry = db.emails[owner];
+        return send(res, 200, { email: entry?.email ?? null, verified: !!entry?.verified });
+      }
+      if (req.method === "POST") {
+        const { body } = await json(req);
+        const email = cleanEmail(body.email);
+        if (!email) throw fieldError("That doesn't look like an email address");
+        const known = db.emails[owner];
+        if (known?.sentAt && Date.now() - known.sentAt < 60_000) throw Object.assign(new Error("Wait a minute before asking for another confirmation email"), { status: 429 });
+        db.emails[owner] = { email, verified: !!(known?.verified && known.email === email), sentAt: Date.now() };
+        save();
+        if (!db.emails[owner].verified) {
+          await sendMail({
+            to: email,
+            subject: "Confirm your email for Freelance Guard",
+            text: `Someone, hopefully you, asked to get Freelance Guard notifications at this address for the wallet ${owner}.\n\nConfirm: ${publicUrl(req)}/api/email/confirm?token=${encodeURIComponent(confirmToken(owner, email))}\n\nIf this wasn't you, ignore this email and nothing will be sent.`,
+          });
+        }
+        return send(res, 200, { email, verified: db.emails[owner].verified });
+      }
+      if (req.method === "DELETE") {
+        delete db.emails[owner];
+        save();
+        return send(res, 200, { email: null, verified: false });
+      }
+    }
+
+    if (req.method === "GET" && (path === "/api/email/confirm" || path === "/api/email/unsubscribe")) {
+      const confirming = path.endsWith("confirm");
+      const who = readEmailToken(url.searchParams.get("token"), confirming ? "confirm" : "unsub");
+      const entry = who && db.emails[who.address];
+      if (!who || !entry || entry.email !== who.email) return page(res, 400, "This link has expired or is no longer valid.");
+      if (confirming) entry.verified = true;
+      else delete db.emails[who.address];
+      save();
+      return page(res, 200, confirming ? "Email confirmed. You will get a message when a job is funded or work is submitted." : "Done. You won't get any more emails.");
     }
 
     if (req.method === "POST" && path === "/api/files") {
@@ -285,6 +339,17 @@ for (const signal of ["SIGTERM", "SIGINT"]) {
 server.listen(PORT, () => {
   console.log(`Freelance Guard backend on http://localhost:${PORT}`);
   console.log(`Watching escrow ${ESCROW_ADDRESS} via ${RPC_URL}`);
-  watchEscrow(onChainEvent);
+  const seen = new Set();
+  const readJob = async (id) => {
+    const [client_, freelancer] = await client.readContract({ address: ESCROW_ADDRESS, abi, functionName: "jobs", args: [id] });
+    return { client: client_, freelancer };
+  };
+  const reviewPeriod = () => client.readContract({ address: ESCROW_ADDRESS, abi, functionName: "reviewPeriod" });
+  const arbiter = () => client.readContract({ address: ESCROW_ADDRESS, abi, functionName: "arbiter" });
+  watchEscrow(async (log) => {
+    await onChainEvent(log);
+    // A failed email must never stop the watcher from moving on to the next event.
+    await notifyParties(log, { emails: db.emails, readJob, reviewPeriod, arbiter, send: sendMail, appUrl: APP_URL, unsubscribeUrl: (address, email) => `${PUBLIC_URL}/api/email/unsubscribe?token=${encodeURIComponent(unsubscribeToken(address, email))}`, seen }).catch((e) => console.error("[mail] failed:", e.message));
+  });
 });
 

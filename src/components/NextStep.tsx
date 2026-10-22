@@ -40,17 +40,23 @@ export function NextStep({ id, index, job, payout }: { id: number; index: number
 
   let title = "";
   let detail = "";
+  // True when the next move is the signed-in account's, so the banner can stand out.
+  let myTurn = false;
   if (status === "Unfunded") {
-    title = isClient ? `Your turn: fund ${the || "this milestone"}` : `Waiting for the client to fund ${the || "this milestone"}`;
+    myTurn = isClient;
+    title = isClient ? `Fund ${the || "this milestone"}` : `Waiting for the client to fund ${the || "this milestone"}`;
     detail = "The freelancer's clock starts once it's funded.";
   } else if (status === "Funded") {
-    title = isFreelancer ? `Your turn: deliver ${the || "the work"}` : `Waiting for the freelancer to deliver${name ? ` ${the}` : ""}`;
+    myTurn = isFreelancer;
+    title = isFreelancer ? `Deliver ${the || "the work"}` : `Waiting for the freelancer to deliver${name ? ` ${the}` : ""}`;
     detail = now > deadline ? (isClient ? "The deadline passed. You can take a refund." : "The deadline passed.") : `Due ${left(deadline)}.`;
   } else if (status === "Submitted") {
-    title = isClient ? `Your turn: review ${the || "the work"}` : `Waiting for the client's review${name ? ` of ${the}` : ""}`;
+    myTurn = isClient;
+    title = isClient ? `Review ${the || "the work"}` : `Waiting for the client's review${name ? ` of ${the}` : ""}`;
     detail = reviewEnd === undefined ? "" : isFreelancer && now >= reviewEnd ? "The review period ended. You can claim your payment." : `Review period ${left(reviewEnd)}.`;
   } else if (status === "Disputed") {
-    title = isArbiter ? "Your turn: resolve the dispute" : "Waiting for the arbiter";
+    myTurn = isArbiter;
+    title = isArbiter ? "Resolve the dispute" : "Waiting for the arbiter";
     detail = "The client contested the work.";
   } else if (status === "Paid") {
     const s = payout.state.status;
@@ -65,8 +71,9 @@ export function NextStep({ id, index, job, payout }: { id: number; index: number
   }
 
   return (
-    <div className={`${page.next} ${STATUS_CLASS[ms.status]}`}>
+    <div className={`${page.next} ${STATUS_CLASS[ms.status]} ${myTurn ? page.nextTurn : ""}`}>
       <div>
+        {myTurn && <span className={page.turnPill}>Your turn</span>}
         <strong>{title}</strong>
         {detail && <p className={styles.muted}>{detail}</p>}
       </div>

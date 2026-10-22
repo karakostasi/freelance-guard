@@ -20,6 +20,8 @@ import { useMyJobs } from "../hooks/useMyJobs";
 import { deriveJourney, simulatedPayloads } from "../lib/chainFlow";
 import { FUNDING_STAGES, ROUTING_STAGE, journeyStages, type FlowState, type PayoutRoute } from "../lib/fiatFlow";
 import { STATUS_CLASS, STATUS_LABEL, currentMilestone, type Job } from "../lib/jobs";
+import { parseDescription } from "../lib/documents";
+import { SpecView } from "./DocView";
 import { toEur, tokenOf } from "../lib/tokens";
 import { escrowAbi, escrowAddress } from "../wagmi";
 import styles from "../App.module.css";
@@ -140,6 +142,8 @@ function JobJourney({ id, job, mode, onModeChange }: { id: number; job: Job; mod
   const index = picked ?? currentMilestone(job);
   const ms = job.milestones[index];
   const multi = job.milestones.length > 1;
+  const { spec, ref } = parseDescription(job.description);
+  const hasSpec = !!spec || !!ref;
   const status = ms.status;
   const { data: trace, refetch, isFetching } = useJobTrace(id, index, ms);
   const amountEur = toEur(tokenOf(job), ms.amount);
@@ -193,6 +197,13 @@ function JobJourney({ id, job, mode, onModeChange }: { id: number; job: Job; mod
                 {m.status === 4 && <Check size={13} />}
               </button>
             ))}
+          </div>
+        )}
+
+        {hasSpec && (
+          <div className={page.spec}>
+            <h3 className={styles.groupTitle}>About this job</h3>
+            <SpecView description={job.description} />
           </div>
         )}
 

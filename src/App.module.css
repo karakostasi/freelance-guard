@@ -160,3 +160,9 @@ select.input:disabled { cursor: not-allowed; }
 .wpMax { position: absolute; right: .6rem; top: 50%; transform: translateY(-50%); padding: .2rem .6rem; border-radius: 999px; border: 1px solid #444; background: none; color: inherit; font: inherit; font-size: .8rem; cursor: pointer; }
 .wpMax:hover:not(:disabled) { border-color: var(--accent); }
 .wpMax:disabled { opacity: .4; cursor: not-allowed; }
+
+.reputation { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.badge.tier_new { color: #9aa3b5; background: rgba(154, 163, 181, .14); border: 1px solid #9aa3b5; }
+.badge.tier_good { color: #4ade80; background: rgba(74, 222, 128, .14); border: 1px solid #4ade80; }
+.badge.tier_mixed { color: #fbbf24; background: rgba(251, 191, 36, .14); border: 1px solid #fbbf24; }
+.badge.tier_risky { color: #f87171; background: rgba(248, 113, 113, .14); border: 1px solid #f87171; }

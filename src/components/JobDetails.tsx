@@ -7,6 +7,7 @@ import { avatarGradient } from "../lib/avatar";
 import { STATUS_CLASS, STATUS_LABEL, addressUrl, jobTotal, roleOf, short, type Job, type Milestone } from "../lib/jobs";
 import { navigate } from "../hooks/useHashRoute";
 import { SpecView } from "./DocView";
+import { ReputationBadge } from "./ReputationBadge";
 import { MilestoneDetails } from "./MilestoneDetails";
 import { JobActions } from "./JobActions";
 import { jobTitle, parseDescription } from "../lib/documents";
@@ -18,7 +19,7 @@ type RawJob = readonly [Omit<Job, "milestones">, readonly Milestone[]];
 const TOTAL_LABEL: Record<string, string> = { "You pay": "You pay in total", "You earn": "You earn in total", Escrow: "Total in escrow" };
 
 /** A person in the job: avatar, short address, and buttons to copy the address or open it in the block explorer. */
-function Party({ label, address, you, tone }: { label: string; address: string; you: boolean; tone: string }) {
+function Party({ label, address, you, tone, role }: { label: string; address: string; you: boolean; tone: string; role: "client" | "freelancer" }) {
   const [copied, setCopied] = useState(false);
   const copy = async () => {
     await navigator.clipboard.writeText(address);
@@ -43,6 +44,7 @@ function Party({ label, address, you, tone }: { label: string; address: string; 
           <ExternalLink size={15} />
         </a>
       </div>
+      <ReputationBadge address={address} role={role} />
     </div>
   );
 }
@@ -108,8 +110,8 @@ export function JobDetails({ id, onClose }: { id: string; onClose: () => void })
         {job && exists && (
           <>
             <div className={styles.tiles}>
-              <Party label="Client" address={job.client} you={!!isClient} tone={styles.roleClient} />
-              <Party label="Freelancer" address={job.freelancer} you={!!isFreelancer} tone={styles.roleFreelancer} />
+              <Party label="Client" address={job.client} you={!!isClient} tone={styles.roleClient} role="client" />
+              <Party label="Freelancer" address={job.freelancer} you={!!isFreelancer} tone={styles.roleFreelancer} role="freelancer" />
               <div className={styles.tile}>
                 <span className={styles.tileLabel}>{TOTAL_LABEL[roleOf(job, me).amountLabel]}</span>
                 <strong className={styles.tileValue}>{formatAmount(job, jobTotal(job))}</strong>

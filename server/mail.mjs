@@ -12,7 +12,7 @@ export async function sendMail({ to, subject, text }, { fetchImpl = fetch, env =
   const res = await fetchImpl("https://api.resend.com/emails", {
     method: "POST",
     headers: { authorization: `Bearer ${env.RESEND_API_KEY}`, "content-type": "application/json" },
-    body: JSON.stringify({ from: env.MAIL_FROM || "Freelance Guard <onboarding@resend.dev>", to: [to], subject, text }),
+    body: JSON.stringify({ from: env.MAIL_FROM || "Squirrel <onboarding@resend.dev>", to: [to], subject, text }),
     signal: AbortSignal.timeout(8000),
   });
   if (!res.ok) throw new Error(`The email service answered ${res.status}`);

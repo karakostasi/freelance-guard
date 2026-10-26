@@ -76,7 +76,7 @@ export function DocView({ reference }: { reference: string }) {
   );
 }
 
-/** A milestone's deliverable: a stored document with files, or the plain link or note the freelancer typed. */
+/** A milestone's deliverable: a stored document with files, or the plain link or note the payee typed. */
 export function DeliverableView({ value }: { value: string }) {
   const { ref, text } = parseDeliverable(value);
   if (ref) return <DocView reference={ref} />;

@@ -30,7 +30,7 @@ export function parseDescription(description: string) {
 }
 
 /** The text a wallet signs to sign in for uploads. The backend builds the same text (server/auth.mjs) and a test keeps them equal. */
-export const signInMessage = (address: string, issuedAt: string) => ["Freelance Guard", "Sign in to upload files and manage notifications.", `Address: ${address}`, `Issued: ${issuedAt}`].join("\n");
+export const signInMessage = (address: string, issuedAt: string) => ["Squirrel", "Sign in to upload files and manage notifications.", `Address: ${address}`, `Issued: ${issuedAt}`].join("\n");
 
 export const jobTitle = (description: string, id: number | string) => parseDescription(description).title || `Job #${id}`;
 
@@ -41,7 +41,7 @@ export function buildDescription(title: string, spec: { text?: string; ref?: str
   return tail ? `${clean}\n${tail}` : clean;
 }
 
-/** A deliverable is either a pointer to a document, or plain text typed by the freelancer. */
+/** A deliverable is either a pointer to a document, or plain text typed by the payee. */
 export function parseDeliverable(value: string): { ref?: string; text: string } {
   const ref = value.trim().match(POINTER)?.[1];
   return ref ? { ref, text: "" } : { text: value };
@@ -85,7 +85,7 @@ export function formatBytes(bytes: number) {
 
 /**
  * A link for a deliverable, or null when it isn't a web or IPFS address. The deliverable is text the
- * freelancer typed, so only http(s) and ipfs links are ever turned into a clickable href.
+ * payee typed, so only http(s) and ipfs links are ever turned into a clickable href.
  */
 export function deliverableUrl(value: string): string | null {
   const text = value.trim();

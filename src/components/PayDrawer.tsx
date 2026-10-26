@@ -4,7 +4,7 @@ import { HireForm } from "./HireForm";
 import type { FundingForm } from "../hooks/useFiatFunding";
 import page from "./FlowPage.module.css";
 
-/** Side drawer with the shared hire form. A bank transfer starts the live payment flow behind it. */
+/** Side drawer with the shared job form. A bank transfer starts the live payment flow behind it. */
 export function PayDrawer({ onClose, onBank }: { onClose: () => void; onBank: (form: FundingForm) => void }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();

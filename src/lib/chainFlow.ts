@@ -42,7 +42,7 @@ export function deriveFunding(id: number, job: Job, ms: Milestone, trace: JobTra
   FUNDING_STAGES.forEach((s, si) => s.steps.forEach((_, i) => (done[stepKey(si, i)] = { at, payload: sim[stepKey(si, i)] })));
 
   done[stepKey(2, 1)].payload = {
-    signer: job.client,
+    signer: job.payer,
     note: "Gas is paid by the signing wallet on this testnet. A production paymaster would sponsor it.",
   };
   done[stepKey(2, 2)].payload = trace?.created
@@ -61,7 +61,7 @@ export function deriveRelease(id: number, job: Job, ms: Milestone, trace: JobTra
   return {
     [stepKey(RELEASE_STAGE, 0)]: {
       at,
-      payload: { jobId: id, event: kind ?? "unknown", paidTo: job.freelancer, decidedBy: kind === "Resolved" ? "arbiter" : "client approval or review timeout" },
+      payload: { jobId: id, event: kind ?? "unknown", paidTo: job.payee, decidedBy: kind === "Resolved" ? "arbiter" : "payer approval or review timeout" },
     },
     [stepKey(RELEASE_STAGE, 1)]: {
       at,
@@ -72,7 +72,7 @@ export function deriveRelease(id: number, job: Job, ms: Milestone, trace: JobTra
   };
 }
 
-/** The real "Work & Review" stage: submitted once the freelancer delivers, reviewed once the job is paid. */
+/** The real "Work & Review" stage: submitted once the payee delivers, reviewed once the job is paid. */
 export function deriveWork(id: number, ms: Milestone, trace: JobTrace | undefined): FlowState["done"] {
   const done: FlowState["done"] = {};
   if (ms.submittedAt > 0n) {
@@ -88,7 +88,7 @@ export function deriveWork(id: number, ms: Milestone, trace: JobTrace | undefine
     const kind = trace?.released?.kind;
     done[stepKey(WORK_STAGE_INDEX, 1)] = {
       at: trace?.released ? trace.released.blockTime * 1000 : 0,
-      payload: { jobId: id, outcome: kind === "Resolved" ? "resolved by arbiter" : "approved by client or review timeout" },
+      payload: { jobId: id, outcome: kind === "Resolved" ? "resolved by arbiter" : "approved by payer or review timeout" },
     };
   }
   return done;

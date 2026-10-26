@@ -28,8 +28,8 @@
 .brand h1 { margin: 0; font-size: 1.4rem; background: linear-gradient(135deg, #fff, #b4c6ff); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .logo { width: 44px; height: 44px; }
 .role { font-size: .7rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; padding: .1rem .5rem; border-radius: 4px; }
-.roleClient { color: #b39dff; background: rgba(139, 108, 255, .16); }
-.roleFreelancer { color: #4cc9f0; background: rgba(76, 201, 240, .16); }
+.rolePayer { color: #b39dff; background: rgba(139, 108, 255, .16); }
+.rolePayee { color: #4cc9f0; background: rgba(76, 201, 240, .16); }
 .roleArbiter { color: #aab; background: rgba(170, 170, 187, .16); }
 .modalHeader { display: flex; align-items: center; gap: .75rem; padding-right: 2.5rem; }
 .modalHeader h2 { margin: 0; }

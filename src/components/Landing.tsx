@@ -6,15 +6,15 @@ import styles from "../App.module.css";
 import page from "./Landing.module.css";
 
 const STEPS = [
-  { icon: Lock, title: "Fund", text: "Client locks the payment in escrow." },
-  { icon: Send, title: "Deliver", text: "Freelancer submits the work." },
-  { icon: FileCheck, title: "Review", text: "Client approves or disputes." },
+  { icon: Lock, title: "Fund", text: "Payer locks the payment in escrow." },
+  { icon: Send, title: "Deliver", text: "Payee submits the work." },
+  { icon: FileCheck, title: "Review", text: "Payer approves or disputes." },
   { icon: Banknote, title: "Get paid", text: "Funds release on approval." },
 ];
 
 const BENEFITS = [
-  { icon: ShieldCheck, title: "Safe for clients", text: "Money moves only when you approve.", accent: "#4f7cff", size: "span3", chip: "Funds locked until approval" },
-  { icon: Wallet, title: "Safe for freelancers", text: "Payment is locked in before you start.", accent: "#3ecf8e", size: "span3", chip: "Paid on approval" },
+  { icon: ShieldCheck, title: "Safe for payers", text: "Money moves only when you approve.", accent: "#4f7cff", size: "span3", chip: "Funds locked until approval" },
+  { icon: Wallet, title: "Safe for payees", text: "Payment is locked in before you start.", accent: "#3ecf8e", size: "span3", chip: "Paid on approval" },
   { icon: Scale, title: "Fair disputes", text: "A neutral arbiter decides.", accent: "#f5b942", size: "span2", chip: "" },
   { icon: Eye, title: "Transparent", text: "Every step is on-chain.", accent: "#a78bfa", size: "span4", chip: "0x7a3f…c91e · On-chain" },
 ] as const;
@@ -32,9 +32,9 @@ export function Landing() {
   return (
     <div className={page.landing}>
       <section className={page.hero}>
-        <span className={page.eyebrow}>Escrow for freelance work</span>
+        <span className={page.eyebrow}>Milestone escrow for business payments</span>
         <h2 className={page.headline}>Get paid for your work. Pay only for work you approve.</h2>
-        <p className={page.lead}>Freelance Guard holds the payment in escrow until the work is approved.</p>
+        <p className={page.lead}>Squirrel holds the payment in escrow until the work is approved.</p>
         <div className={page.cta}>
           <button className={`${styles.button} ${page.primary}`} onClick={start} disabled={isPending}>
             {isConnected ? "Open the app" : "Connect wallet to start"} <ArrowRight size={16} />
@@ -64,7 +64,7 @@ export function Landing() {
       </section>
 
       <section className={page.section}>
-        <h3 className={page.title}>Why Freelance Guard</h3>
+        <h3 className={page.title}>Why Squirrel</h3>
         <div className={page.bento}>
           {BENEFITS.map(({ icon: Icon, title, text, accent, size, chip }) => (
             <div key={title} className={`${page.tile} ${page[size]}`} style={{ "--accent": accent } as React.CSSProperties}>

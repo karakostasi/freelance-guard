@@ -3,10 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useReadContract, useReadContracts, usePublicClient } from "wagmi";
 import type { Abi } from "viem";
 import { escrowAbi, escrowAddress, escrowDeployBlock } from "../wagmi";
-import type { Job, Milestone } from "../lib/jobs";
+import { jobFromChain, type RawJob } from "../lib/jobs";
 import { computeReputation, jobKey } from "../lib/reputation";
-
-type RawJob = readonly [Omit<Job, "milestones">, readonly Milestone[]];
 
 const RANGE = 9000n; // public RPCs cap how many blocks one log query may cover
 const PARALLEL = 4;
@@ -41,7 +39,7 @@ function useDisputed(jobCount: number) {
 }
 
 /**
- * An account's record as client and as freelancer. Reads every job once (shared with the job lists) and the
+ * An account's record as payer and as payee. Reads every job once (shared with the job lists) and the
  * Disputed events. If the events can't be read, `approximate` is true and past disputes that ended in a payment are missing.
  */
 export function useReputation(address: string | undefined) {
@@ -57,7 +55,7 @@ export function useReputation(address: string | undefined) {
     if (!address || !data) return undefined;
     const jobs = data.flatMap((r, i) => {
       const raw = r.result as RawJob | undefined;
-      return raw ? [{ id: i + 1, job: { ...raw[0], milestones: [...raw[1]] } as Job }] : [];
+      return raw ? [{ id: i + 1, job: jobFromChain(raw) }] : [];
     });
     return computeReputation(jobs, address, disputes.data ?? new Set());
   }, [address, data, disputes.data]);

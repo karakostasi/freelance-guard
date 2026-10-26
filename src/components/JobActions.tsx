@@ -29,8 +29,8 @@ export function JobActions({ id, index, job }: { id: string; index: number; job:
   const ms = job.milestones[index];
   const busy = !!working || confirming;
   const me = address?.toLowerCase();
-  const isClient = me === job.client.toLowerCase();
-  const isFreelancer = me === job.freelancer.toLowerCase();
+  const isPayer = me === job.payer.toLowerCase();
+  const isPayee = me === job.payee.toLowerCase();
   const isArbiter = !!me && arbiter?.toLowerCase() === me;
   const status = STATUS[ms.status];
   // For multi-milestone jobs the buttons name the step, e.g. "Submit draft".
@@ -86,9 +86,9 @@ export function JobActions({ id, index, job }: { id: string; index: number; job:
 
   return (
     <>
-      {status === "Unfunded" && isClient && action(name ? `Fund ${name}` : "Fund this milestone", fund)}
-      {status === "Unfunded" && !isClient && <p className={styles.muted}>Waiting for the client to fund this milestone.</p>}
-      {isFreelancer && status === "Funded" && (
+      {status === "Unfunded" && isPayer && action(name ? `Fund ${name}` : "Fund this milestone", fund)}
+      {status === "Unfunded" && !isPayer && <p className={styles.muted}>Waiting for the payer to fund this milestone.</p>}
+      {isPayee && status === "Funded" && (
         <>
           <input className={styles.input} placeholder={name ? `Link or note for your ${name}` : "Deliverable link or note"} value={deliverable} onChange={(e) => setDeliverable(e.target.value)} />
           {backendOnline && <FileDrop files={files} onChange={setFiles} disabled={busy} />}
@@ -99,23 +99,23 @@ export function JobActions({ id, index, job }: { id: string; index: number; job:
           )}
         </>
       )}
-      {isFreelancer && status === "Submitted" && (
+      {isPayee && status === "Submitted" && (
         <>
           {action(name ? `Claim ${name} payment` : "Claim payment", () => send("claimAfterTimeout", [n, m]), reviewEnd === undefined || now < reviewEnd ? `Available in ${formatDuration((reviewEnd ?? now) - now)}` : "")}
-          {(reviewEnd === undefined || now < reviewEnd) && <p className={styles.muted}>If the client doesn&apos;t respond, you can claim the payment once the review period ends.</p>}
+          {(reviewEnd === undefined || now < reviewEnd) && <p className={styles.muted}>If the payer doesn&apos;t respond, you can claim the payment once the review period ends.</p>}
         </>
       )}
-      {isClient && status === "Submitted" && (
+      {isPayer && status === "Submitted" && (
         <>
           {action(name ? `Approve ${name} & pay` : "Approve & pay", () => send("approve", [n, m]))}
           {action("Dispute", () => send("dispute", [n, m]), reviewEnd !== undefined && now >= reviewEnd ? "Review period ended" : "")}
         </>
       )}
-      {isClient && status === "Funded" && action(name ? `Refund ${name}` : "Refund", () => send("refundExpired", [n, m]), now <= deadline ? `Available in ${formatDuration(deadline - now + 1n)}` : "")}
+      {isPayer && status === "Funded" && action(name ? `Refund ${name}` : "Refund", () => send("refundExpired", [n, m]), now <= deadline ? `Available in ${formatDuration(deadline - now + 1n)}` : "")}
       {status === "Disputed" && isArbiter && (
         <>
-          {action("Pay freelancer", () => send("resolve", [n, m, true]))}
-          {action("Refund client", () => send("resolve", [n, m, false]))}
+          {action("Pay payee", () => send("resolve", [n, m, true]))}
+          {action("Refund payer", () => send("resolve", [n, m, false]))}
         </>
       )}
       {status === "Disputed" && !isArbiter && <p className={styles.muted}>Waiting for the arbiter to resolve this dispute.</p>}

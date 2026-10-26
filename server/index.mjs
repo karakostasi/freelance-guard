@@ -129,15 +129,17 @@ const APP_URL = (process.env.APP_URL ?? "http://localhost:5173").replace(/\/+$/,
 const escapeHtml = (text) => text.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 const page = (res, status, message) => {
   res.writeHead(status, { "content-type": "text/html; charset=utf-8", "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'", ...res.cors });
-  res.end(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Freelance Guard</title><body style="font:16px system-ui;background:#0f1115;color:#e8eaf0;display:grid;place-items:center;height:100vh;margin:0"><p style="max-width:28rem;padding:1rem">${escapeHtml(message)}</p><a style="color:#8fa8ff" href="${escapeHtml(APP_URL)}">Back to the app</a>`);
+  res.end(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Squirrel</title><body style="font:16px system-ui;background:#0f1115;color:#e8eaf0;display:grid;place-items:center;height:100vh;margin:0"><p style="max-width:28rem;padding:1rem">${escapeHtml(message)}</p><a style="color:#8fa8ff" href="${escapeHtml(APP_URL)}">Back to the app</a>`);
 };
 
 const fieldError = (msg) => Object.assign(new Error(msg), { status: 400 });
 
 function validatePayment(b) {
+  b.payee ??= b.freelancer; // callers still on the old field name (e.g. a frontend deployed before this backend)
+  delete b.freelancer;
   if (!ADDRESS.test(b.payer ?? "")) throw fieldError("payer must be an address");
-  if (!ADDRESS.test(b.freelancer ?? "")) throw fieldError("freelancer must be an address");
-  if (b.payer.toLowerCase() === b.freelancer.toLowerCase()) throw fieldError("freelancer must differ from payer");
+  if (!ADDRESS.test(b.payee ?? "")) throw fieldError("payee must be an address");
+  if (b.payer.toLowerCase() === b.payee.toLowerCase()) throw fieldError("payee must differ from payer");
   if (!(Number(b.amount) > 0)) throw fieldError("amount must be greater than 0");
   if (b.token !== undefined && !["eth", "eurc"].includes(b.token)) throw fieldError("token must be eth or eurc");
   milestonePlan(b);
@@ -192,8 +194,8 @@ const server = createServer(async (req, res) => {
         if (!db.emails[owner].verified) {
           await sendMail({
             to: email,
-            subject: "Confirm your email for Freelance Guard",
-            text: `Someone, hopefully you, asked to get Freelance Guard notifications at this address for the wallet ${owner}.\n\nConfirm: ${publicUrl(req)}/api/email/confirm?token=${encodeURIComponent(confirmToken(owner, email))}\n\nIf this wasn't you, ignore this email and nothing will be sent.`,
+            subject: "Confirm your email for Squirrel",
+            text: `Someone, hopefully you, asked to get Squirrel notifications at this address for the wallet ${owner}.\n\nConfirm: ${publicUrl(req)}/api/email/confirm?token=${encodeURIComponent(confirmToken(owner, email))}\n\nIf this wasn't you, ignore this email and nothing will be sent.`,
           });
         }
         return send(res, 200, { email, verified: db.emails[owner].verified });
@@ -255,7 +257,7 @@ const server = createServer(async (req, res) => {
       const { body } = await json(req);
       validatePayment(body);
       const run = createRun(body);
-      return send(res, 201, { run: publicRun(run), bank: { iban: "DE89 3704 0044 0532 0130 00", name: "Freelance Guard (sandbox)", reference: run.ref, amountEur: run.amountEur } });
+      return send(res, 201, { run: publicRun(run), bank: { iban: "DE89 3704 0044 0532 0130 00", name: "Squirrel (sandbox)", reference: run.ref, amountEur: run.amountEur } });
     }
 
     // Stand-in for the user's banking app: it triggers the same signed webhook a real bank would send.
@@ -337,12 +339,12 @@ for (const signal of ["SIGTERM", "SIGINT"]) {
 }
 
 server.listen(PORT, () => {
-  console.log(`Freelance Guard backend on http://localhost:${PORT}`);
+  console.log(`Squirrel backend on http://localhost:${PORT}`);
   console.log(`Watching escrow ${ESCROW_ADDRESS} via ${RPC_URL}`);
   const seen = new Set();
   const readJob = async (id) => {
-    const [client_, freelancer] = await client.readContract({ address: ESCROW_ADDRESS, abi, functionName: "jobs", args: [id] });
-    return { client: client_, freelancer };
+    const [payer, payee] = await client.readContract({ address: ESCROW_ADDRESS, abi, functionName: "jobs", args: [id] });
+    return { payer, payee };
   };
   const reviewPeriod = () => client.readContract({ address: ESCROW_ADDRESS, abi, functionName: "reviewPeriod" });
   const arbiter = () => client.readContract({ address: ESCROW_ADDRESS, abi, functionName: "arbiter" });

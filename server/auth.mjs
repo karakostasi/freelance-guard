@@ -9,7 +9,7 @@ const b64 = (data) => Buffer.from(data).toString("base64url");
 const mac = (payload) => createHmac("sha256", secret()).update(payload).digest("base64url");
 
 /** The text a wallet signs to prove it controls an address. The frontend builds the same text. */
-export const signInMessage = (address, issuedAt) => ["Freelance Guard", "Sign in to upload files and manage notifications.", `Address: ${address}`, `Issued: ${issuedAt}`].join("\n");
+export const signInMessage = (address, issuedAt) => ["Squirrel", "Sign in to upload files and manage notifications.", `Address: ${address}`, `Issued: ${issuedAt}`].join("\n");
 
 const unauthorized = (msg) => Object.assign(new Error(msg), { status: 401 });
 

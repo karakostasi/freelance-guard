@@ -86,15 +86,15 @@ export function milestonePlan({ token, amount, days, milestones }) {
   return plan;
 }
 
-export function createRun({ payer, freelancer, amount, token, milestones, days, description, route }) {
+export function createRun({ payer, payee, amount, token, milestones, days, description, route }) {
   const id = randomUUID().slice(0, 8);
   const kind = token === "eurc" ? "eurc" : "eth";
   const run = {
     id,
-    ref: `FG-${id.toUpperCase()}`,
+    ref: `SQ-${id.toUpperCase()}`,
     contract: ESCROW_ADDRESS,
     payer,
-    freelancer,
+    payee,
     token: kind,
     amount: String(amount),
     amountEur: Math.round(Number(amount) * (kind === "eth" ? providers.EUR_PER_ETH : 1) * 100) / 100,
@@ -130,7 +130,7 @@ export function bankReceived(run, { amountEur }) {
     }));
     await step(run, "inbound", "aml", () => providers.aml.screen({ payer: run.payer, amountEur }));
     await step(run, "inbound", "ledger", async () => {
-      const entry = ledger(run, "client_vIBAN", "escrow_pending", "SEPA credit allocated");
+      const entry = ledger(run, "payer_vIBAN", "escrow_pending", "SEPA credit allocated");
       return { source: "backend", ledgerEntry: entry.id, debit: entry.debit, credit: entry.credit, amountEur };
     });
 
@@ -147,7 +147,7 @@ export function bankReceived(run, { amountEur }) {
     const items = run.milestones.map((m) => ({ title: m.title, amount: unitsFor(run.token, m.amount), duration: Math.round(m.days * 86400) }));
     const asset = assetOf(run);
     const isToken = asset.address !== ZERO;
-    const data = encodeFunctionData({ abi, functionName: "createJob", args: [run.freelancer, asset.address, run.description, items, true] });
+    const data = encodeFunctionData({ abi, functionName: "createJob", args: [run.payee, asset.address, run.description, items, true] });
     run.tx = { to: ESCROW_ADDRESS, data, value: isToken ? "0" : asset.units.toString() };
     // A token job needs the escrow to be allowed to pull the tokens first.
     run.approval = isToken
@@ -185,7 +185,7 @@ const byJob = (jobId) => Object.values(db.runs).find((r) => onThisContract(r) &&
 
 async function notify(run, event) {
   const url = process.env.NOTIFY_WEBHOOK_URL;
-  const record = { runId: run.id, event, jobId: run.jobId, freelancer: run.freelancer, at: new Date().toISOString(), delivered: false, target: url ?? "log" };
+  const record = { runId: run.id, event, jobId: run.jobId, payee: run.payee, at: new Date().toISOString(), delivered: false, target: url ?? "log" };
   if (url) {
     try {
       const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(record), signal: AbortSignal.timeout(5000) });
@@ -209,11 +209,12 @@ export async function onChainEvent(log) {
   const info = () => txInfo(log.transactionHash, log.blockNumber);
 
   if (eventName === "JobCreated") {
+    // Event args keep the contract's names: `client` is the payer, `freelancer` the payee.
     const run = byStatus("awaiting_deposit", (r) => {
       const asset = assetOf(r);
       return (
         r.payer.toLowerCase() === args.client.toLowerCase() &&
-        r.freelancer.toLowerCase() === args.freelancer.toLowerCase() &&
+        r.payee.toLowerCase() === args.freelancer.toLowerCase() &&
         asset.address.toLowerCase() === args.token.toLowerCase() &&
         args.milestoneCount === BigInt(r.milestones.length) &&
         asset.units === args.total
@@ -269,9 +270,9 @@ export async function onChainEvent(log) {
   if (paid && run.status !== "released" && run.status !== "paid_out") {
     run.status = "released";
     const tx = await info();
-    const decidedBy = eventName === "Resolved" ? "arbiter" : "client approval or review timeout";
-    emit(run, { type: "step_done", stage: "work", step: "review", payload: { source: "chain", jobId: run.jobId, outcome: eventName === "Resolved" ? "resolved by arbiter" : "approved by client or review timeout" } });
-    emit(run, { type: "step_done", stage: "release", step: "approval", payload: { source: "chain", jobId: run.jobId, event: eventName, paidTo: run.freelancer, decidedBy } });
+    const decidedBy = eventName === "Resolved" ? "arbiter" : "payer approval or review timeout";
+    emit(run, { type: "step_done", stage: "work", step: "review", payload: { source: "chain", jobId: run.jobId, outcome: eventName === "Resolved" ? "resolved by arbiter" : "approved by payer or review timeout" } });
+    emit(run, { type: "step_done", stage: "release", step: "approval", payload: { source: "chain", jobId: run.jobId, event: eventName, paidTo: run.payee, decidedBy } });
     await step(run, "release", "release", async () => ({ ...tx, function: eventName === "Resolved" ? "resolve" : "approve / claimAfterTimeout", jobId: run.jobId }));
 
     // Payout routing runs by itself once the escrow has released the funds.

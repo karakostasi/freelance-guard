@@ -6,7 +6,7 @@ export type PaymentRun = {
   id: string;
   ref: string;
   payer: string;
-  freelancer: string;
+  payee: string;
   amount: string;
   token: "eth" | "eurc";
   amountEur: number;
@@ -39,7 +39,7 @@ const post = <T>(path: string, body: unknown) => request<T>(path, { method: "POS
 
 export const api = {
   health: () => request<{ ok: boolean; eurPerEth: number }>("/api/health"),
-  createPayment: (body: { payer: string; freelancer: string; amount: string; token: "eth" | "eurc"; milestones: { title: string; amount: string; days: string }[]; description: string; route: PayoutRoute }) =>
+  createPayment: (body: { payer: string; payee: string; amount: string; token: "eth" | "eurc"; milestones: { title: string; amount: string; days: string }[]; description: string; route: PayoutRoute }) =>
     post<{ run: PaymentRun; bank: { reference: string; amountEur: number } }>("/api/payments", body),
   bankTransfer: (reference: string) => post<{ ok: boolean }>("/api/sandbox/bank-transfer", { reference }),
   markSigned: (id: string, gasMode: "sponsored" | "wallet") => post(`/api/payments/${id}/signed`, { gasMode }),

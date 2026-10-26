@@ -106,13 +106,13 @@ async function run({ escrow, eurc }) {
     { type: "function", name: "mint", stateMutability: "nonpayable", inputs: [{ type: "address" }, { type: "uint256" }], outputs: [] },
     { type: "function", name: "balanceOf", stateMutability: "view", inputs: [{ type: "address" }], outputs: [{ type: "uint256" }] },
   ];
-  // Hardhat's well-known test accounts: #0 is the client, #1 the freelancer.
-  const client = privateKeyToAccount("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80");
-  const freelancer = privateKeyToAccount("0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d");
+  // Hardhat's well-known test accounts: #0 is the payer, #1 the payee.
+  const payer = privateKeyToAccount("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80");
+  const payee = privateKeyToAccount("0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d");
   const chain = { chain: hardhat, transport: http(RPC) };
   const pub = createPublicClient(chain);
-  const asClient = createWalletClient({ account: client, ...chain });
-  const asFreelancer = createWalletClient({ account: freelancer, ...chain });
+  const asPayer = createWalletClient({ account: payer, ...chain });
+  const asPayee = createWalletClient({ account: payee, ...chain });
   const mined = (hash) => pub.waitForTransactionReceipt({ hash });
 
   const post = async (path, body) => {
@@ -145,12 +145,14 @@ async function run({ escrow, eurc }) {
     return { events, stop: async () => (abort.abort(), finished) };
   }
   const stepDone = (events, stage, step) => events.find((e) => e.type === "step_done" && e.stage === stage && e.step === step);
-  const base = { payer: client.address, freelancer: freelancer.address, description: "flow test" };
+  const base = { payer: payer.address, payee: payee.address, description: "flow test" };
 
   console.log("\nRequest checks");
   const badHook = await fetch(`${API}/webhooks/bank`, { method: "POST", headers: { "content-type": "application/json", "x-signature": "00" }, body: "{}" });
   check(badHook.status === 401, "a bank webhook with a bad signature is rejected (401)");
   check((await post("/api/payments", { payer: "nope" })).status === 400, "an invalid payment is rejected (400)");
+  const legacy = await post("/api/payments", { payer: payer.address, freelancer: payer.address, amount: "1", milestones: [{ title: "a", amount: "1", days: 1 }] });
+  check(legacy.status === 400 && legacy.body.error ==="payee must differ from payer", "the old `freelancer` field is still read as the payee");
   const bad = (extra) => post("/api/payments", { ...base, amount: "1000", token: "eurc", route: "eurc", ...extra });
   check((await bad({ milestones: [{ title: "a", amount: "400", days: 3 }, { title: "b", amount: "500", days: 5 }] })).status === 400, "milestones that don't add up to the total are rejected");
   check((await bad({ milestones: [] })).status === 400, "an empty milestone list is rejected");
@@ -162,7 +164,7 @@ async function run({ escrow, eurc }) {
   {
     const send = (path, init) => fetch(API + path, init);
     const sha = (bytes) => createHash("sha256").update(bytes).digest("hex");
-    const login = async (account = client, issuedAt = new Date().toISOString()) => {
+    const login = async (account = payer, issuedAt = new Date().toISOString()) => {
       const signature = await account.signMessage({ message: signInMessage(account.address, issuedAt) });
       return send("/api/auth", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ address: account.address, issuedAt, signature }) });
     };
@@ -171,9 +173,9 @@ async function run({ escrow, eurc }) {
 
     check((await send("/api/files", { method: "POST", body: "x" })).status === 401, "uploading without signing in is refused (401)");
     check((await send("/api/files", { method: "POST", headers: { authorization: "Bearer nope" }, body: "x" })).status === 401, "a made-up token is refused (401)");
-    const wrongSigner = await send("/api/auth", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ address: client.address, issuedAt: new Date().toISOString(), signature: await freelancer.signMessage({ message: "hi" }) }) });
+    const wrongSigner = await send("/api/auth", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ address: payer.address, issuedAt: new Date().toISOString(), signature: await payee.signMessage({ message: "hi" }) }) });
     check(wrongSigner.status === 401, "signing in with a signature from another wallet is refused (401)");
-    check((await login(client, new Date(Date.now() - 3_600_000).toISOString())).status === 401, "an hour-old sign-in message is refused (401)");
+    check((await login(payer, new Date(Date.now() - 3_600_000).toISOString())).status === 401, "an hour-old sign-in message is refused (401)");
 
     const { token } = await (await login()).json();
     const bytes = Buffer.from("the delivered draft, version 1");
@@ -203,7 +205,7 @@ async function run({ escrow, eurc }) {
     let limited = 0;
     for (let i = 0; i < 12 && !limited; i++) if ((await put(token, Buffer.from(`filler ${i}`), `f${i}`)).status === 429) limited = i + 1;
     check(limited > 0, `the daily upload limit stops further uploads (hit after ${limited} more)`);
-    const other = await (await login(freelancer)).json();
+    const other = await (await login(payee)).json();
     check((await put(other.token, Buffer.from("someone else's file"), "theirs")).status === 201, "another wallet has its own quota");
   }
 
@@ -214,10 +216,10 @@ async function run({ escrow, eurc }) {
     await post("/api/sandbox/bank-transfer", { reference: body.run.ref });
     const action = await until(() => stream.events.find((e) => e.type === "action_required"), "the call to sign");
     check(!action.approval && action.tx.value === parseEther("0.01").toString(), "an ETH job needs no approval and carries the value");
-    await mined(await asClient.sendTransaction({ to: action.tx.to, data: action.tx.data, value: BigInt(action.tx.value) }));
+    await mined(await asPayer.sendTransaction({ to: action.tx.to, data: action.tx.data, value: BigInt(action.tx.value) }));
     await until(() => stepDone(stream.events, "activated", "dashboard"), "the job to be funded");
-    await mined(await asFreelancer.writeContract({ address: escrow, abi, functionName: "submitWork", args: [1n, 0n, "https://example.com/work"] }));
-    await mined(await asClient.writeContract({ address: escrow, abi, functionName: "approve", args: [1n, 0n] }));
+    await mined(await asPayee.writeContract({ address: escrow, abi, functionName: "submitWork", args: [1n, 0n, "https://example.com/work"] }));
+    await mined(await asPayer.writeContract({ address: escrow, abi, functionName: "approve", args: [1n, 0n] }));
     await until(() => stream.events.find((e) => e.type === "done"), "the payout to finish");
     const finalRun = await (await fetch(`${API}/api/payments/${body.run.id}`)).json();
     check(finalRun.status === "paid_out", "the payment ends as paid out");
@@ -228,7 +230,7 @@ async function run({ escrow, eurc }) {
 
   console.log("\nEURC payment, three milestones (30 / 40 / 30)");
   {
-    await mined(await asClient.writeContract({ address: eurc, abi: erc20, functionName: "mint", args: [client.address, parseUnits("5000", 6)] }));
+    await mined(await asPayer.writeContract({ address: eurc, abi: erc20, functionName: "mint", args: [payer.address, parseUnits("5000", 6)] }));
     const { body } = await post("/api/payments", {
       ...base,
       amount: "1000",
@@ -245,8 +247,8 @@ async function run({ escrow, eurc }) {
     await post("/api/sandbox/bank-transfer", { reference: body.run.ref });
     const action = await until(() => stream.events.find((e) => e.type === "action_required"), "the calls to sign");
     check(action.approval?.to.toLowerCase() === eurc.toLowerCase() && action.tx.value === "0", "the token is approved first, and no ETH is sent");
-    await mined(await asClient.sendTransaction({ to: action.approval.to, data: action.approval.data }));
-    await mined(await asClient.sendTransaction({ to: action.tx.to, data: action.tx.data }));
+    await mined(await asPayer.sendTransaction({ to: action.approval.to, data: action.approval.data }));
+    await mined(await asPayer.sendTransaction({ to: action.tx.to, data: action.tx.data }));
     await until(() => stepDone(stream.events, "activated", "dashboard"), "the job to be funded");
 
     const [, milestones] = await pub.readContract({ address: escrow, abi, functionName: "getJob", args: [2n] });
@@ -257,17 +259,17 @@ async function run({ escrow, eurc }) {
     check(linked.status === "funded" && linked.token === "eurc", "the payment is linked to its job");
 
     // A later milestone is delivered and paid first: the live steps follow the first milestone only.
-    await mined(await asFreelancer.writeContract({ address: escrow, abi, functionName: "submitWork", args: [2n, 1n, "ipfs://draft"] }));
-    const approvedAt = (await mined(await asClient.writeContract({ address: escrow, abi, functionName: "approve", args: [2n, 1n] }))).blockNumber;
+    await mined(await asPayee.writeContract({ address: escrow, abi, functionName: "submitWork", args: [2n, 1n, "ipfs://draft"] }));
+    const approvedAt = (await mined(await asPayer.writeContract({ address: escrow, abi, functionName: "approve", args: [2n, 1n] }))).blockNumber;
     // Wait until the backend has really processed that block, so "nothing happened" can't be a false pass.
     await until(async () => BigInt((await (await fetch(`${API}/api/health`)).json()).processedBlock ?? 0) >= approvedAt, "the backend to process the approval");
     check(!stream.events.some((e) => e.stage === "work"), "events of other milestones don't move the first milestone's steps");
 
-    await mined(await asFreelancer.writeContract({ address: escrow, abi, functionName: "submitWork", args: [2n, 0n, "ipfs://upfront"] }));
-    await mined(await asClient.writeContract({ address: escrow, abi, functionName: "approve", args: [2n, 0n] }));
+    await mined(await asPayee.writeContract({ address: escrow, abi, functionName: "submitWork", args: [2n, 0n, "ipfs://upfront"] }));
+    await mined(await asPayer.writeContract({ address: escrow, abi, functionName: "approve", args: [2n, 0n] }));
     await until(() => stream.events.find((e) => e.type === "done"), "the first milestone's payout");
-    const received = await pub.readContract({ address: eurc, abi: erc20, functionName: "balanceOf", args: [freelancer.address] });
-    check(received === parseUnits("700", 6), "the freelancer holds 700 EURC from the two paid milestones");
+    const received = await pub.readContract({ address: eurc, abi: erc20, functionName: "balanceOf", args: [payee.address] });
+    check(received === parseUnits("700", 6), "the payee holds 700 EURC from the two paid milestones");
     check(stepDone(stream.events, "settlement", "settle")?.payload.rail === "base", "the payout was routed as EURC");
     await stream.stop();
   }

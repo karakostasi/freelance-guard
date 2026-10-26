@@ -62,6 +62,6 @@ export const offramp = {
     await wait(900);
     return route === "eurc"
       ? { source: "sandbox", rail: "base", amountEur, reference: `eurc_${hex(6)}` }
-      : { source: "sandbox", rail: "sepa_instant", amountEur, reference: `FG-${hex(5)}` };
+      : { source: "sandbox", rail: "sepa_instant", amountEur, reference: `SQ-${hex(5)}` };
   },
 };

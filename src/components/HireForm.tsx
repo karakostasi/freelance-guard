@@ -47,7 +47,7 @@ const DAY = 86400;
 const sameRows = (a: Row[], b: Row[]) => a.length === b.length && a.every((r, i) => r.title === b[i].title && r.percent === b[i].percent && r.days === b[i].days);
 
 /**
- * The one form for hiring a freelancer. The client pays either from their wallet (an on-chain
+ * The one form for creating a job. The payer pays either from their wallet (an on-chain
  * transaction right here) or by bank transfer in euros (handed to `onBank`, which runs the live payment flow).
  */
 export function HireForm({ variant = "page", onBank, onCreated }: { variant?: "page" | "drawer"; onBank: (form: FundingForm) => void; onCreated?: () => void }) {
@@ -60,7 +60,7 @@ export function HireForm({ variant = "page", onBank, onCreated }: { variant?: "p
   const [payWith, setPayWith] = useState<PayWith>("wallet");
   const [route, setRoute] = useState<PayoutRoute>("sepa");
   const [symbol, setSymbol] = useState("ETH");
-  const [freelancer, setFreelancer] = useState("");
+  const [payee, setPayee] = useState("");
   const [total, setTotal] = useState("");
   const [rows, setRows] = useState<Row[]>(PRESETS[0].rows);
   const [fundNowChoice, setFundNow] = useState(true);
@@ -80,7 +80,7 @@ export function HireForm({ variant = "page", onBank, onCreated }: { variant?: "p
   };
 
   const reset = () => {
-    setFreelancer("");
+    setPayee("");
     setTotal("");
     setRows(PRESETS[0].rows);
     setTitle("");
@@ -113,7 +113,7 @@ export function HireForm({ variant = "page", onBank, onCreated }: { variant?: "p
   const rowsValid = rows.length > 0 && percentSum === 100n && percents.every((p) => p > 0n) && rows.every((r) => Number(r.days) > 0 && r.title.trim());
   // The deposit is signed in this wallet for both ways of paying, so it needs the funds at hand.
   const short = fundNow && balance !== undefined && totalUnits > balance;
-  const valid = isAddress(freelancer) && title.trim().length > 0 && totalUnits > 0n && rowsValid && !short;
+  const valid = isAddress(payee) && title.trim().length > 0 && totalUnits > 0n && rowsValid && !short;
   const busy = !!working || confirming;
   // The split matches a preset until the rows are edited, then it is a custom split.
   const activePreset = PRESETS.find((p) => sameRows(p.rows, rows))?.label ?? null;
@@ -138,7 +138,7 @@ export function HireForm({ variant = "page", onBank, onCreated }: { variant?: "p
       try {
         const description = await makeDescription();
         onBank({
-          freelancer,
+          payee,
           amount: formatUnits(totalUnits, token.decimals),
           token: token.symbol === "EURC" ? "eurc" : "eth",
           description,
@@ -165,7 +165,7 @@ export function HireForm({ variant = "page", onBank, onCreated }: { variant?: "p
           address: escrowAddress,
           abi: escrowAbi,
           functionName: "createJob",
-          args: [freelancer, token.address ?? zeroAddress, description, items, fundNow],
+          args: [payee, token.address ?? zeroAddress, description, items, fundNow],
           value: fundNow && !token.address ? totalUnits : 0n,
         }),
       );
@@ -181,8 +181,8 @@ export function HireForm({ variant = "page", onBank, onCreated }: { variant?: "p
     <>
       <div className={styles.formGroup}>
         <h3 className={styles.groupTitle}>Who and how much</h3>
-        <input className={styles.input} placeholder="Freelancer address (0x…)" value={freelancer} onChange={(e) => setFreelancer(e.target.value)} />
-        {isAddress(freelancer) && <ReputationBadge address={freelancer} role="freelancer" />}
+        <input className={styles.input} placeholder="Payee address (0x…)" value={payee} onChange={(e) => setPayee(e.target.value)} />
+        {isAddress(payee) && <ReputationBadge address={payee} role="payee" />}
         <div className={styles.amountRow}>
           <input className={styles.input} placeholder={`Total amount (${token.symbol})`} value={total} onChange={(e) => setTotal(e.target.value)} />
           <select className={styles.input} value={symbol} onChange={(e) => setSymbol(e.target.value)} aria-label="Asset">
@@ -230,9 +230,9 @@ export function HireForm({ variant = "page", onBank, onCreated }: { variant?: "p
           </label>
         </div>
         {bank && backendOnline && (
-          <select className={styles.input} value={route} onChange={(e) => setRoute(e.target.value as PayoutRoute)} aria-label="Freelancer payout">
-            <option value="sepa">Freelancer is paid out by SEPA bank transfer</option>
-            <option value="eurc">Freelancer keeps EURC in their wallet</option>
+          <select className={styles.input} value={route} onChange={(e) => setRoute(e.target.value as PayoutRoute)} aria-label="Payee payout">
+            <option value="sepa">Payee is paid out by SEPA bank transfer</option>
+            <option value="eurc">Payee keeps EURC in their wallet</option>
           </select>
         )}
       </div>
@@ -244,7 +244,7 @@ export function HireForm({ variant = "page", onBank, onCreated }: { variant?: "p
             <input type="radio" checked={fundNow} onChange={() => setFundNow(true)} />
             <span>
               <strong>Fund everything now</strong>
-              <span className={styles.muted}>Lock the full amount in escrow today. The freelancer can see the money is there.</span>
+              <span className={styles.muted}>Lock the full amount in escrow today. The payee can see the money is there.</span>
             </span>
           </label>
           <label className={`${styles.optionCard} ${!fundNow ? styles.optionCardActive : ""} ${bank ? styles.optionCardDisabled : ""}`}>
@@ -325,7 +325,7 @@ export function HireForm({ variant = "page", onBank, onCreated }: { variant?: "p
   if (variant === "drawer") return <div className={styles.drawerForm}>{body}</div>;
   return (
     <section className={styles.section}>
-      <h2>Hire a freelancer</h2>
+      <h2>Create a job</h2>
       {body}
     </section>
   );

@@ -37,6 +37,14 @@ async function openStore() {
 const store = await openStore();
 export const db = { ...empty(), ...(await store.read()) };
 
+// Runs saved before the payer/payee rename carry the payee as `freelancer`.
+for (const run of Object.values(db.runs)) {
+  if (run.payee === undefined && run.freelancer !== undefined) {
+    run.payee = run.freelancer;
+    delete run.freelancer;
+  }
+}
+
 let dirty = false;
 let writing = false;
 

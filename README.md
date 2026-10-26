@@ -1,14 +1,18 @@
-# freelance-guard
+# Squirrel
 
-Peer-to-peer freelance marketplace on Ethereum. A client's payment is locked in an escrow smart contract, so freelancers can't be stiffed and clients only pay for delivered work.
+Milestone escrow for business payments on Ethereum. A payer's payment is locked in an escrow smart contract, so payees can't be stiffed and payers only pay for delivered work.
 
 ## How it works
 
-1. Client creates a job and funds the escrow (ETH) with a delivery deadline.
-2. Freelancer submits the deliverable (link/IPFS hash).
-3. Client approves and the freelancer is paid. If the client stays silent past the review period (3 days), the freelancer claims the funds.
-4. Client can dispute within the review period; an arbiter decides who gets the funds.
-5. If nothing is delivered by the deadline, the client reclaims the funds.
+1. Payer creates a job and funds the escrow (ETH) with a delivery deadline.
+2. Payee submits the deliverable (link/IPFS hash).
+3. Payer approves and the payee is paid. If the payer stays silent past the review period (3 days), the payee claims the funds.
+4. Payer can dispute within the review period; an arbiter decides who gets the funds.
+5. If nothing is delivered by the deadline, the payer reclaims the funds.
+
+## Terminology
+
+The app calls the two sides the **payer** (funds the escrow) and the **payee** (delivers and gets paid). The contract predates that and still uses `client` and `freelancer` in its storage, events and function arguments. The frontend translates once, in `jobFromChain` (`src/lib/jobs.ts`), and the backend reads the event arguments by their contract names.
 
 ## Layout
 
@@ -32,14 +36,14 @@ Connect MetaMask to `http://127.0.0.1:8545` (chain id 31337).
 
 ## Milestones and tokens
 
-A job has 1 to 20 milestones, each with a title, an amount and the number of days the freelancer has to deliver. Every milestone is funded, delivered, approved and paid (or refunded) on its own, so a dispute on one milestone doesn't block the others.
+A job has 1 to 20 milestones, each with a title, an amount and the number of days the payee has to deliver. Every milestone is funded, delivered, approved and paid (or refunded) on its own, so a dispute on one milestone doesn't block the others.
 
-- `createJob(freelancer, token, description, milestones, fundNow)` creates the job. With `fundNow` every milestone is funded in the same transaction (send the total as ETH, or approve the total for a token). Without it, the client funds milestones one at a time with `fundMilestone(id, index)`.
-- The freelancer's deadline for a milestone starts when that milestone is funded, not when the job is created.
-- `token` is `address(0)` for ETH, or an ERC-20 address. A job uses one token. The client approves the escrow first, and payouts and refunds are in the same token. Fee-on-transfer tokens are rejected.
+- `createJob(freelancer, token, description, milestones, fundNow)` creates the job. With `fundNow` every milestone is funded in the same transaction (send the total as ETH, or approve the total for a token). Without it, the payer funds milestones one at a time with `fundMilestone(id, index)`.
+- The payee's deadline for a milestone starts when that milestone is funded, not when the job is created.
+- `token` is `address(0)` for ETH, or an ERC-20 address. A job uses one token. The payer approves the escrow first, and payouts and refunds are in the same token. Fee-on-transfer tokens are rejected.
 - All actions take the job id and the milestone index: `submitWork`, `approve`, `claimAfterTimeout`, `dispute`, `resolve`, `refundExpired`.
 
-One form hires a freelancer, on the Jobs page and in the "Fund a job" drawer of the Payment flow page. It has a split builder (1 payment, 50 / 50, 30 / 40 / 30, or custom shares) and a choice of how to pay:
+One form creates a job, on the Jobs page and in the "Fund a job" drawer of the Payment flow page. It has a split builder (1 payment, 50 / 50, 30 / 40 / 30, or custom shares) and a choice of how to pay:
 - **From my wallet:** an on-chain transaction, with ETH, EURC or USDC, funding everything now or milestone by milestone.
 - **Bank transfer in euros:** the backend runs the live payment flow (sandbox bank steps, then a real deposit signed in the wallet). It pays everything at once, with ETH or EURC, and the live steps follow the first milestone. Other milestones show the real on-chain data.
 
@@ -65,9 +69,9 @@ Set `VITE_PAYMASTER_URL` to try sponsored gas. It only applies if the wallet sup
 
 ## Email notifications (optional)
 
-With the backend running, people can open **Email notifications** in the account menu, sign in with their wallet and give an email address. After they confirm it with the link we send, both the client and the freelancer get an email at every step of a job, worded for their side:
+With the backend running, people can open **Email notifications** in the account menu, sign in with their wallet and give an email address. After they confirm it with the link we send, both the payer and the payee get an email at every step of a job, worded for their side:
 - a milestone is funded,
-- work is submitted (the client is told how long they have to review it),
+- work is submitted (the payer is told how long they have to review it),
 - the payment is released (approved, claimed after the timeout, or decided by the arbiter),
 - the work is disputed (the arbiter is told too, if they registered an email),
 - the payment is refunded.
@@ -115,4 +119,4 @@ CI installs with `npm ci`, so it uses exactly the versions in `package-lock.json
 
 - Jobs can be paid in ETH or ERC-20 tokens (EURC and USDC are listed). Fee-on-transfer tokens are rejected, and each job is in a single token.
 - Dispute resolution is a single arbiter address, all-or-nothing (no split).
-- No marketplace listings/profiles yet, jobs are created directly with a freelancer's address.
+- No marketplace listings/profiles yet, jobs are created directly with the payee's address.

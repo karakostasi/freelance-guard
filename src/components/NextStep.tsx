@@ -27,8 +27,8 @@ export function NextStep({ id, index, job, payout }: { id: number; index: number
 
   const me = address?.toLowerCase();
   const ms = job.milestones[index];
-  const isClient = me === job.client.toLowerCase();
-  const isFreelancer = me === job.freelancer.toLowerCase();
+  const isPayer = me === job.payer.toLowerCase();
+  const isPayee = me === job.payee.toLowerCase();
   const isArbiter = !!me && arbiter?.toLowerCase() === me;
   const status = STATUS[ms.status];
   const name = milestoneName(job, index);
@@ -43,31 +43,31 @@ export function NextStep({ id, index, job, payout }: { id: number; index: number
   // True when the next move is the signed-in account's, so the banner can stand out.
   let myTurn = false;
   if (status === "Unfunded") {
-    myTurn = isClient;
-    title = isClient ? `Fund ${the || "this milestone"}` : `Waiting for the client to fund ${the || "this milestone"}`;
-    detail = "The freelancer's clock starts once it's funded.";
+    myTurn = isPayer;
+    title = isPayer ? `Fund ${the || "this milestone"}` : `Waiting for the payer to fund ${the || "this milestone"}`;
+    detail = "The payee's clock starts once it's funded.";
   } else if (status === "Funded") {
-    myTurn = isFreelancer;
-    title = isFreelancer ? `Deliver ${the || "the work"}` : `Waiting for the freelancer to deliver${name ? ` ${the}` : ""}`;
-    detail = now > deadline ? (isClient ? "The deadline passed. You can take a refund." : "The deadline passed.") : `Due ${left(deadline)}.`;
+    myTurn = isPayee;
+    title = isPayee ? `Deliver ${the || "the work"}` : `Waiting for the payee to deliver${name ? ` ${the}` : ""}`;
+    detail = now > deadline ? (isPayer ? "The deadline passed. You can take a refund." : "The deadline passed.") : `Due ${left(deadline)}.`;
   } else if (status === "Submitted") {
-    myTurn = isClient;
-    title = isClient ? `Review ${the || "the work"}` : `Waiting for the client's review${name ? ` of ${the}` : ""}`;
-    detail = reviewEnd === undefined ? "" : isFreelancer && now >= reviewEnd ? "The review period ended. You can claim your payment." : `Review period ${left(reviewEnd)}.`;
+    myTurn = isPayer;
+    title = isPayer ? `Review ${the || "the work"}` : `Waiting for the payer's review${name ? ` of ${the}` : ""}`;
+    detail = reviewEnd === undefined ? "" : isPayee && now >= reviewEnd ? "The review period ended. You can claim your payment." : `Review period ${left(reviewEnd)}.`;
   } else if (status === "Disputed") {
     myTurn = isArbiter;
     title = isArbiter ? "Resolve the dispute" : "Waiting for the arbiter";
-    detail = "The client contested the work.";
+    detail = "The payer contested the work.";
   } else if (status === "Paid") {
     const s = payout.state.status;
     title = s === "done" ? "All done" : s === "running" ? "Routing the payout…" : payout.auto ? "Payment released. The payout starts automatically" : "Payment released. Choose where the money goes";
     detail =
       s === "done"
         ? `${euro(payout.amountEur)} ${payout.route === "eurc" ? "kept as EURC in the wallet" : "sent to the bank account via SEPA Instant"}.`
-        : "The escrow released the funds to the freelancer.";
+        : "The escrow released the funds to the payee.";
   } else if (status === "Refunded") {
     title = "Refunded";
-    detail = "The funds went back to the client.";
+    detail = "The funds went back to the payer.";
   }
 
   return (

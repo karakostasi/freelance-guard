@@ -14,7 +14,7 @@ import { setPendingPayment } from "../lib/pendingPayment";
 import styles from "../App.module.css";
 import page from "./FlowPage.module.css";
 
-/** The form to hire a freelancer, with your jobs as a list beside it. Clicking a job opens it as a card over the page. */
+/** The form to start a job with a payee, with your jobs as a list beside it. Clicking a job opens it as a card over the page. */
 export function JobsPage() {
   const mine = useMyJobs();
   const [open, setOpen] = useState<string | null>(null);
@@ -29,7 +29,7 @@ export function JobsPage() {
 
   return (
     <div className={page.jobsLayout}>
-      <JobList jobs={mine} selectedId={open ?? ""} onSelect={setOpen} emptyText="No jobs yet. Fill in the form to hire someone." />
+      <JobList jobs={mine} selectedId={open ?? ""} onSelect={setOpen} emptyText="No jobs yet. Fill in the form to create one." />
       <WalletCard className={page.wallet} />
       <div className={page.top}>
         {due.length > 0 && (

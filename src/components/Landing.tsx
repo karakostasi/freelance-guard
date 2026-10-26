@@ -6,15 +6,15 @@ import styles from "../App.module.css";
 import page from "./Landing.module.css";
 
 const STEPS = [
-  { icon: Lock, title: "Fund", text: "Client locks the payment in escrow." },
-  { icon: Send, title: "Deliver", text: "Freelancer submits the work." },
-  { icon: FileCheck, title: "Review", text: "Client approves or disputes." },
+  { icon: Lock, title: "Fund", text: "Payer locks the payment in escrow." },
+  { icon: Send, title: "Deliver", text: "Payee submits the work." },
+  { icon: FileCheck, title: "Review", text: "Payer approves or disputes." },
   { icon: Banknote, title: "Get paid", text: "Funds release on approval." },
 ];
 
 const BENEFITS = [
-  { icon: ShieldCheck, title: "Safe for clients", text: "Money moves only when you approve.", accent: "#4f7cff", size: "span3", chip: "Funds locked until approval" },
-  { icon: Wallet, title: "Safe for freelancers", text: "Payment is locked in before you start.", accent: "#3ecf8e", size: "span3", chip: "Paid on approval" },
+  { icon: ShieldCheck, title: "Safe for payers", text: "Money moves only when you approve.", accent: "#4f7cff", size: "span3", chip: "Funds locked until approval" },
+  { icon: Wallet, title: "Safe for payees", text: "Payment is locked in before you start.", accent: "#3ecf8e", size: "span3", chip: "Paid on approval" },
   { icon: Scale, title: "Fair disputes", text: "A neutral arbiter decides.", accent: "#f5b942", size: "span2", chip: "" },
   { icon: Eye, title: "Transparent", text: "Every step is on-chain.", accent: "#a78bfa", size: "span4", chip: "0x7a3f…c91e · On-chain" },
 ] as const;

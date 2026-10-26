@@ -1,10 +1,8 @@
 import { useAccount, useReadContract, useReadContracts } from "wagmi";
 import type { Abi } from "viem";
 import { escrowAbi, escrowAddress } from "../wagmi";
-import { STATUS, type Job, type Milestone } from "../lib/jobs";
+import { STATUS, jobFromChain, type Job, type RawJob } from "../lib/jobs";
 import { useEscrowConfig } from "./useEscrowConfig";
-
-type RawJob = readonly [Omit<Job, "milestones">, readonly Milestone[]];
 
 /** Jobs the connected account is part of (plus jobs with a dispute, for the arbiter), newest first. */
 export function useMyJobs() {
@@ -27,13 +25,13 @@ export function useMyJobs() {
   return (data ?? [])
     .map((r, i) => {
       const raw = r.result as RawJob | undefined;
-      return { id: i + 1, job: raw ? ({ ...raw[0], milestones: [...raw[1]] } as Job) : undefined };
+      return { id: i + 1, job: raw ? jobFromChain(raw) : undefined };
     })
     .filter(
       ({ job }) =>
         job &&
-        (job.client.toLowerCase() === me ||
-          job.freelancer.toLowerCase() === me ||
+        (job.payer.toLowerCase() === me ||
+          job.payee.toLowerCase() === me ||
           (isArbiter && job.milestones.some((m) => STATUS[m.status] === "Disputed"))),
     )
     .reverse() as { id: number; job: Job }[];

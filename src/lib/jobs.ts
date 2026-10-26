@@ -6,7 +6,7 @@ export { formatDuration };
 export type Milestone = {
   title: string;
   amount: bigint;
-  /** Seconds the freelancer has once the milestone is funded. */
+  /** Seconds the payee has once the milestone is funded. */
   duration: number;
   deadline: bigint;
   submittedAt: bigint;
@@ -15,13 +15,27 @@ export type Milestone = {
 };
 
 export type Job = {
-  client: string;
-  freelancer: string;
+  payer: string;
+  payee: string;
   /** Zero address means ETH. */
   token: string;
   description: string;
   milestones: Milestone[];
 };
+
+/**
+ * The tuple `getJob` returns. The contract still calls the two parties `client` and `freelancer`;
+ * `jobFromChain` is the one place those names are translated to the app's `payer` and `payee`.
+ */
+export type RawJob = readonly [{ client: string; freelancer: string; token: string; description: string }, readonly Milestone[]];
+
+export const jobFromChain = ([head, milestones]: RawJob): Job => ({
+  payer: head.client,
+  payee: head.freelancer,
+  token: head.token,
+  description: head.description,
+  milestones: [...milestones],
+});
 
 export const STATUS = ["Unfunded", "Funded", "Submitted", "Disputed", "Paid", "Refunded"];
 
@@ -73,8 +87,8 @@ export type Role = { label: string; className: string; amountLabel: string };
 /** Which side of the job `me` is on. Anyone who is neither party is the arbiter. */
 export function roleOf(job: Job, me: string | undefined): Role {
   const addr = me?.toLowerCase();
-  if (addr === job.client.toLowerCase()) return { label: "Client", className: styles.roleClient, amountLabel: "You pay" };
-  if (addr === job.freelancer.toLowerCase()) return { label: "Freelancer", className: styles.roleFreelancer, amountLabel: "You earn" };
+  if (addr === job.payer.toLowerCase()) return { label: "Payer", className: styles.rolePayer, amountLabel: "You pay" };
+  if (addr === job.payee.toLowerCase()) return { label: "Payee", className: styles.rolePayee, amountLabel: "You earn" };
   return { label: "Arbiter", className: styles.roleArbiter, amountLabel: "Escrow" };
 }
 

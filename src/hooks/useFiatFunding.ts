@@ -10,7 +10,7 @@ export type FundingMilestone = { title: string; amount: string; days: string };
 
 /** A payment made by bank transfer. `amount` is the total, split over the milestones. */
 export type FundingForm = {
-  freelancer: string;
+  payee: string;
   amount: string;
   description: string;
   milestones: FundingMilestone[];
@@ -56,7 +56,7 @@ export function useFiatFunding(onFunded: (jobId: number) => void) {
         abi: escrowAbi,
         functionName: "createJob",
         // Every milestone is funded right away: a bank transfer is one payment for the total.
-        args: [form.freelancer, zeroAddress, form.description, form.milestones.map((m) => ({ title: m.title, amount: parseEther(m.amount), duration: Math.round(Number(m.days) * 86400) })), true],
+        args: [form.payee, zeroAddress, form.description, form.milestones.map((m) => ({ title: m.title, amount: parseEther(m.amount), duration: Math.round(Number(m.days) * 86400) })), true],
         value: parseEther(form.amount),
       });
       finish(2, 1, {

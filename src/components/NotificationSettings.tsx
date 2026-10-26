@@ -7,7 +7,7 @@ import styles from "../App.module.css";
 
 const firstLine = (e: unknown) => (e instanceof Error ? e.message : String(e)).split("\n")[0];
 
-/** A small dialog to get an email when a job is funded (freelancers) or work is submitted (clients). */
+/** A small dialog to get an email when a job is funded (payees) or work is submitted (payers). */
 export function NotificationSettings({ onClose }: { onClose: () => void }) {
   const { address } = useAccount();
   const [status, setStatus] = useState<EmailStatus | null>(null);
@@ -40,7 +40,7 @@ export function NotificationSettings({ onClose }: { onClose: () => void }) {
         <h2 className={styles.modalTitle}>
           <Mail size={18} style={{ verticalAlign: "-3px" }} /> Email notifications
         </h2>
-        <p className={styles.muted}>Get an email when a job you were hired for is funded, and when work you hired for is submitted. We only email confirmed addresses, and every email has an unsubscribe link.</p>
+        <p className={styles.muted}>Get an email when a job where you are the payee is funded, and when work on a job where you are the payer is submitted. We only email confirmed addresses, and every email has an unsubscribe link.</p>
 
         {!status && !asked && (
           <button

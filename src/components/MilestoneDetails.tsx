@@ -46,12 +46,12 @@ export function MilestoneDetails({ job, index, trace, onRetry, loading, compact 
 
   const outcome = (() => {
     if (status === "Paid") {
-      if (trace?.released?.kind === "Resolved") return "Resolved by the arbiter in favour of the freelancer";
-      if (releaser === job.freelancer.toLowerCase()) return "Claimed by the freelancer after the review period";
-      if (releaser === job.client.toLowerCase()) return "Approved by the client";
-      return "Paid to the freelancer";
+      if (trace?.released?.kind === "Resolved") return "Resolved by the arbiter in favour of the payee";
+      if (releaser === job.payee.toLowerCase()) return "Claimed by the payee after the review period";
+      if (releaser === job.payer.toLowerCase()) return "Approved by the payer";
+      return "Paid to the payee";
     }
-    if (status === "Refunded") return trace?.refunded?.viaArbiter ? "Refunded to the client by the arbiter's decision" : "Refunded to the client after the deadline passed";
+    if (status === "Refunded") return trace?.refunded?.viaArbiter ? "Refunded to the payer by the arbiter's decision" : "Refunded to the payer after the deadline passed";
     return null;
   })();
   const outcomeTx = status === "Paid" ? trace?.released : trace?.refunded;
@@ -145,7 +145,7 @@ export function MilestoneDetails({ job, index, trace, onRetry, loading, compact 
         {status === "Disputed" && (
           <>
             <dt>Review</dt>
-            <dd>The client disputed the work. Waiting for the arbiter.</dd>
+            <dd>The payer disputed the work. Waiting for the arbiter.</dd>
           </>
         )}
         {outcome && (

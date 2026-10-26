@@ -135,9 +135,11 @@ const page = (res, status, message) => {
 const fieldError = (msg) => Object.assign(new Error(msg), { status: 400 });
 
 function validatePayment(b) {
+  b.payee ??= b.freelancer; // callers still on the old field name (e.g. a frontend deployed before this backend)
+  delete b.freelancer;
   if (!ADDRESS.test(b.payer ?? "")) throw fieldError("payer must be an address");
-  if (!ADDRESS.test(b.freelancer ?? "")) throw fieldError("freelancer must be an address");
-  if (b.payer.toLowerCase() === b.freelancer.toLowerCase()) throw fieldError("freelancer must differ from payer");
+  if (!ADDRESS.test(b.payee ?? "")) throw fieldError("payee must be an address");
+  if (b.payer.toLowerCase() === b.payee.toLowerCase()) throw fieldError("payee must differ from payer");
   if (!(Number(b.amount) > 0)) throw fieldError("amount must be greater than 0");
   if (b.token !== undefined && !["eth", "eurc"].includes(b.token)) throw fieldError("token must be eth or eurc");
   milestonePlan(b);
@@ -341,8 +343,8 @@ server.listen(PORT, () => {
   console.log(`Watching escrow ${ESCROW_ADDRESS} via ${RPC_URL}`);
   const seen = new Set();
   const readJob = async (id) => {
-    const [client_, freelancer] = await client.readContract({ address: ESCROW_ADDRESS, abi, functionName: "jobs", args: [id] });
-    return { client: client_, freelancer };
+    const [payer, payee] = await client.readContract({ address: ESCROW_ADDRESS, abi, functionName: "jobs", args: [id] });
+    return { payer, payee };
   };
   const reviewPeriod = () => client.readContract({ address: ESCROW_ADDRESS, abi, functionName: "reviewPeriod" });
   const arbiter = () => client.readContract({ address: ESCROW_ADDRESS, abi, functionName: "arbiter" });

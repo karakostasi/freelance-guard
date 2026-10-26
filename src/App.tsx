@@ -18,7 +18,7 @@ export default function App() {
       <header className={styles.header}>
         <a className={`${styles.brand} ${styles.brandLink}`} href="#/" aria-label="Home">
           <img src={logo} alt="" className={styles.logo} />
-          <h1>Freelance Guard</h1>
+          <h1>Squirrel</h1>
         </a>
         <div className={styles.headerRight}>
           <nav className={styles.nav}>

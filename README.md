@@ -1,6 +1,6 @@
-# freelance-guard
+# Squirrel
 
-Peer-to-peer freelance marketplace on Ethereum. A payer's payment is locked in an escrow smart contract, so payees can't be stiffed and payers only pay for delivered work.
+Milestone escrow for business payments on Ethereum. A payer's payment is locked in an escrow smart contract, so payees can't be stiffed and payers only pay for delivered work.
 
 ## How it works
 

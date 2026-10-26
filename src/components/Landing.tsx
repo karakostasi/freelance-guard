@@ -32,9 +32,9 @@ export function Landing() {
   return (
     <div className={page.landing}>
       <section className={page.hero}>
-        <span className={page.eyebrow}>Escrow for freelance work</span>
+        <span className={page.eyebrow}>Milestone escrow for business payments</span>
         <h2 className={page.headline}>Get paid for your work. Pay only for work you approve.</h2>
-        <p className={page.lead}>Freelance Guard holds the payment in escrow until the work is approved.</p>
+        <p className={page.lead}>Squirrel holds the payment in escrow until the work is approved.</p>
         <div className={page.cta}>
           <button className={`${styles.button} ${page.primary}`} onClick={start} disabled={isPending}>
             {isConnected ? "Open the app" : "Connect wallet to start"} <ArrowRight size={16} />
@@ -64,7 +64,7 @@ export function Landing() {
       </section>
 
       <section className={page.section}>
-        <h3 className={page.title}>Why Freelance Guard</h3>
+        <h3 className={page.title}>Why Squirrel</h3>
         <div className={page.bento}>
           {BENEFITS.map(({ icon: Icon, title, text, accent, size, chip }) => (
             <div key={title} className={`${page.tile} ${page[size]}`} style={{ "--accent": accent } as React.CSSProperties}>

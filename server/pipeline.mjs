@@ -91,7 +91,7 @@ export function createRun({ payer, payee, amount, token, milestones, days, descr
   const kind = token === "eurc" ? "eurc" : "eth";
   const run = {
     id,
-    ref: `FG-${id.toUpperCase()}`,
+    ref: `SQ-${id.toUpperCase()}`,
     contract: ESCROW_ADDRESS,
     payer,
     payee,

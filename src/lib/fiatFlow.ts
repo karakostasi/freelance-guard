@@ -255,7 +255,7 @@ export const payoutStages = (route: PayoutRoute): Stage[] => [
         label: route === "eurc" ? "EURC available" : "SEPA Instant sent",
         simple: route === "eurc" ? "Funds available in your wallet" : "Transfer sent, arrives within seconds",
         durationMs: 1000,
-        payload: (c) => ({ rail: route === "eurc" ? "base-sepolia" : "sepa_instant", amount: eur(c.amountEur), reference: `FG-${c.jobId}-${hex(3).slice(2)}` }),
+        payload: (c) => ({ rail: route === "eurc" ? "base-sepolia" : "sepa_instant", amount: eur(c.amountEur), reference: `SQ-${c.jobId}-${hex(3).slice(2)}` }),
       },
       {
         id: "receipt",

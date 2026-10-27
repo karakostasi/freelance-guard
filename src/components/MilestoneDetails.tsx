@@ -1,5 +1,5 @@
-import { ExternalLink, LoaderCircle } from "lucide-react";
-import { STATUS, STATUS_CLASS, STATUS_LABEL, euro, formatDate, formatDuration, jobTotal, txUrl, type Job } from "../lib/jobs";
+import { ExternalLink, FileText, LoaderCircle } from "lucide-react";
+import { STATUS, STATUS_CLASS, STATUS_LABEL, euro, formatDate, formatDuration, jobTotal, paidOutcome, txUrl, type Job } from "../lib/jobs";
 import { formatAmount, formatUnitsOf, tokenOf, toEur } from "../lib/tokens";
 import type { JobTrace, TxInfo } from "../hooks/useJobTrace";
 import { DeliverableView } from "./DocView";
@@ -28,7 +28,7 @@ const TxLink = ({ tx, pending }: { tx?: TxInfo; pending?: boolean }) => {
 };
 
 /** Everything known about one milestone: amount, timeline, deliverable and how it ended. */
-export function MilestoneDetails({ job, index, trace, onRetry, loading, compact }: { job: Job; index: number; trace: JobTrace | undefined; onRetry?: () => void; loading?: boolean; compact?: boolean }) {
+export function MilestoneDetails({ job, index, trace, onRetry, loading, compact, receiptHref }: { job: Job; index: number; trace: JobTrace | undefined; onRetry?: () => void; loading?: boolean; compact?: boolean; receiptHref?: string }) {
   const { reviewPeriod } = useEscrowConfig();
   const now = useNow();
   const ms = job.milestones[index];
@@ -45,12 +45,7 @@ export function MilestoneDetails({ job, index, trace, onRetry, loading, compact 
   const releaser = trace?.released?.from.toLowerCase();
 
   const outcome = (() => {
-    if (status === "Paid") {
-      if (trace?.released?.kind === "Resolved") return "Resolved by the arbiter in favour of the payee";
-      if (releaser === job.payee.toLowerCase()) return "Claimed by the payee after the review period";
-      if (releaser === job.payer.toLowerCase()) return "Approved by the payer";
-      return "Paid to the payee";
-    }
+    if (status === "Paid") return paidOutcome(job, trace?.released?.kind, releaser);
     if (status === "Refunded") return trace?.refunded?.viaArbiter ? "Refunded to the payer by the arbiter's decision" : "Refunded to the payer after the deadline passed";
     return null;
   })();
@@ -154,6 +149,14 @@ export function MilestoneDetails({ job, index, trace, onRetry, loading, compact 
             <dd>
               {outcome}
               {outcomeTx && <span className={page.factLabel}> · {formatDate(BigInt(outcomeTx.blockTime))}</span>} <TxLink tx={outcomeTx} pending={loading && !outcomeTx} />
+              {status === "Paid" && receiptHref && (
+                <>
+                  {" "}
+                  <a className={page.txLink} href={receiptHref}>
+                    receipt <FileText size={12} />
+                  </a>
+                </>
+              )}
             </dd>
           </>
         )}

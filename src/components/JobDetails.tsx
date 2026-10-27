@@ -10,7 +10,7 @@ import { SpecView } from "./DocView";
 import { ReputationBadge } from "./ReputationBadge";
 import { MilestoneDetails } from "./MilestoneDetails";
 import { JobActions } from "./JobActions";
-import { jobTitle, parseDescription } from "../lib/documents";
+import { jobTitle, parseDescription, receiptPath } from "../lib/documents";
 import { useJobTrace } from "../hooks/useJobTrace";
 import styles from "../App.module.css";
 
@@ -60,7 +60,7 @@ function MilestoneCard({ id, index, job }: { id: string; index: number; job: Job
         <span className={`${styles.badge} ${STATUS_CLASS[ms.status]}`}>{STATUS_LABEL[ms.status]}</span>
       </div>
       <span>{formatAmount(job, ms.amount)}</span>
-      <MilestoneDetails compact job={job} index={index} trace={trace} onRetry={() => refetch()} loading={isFetching} />
+      <MilestoneDetails compact job={job} index={index} trace={trace} onRetry={() => refetch()} loading={isFetching} receiptHref={`#${receiptPath(id, index)}`} />
       <JobActions id={id} index={index} job={job} />
     </div>
   );

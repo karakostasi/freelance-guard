@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { privateKeyToAccount } from "viem/accounts";
-import { buildDescription, deliverableUrl, formatBytes, jobTitle, parseDeliverable, parseDescription, parseDoc, serializeDoc, signInMessage as frontendMessage } from "../src/lib/documents.ts";
+import { BILLING_MAX, buildDescription, cleanBilling, deliverableUrl, formatBytes, jobTitle, parseDeliverable, parseDescription, parseDoc, receiptNumber, receiptPath, serializeDoc, signInMessage as frontendMessage } from "../src/lib/documents.ts";
 import { computeReputation, jobKey } from "../src/lib/reputation.ts";
 import { reminderFor } from "../src/lib/reminders.ts";
 import { formatBalance } from "../src/lib/format.ts";
@@ -61,6 +61,18 @@ check(parseDoc(JSON.stringify({ ...doc, files: [{ ...doc.files[0], sha256: "nope
 check(parseDoc(JSON.stringify({ ...doc, files: Array(21).fill(doc.files[0]) })) === null, "too many files are rejected");
 check(parseDoc(JSON.stringify({ ...doc, text: "x".repeat(20_001) })) === null, "an oversized text is rejected");
 check(parseDoc(JSON.stringify({ ...doc, files: [{ ...doc.files[0], size: -1 }] })) === null, "a negative size is rejected");
+
+console.log("\nBilling details and receipts");
+const billing = { reference: "PO-1042", payerName: "Acme GmbH", payerVatId: "DE123456789", payeeName: "Studio Nord AB", payeeVatId: "SE556677889901" };
+check(same(parseDoc(serializeDoc({ ...doc, billing })), { ...doc, billing }), "billing details survive a round trip inside the document");
+check(!serializeDoc(doc).includes("billing") && serializeDoc({ ...doc, billing: {} }) === serializeDoc(doc) && serializeDoc({ ...doc, billing: { reference: "   " } }) === serializeDoc(doc), "no details, no billing key: hashes of older documents don't change");
+check(serializeDoc({ ...doc, billing: { payeeName: "B", reference: "A" } }) === serializeDoc({ ...doc, billing: { reference: "A", payeeName: "B" } }), "the order the fields were typed in doesn't change the hash");
+check(same(cleanBilling({ reference: "  PO   1042 ", payerName: "" }), { reference: "PO 1042" }) && cleanBilling({ reference: "  " }) === undefined && cleanBilling(undefined) === undefined, "details are trimmed and blanks dropped");
+check(cleanBilling({ reference: "x".repeat(200) }).reference.length === BILLING_MAX.reference, "an over-long value is cut to its limit");
+check(same(parseDoc(JSON.stringify({ ...doc, billing: { ...billing, extra: "ignored" } })).billing, billing), "unknown billing fields are dropped on reading");
+check(parseDoc(JSON.stringify({ ...doc, billing: "PO-1" })) === null && parseDoc(JSON.stringify({ ...doc, billing: [] })) === null && parseDoc(JSON.stringify({ ...doc, billing: { reference: 5 } })) === null, "billing that isn't an object of strings is rejected");
+check(parseDoc(JSON.stringify({ ...doc, billing: { reference: "x".repeat(BILLING_MAX.reference + 1) } })) === null, "an over-long reference is rejected");
+check(receiptNumber(12, 1) === "RC-12-2" && receiptPath(12, 1) === "/receipt/12/2", "receipts are numbered by job and milestone, from 1");
 check(formatBytes(512) === "512 B" && formatBytes(2048) === "2.0 KB" && formatBytes(5 * 1024 * 1024) === "5.0 MB", "file sizes are readable");
 
 console.log("\nBalances");
@@ -206,6 +218,10 @@ check(funding.length === 2 && to(funding, YOU).subject === "Job #4 has been fund
 const submission = messagesFor("WorkSubmitted", { id: 4n, milestone: 1n }, escrowJob, opts);
 check(to(submission, ME).text.includes("3 days") && to(submission, ME).text.includes("https://app/#/flow/4") && to(submission, ME).text.includes("milestone 2") && to(submission, YOU).subject.includes("was submitted"), "a submission tells the payer what to do, and the payee it is with the payer");
 check(to(messagesFor("Approved", { id: 4n, milestone: 0n }, escrowJob, opts), YOU).subject === "Payment released for job #4" && messagesFor("Approved", { id: 4n, milestone: 0n }, escrowJob, opts).length === 2, "a payment release goes to both");
+const released = messagesFor("Approved", { id: 4n, milestone: 1n }, escrowJob, opts);
+check(released.every((m) => m.text.includes(`Receipt: https://app/#${receiptPath(4, 1)}`)), "a payment release links both people to the receipt, at the address the frontend uses");
+check(messagesFor("Resolved", { id: 4n, milestone: 0n, paidFreelancer: true }, escrowJob, opts).every((m) => m.text.includes("Receipt: https://app/#/receipt/4/1")), "an arbiter's payment links to the receipt too");
+check(messagesFor("Refunded", { id: 4n, milestone: 0n }, escrowJob, opts).every((m) => !m.text.includes("Receipt")), "a refund has no receipt link");
 const arbitrated = messagesFor("Resolved", { id: 4n, milestone: 0n, paidFreelancer: true }, escrowJob, opts);
 check(arbitrated.length === 2 && to(arbitrated, YOU).text.includes("arbiter decided"), "the arbiter paying the payee is announced as a payment");
 check(messagesFor("Resolved", { id: 4n, milestone: 0n, paidFreelancer: false }, escrowJob, opts).length === 0, "an arbiter refund is announced by the Refunded event, not twice");

@@ -95,6 +95,9 @@ a.fileName { color: #8fa8ff; }
 .doc { display: flex; flex-direction: column; gap: .5rem; align-items: flex-start; }
 .docText { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .docText a, .specText a { color: #8fa8ff; }
+.docBilling { display: grid; grid-template-columns: max-content 1fr; gap: .15rem .75rem; margin: 0; font-size: .9rem; }
+.docBilling dt { opacity: .6; }
+.docBilling dd { margin: 0; overflow-wrap: anywhere; }
 .specText { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .cardTitle { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 a.chipButton { text-decoration: none; }
@@ -175,3 +178,7 @@ select.input:disabled { cursor: not-allowed; }
 .nudges { margin-bottom: 1rem; display: flex; flex-direction: column; gap: .5rem; }
 .nudge { text-align: left; padding: .6rem .9rem; border-radius: 8px; color: inherit; font: inherit; cursor: pointer; background: rgba(74, 222, 128, .12); border: 1px solid #4ade80; }
 .nudge:hover { background: rgba(74, 222, 128, .2); }
+
+@media print {
+  .noPrint { display: none !important; }
+}

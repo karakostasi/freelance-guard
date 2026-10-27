@@ -67,6 +67,14 @@ The bank, AML, FX and off-ramp providers are **sandboxes** (`server/providers.mj
 
 Set `VITE_PAYMASTER_URL` to try sponsored gas. It only applies if the wallet supports sponsored calls (EIP-5792 + ERC-7677) and otherwise the wallet pays as usual.
 
+## Receipts and business details
+
+When creating a job, the payer can add **business details**: a PO or invoice reference, and a company name and VAT ID for each side. They are stored inside the job's document, whose SHA-256 is already in the job's on-chain description, so they can't be changed afterwards without the hash showing it. No contract change was needed. Jobs without them work as before. They need the backend, and are not verified by Squirrel.
+
+Every paid milestone has a **receipt** at `#/receipt/<job>/<milestone>` (milestones numbered from 1). It is built from the chain and the job's document, so anyone with the link sees the same thing, with no wallet connected. It shows the amount, date, parties, reference, how the payment was released, and links to the transaction and contract. **Print or save as PDF** uses the browser's print dialog. A receipt is a record of payment, not a tax invoice. The "payment released" emails link to it, and so do the milestone views on the Jobs and Payment flow pages.
+
+The details document is public to anyone who looks the job up on-chain, like the job's other documents, so don't put anything in it you wouldn't want public. The date comes from searching the chain for the release transaction, which can take a while on old jobs with a public RPC.
+
 ## Email notifications (optional)
 
 With the backend running, people can open **Email notifications** in the account menu, sign in with their wallet and give an email address. After they confirm it with the link we send, both the payer and the payee get an email at every step of a job, worded for their side:

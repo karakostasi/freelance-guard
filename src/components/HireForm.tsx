@@ -6,7 +6,7 @@ import { escrowAbi, escrowAddress } from "../wagmi";
 import { useBackendStatus } from "../hooks/useBackend";
 import type { FundingForm } from "../hooks/useFiatFunding";
 import { useRefreshOnConfirm } from "../hooks/useRefreshOnConfirm";
-import { buildDescription } from "../lib/documents";
+import { BILLING_MAX, buildDescription, cleanBilling, type Billing } from "../lib/documents";
 import { ensureAllowance } from "../lib/erc20";
 import { uploadDoc, uploadFile } from "../lib/files";
 import { FileDrop } from "./FileDrop";
@@ -67,6 +67,7 @@ export function HireForm({ variant = "page", onBank, onCreated }: { variant?: "p
   const [title, setTitle] = useState("");
   const [spec, setSpec] = useState("");
   const [files, setFiles] = useState<File[]>([]);
+  const [billing, setBilling] = useState<Billing>({});
 
   const bank = payWith === "bank";
   // A bank transfer is one payment for the total, so it always funds everything. Offline only ETH works.
@@ -86,6 +87,7 @@ export function HireForm({ variant = "page", onBank, onCreated }: { variant?: "p
     setTitle("");
     setSpec("");
     setFiles([]);
+    setBilling({});
   };
 
   // Clear the form only once the job exists on-chain, so a rejected tx keeps the input.
@@ -119,16 +121,19 @@ export function HireForm({ variant = "page", onBank, onCreated }: { variant?: "p
   const activePreset = PRESETS.find((p) => sameRows(p.rows, rows))?.label ?? null;
   const eur = token.eurPer > 0 ? toEur(token, totalUnits) : 0;
 
+  const setBillingField = (key: keyof Billing, value: string) => setBilling((b) => ({ ...b, [key]: value }));
+
   const setRow = (i: number, patch: Partial<Row>) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r)));
 
-  // The text recorded on-chain: the title, then the spec as text or, with files or a long spec, a pointer to a stored document.
+  // The text recorded on-chain: the title, then the spec as text or, with files, a long spec or billing details, a pointer to a stored document.
   const makeDescription = async () => {
-    const needsDocument = backendOnline && (files.length > 0 || spec.trim().length > INLINE_SPEC_MAX);
+    const details = cleanBilling(billing);
+    const needsDocument = backendOnline && (files.length > 0 || spec.trim().length > INLINE_SPEC_MAX || !!details);
     if (!needsDocument) return buildDescription(title, { text: spec });
     setWorking("Uploading files…");
     const uploaded = [];
     for (const file of files) uploaded.push(await uploadFile(file, address!));
-    const ref = await uploadDoc({ version: 1, title: title.trim(), text: spec.trim(), files: uploaded }, address!);
+    const ref = await uploadDoc({ version: 1, title: title.trim(), text: spec.trim(), files: uploaded, billing: details }, address!);
     return buildDescription(title, { ref });
   };
 
@@ -301,6 +306,26 @@ export function HireForm({ variant = "page", onBank, onCreated }: { variant?: "p
           </button>
           <span className={percentSum === 100n ? styles.muted : styles.error}>Shares add up to {percentSum.toString()}% {percentSum !== 100n && "(must be 100%)"}</span>
         </div>
+      </div>
+
+      <div className={styles.formGroup}>
+        <h3 className={styles.groupTitle}>Business details (optional)</h3>
+        {backendOnline ? (
+          <>
+            <input className={styles.input} placeholder="PO or invoice reference" maxLength={BILLING_MAX.reference} value={billing.reference ?? ""} onChange={(e) => setBillingField("reference", e.target.value)} aria-label="PO or invoice reference" />
+            <div className={styles.amountRow}>
+              <input className={styles.input} placeholder="Payer company name" maxLength={BILLING_MAX.payerName} value={billing.payerName ?? ""} onChange={(e) => setBillingField("payerName", e.target.value)} aria-label="Payer company name" />
+              <input className={styles.input} placeholder="Payer VAT ID" maxLength={BILLING_MAX.payerVatId} value={billing.payerVatId ?? ""} onChange={(e) => setBillingField("payerVatId", e.target.value)} aria-label="Payer VAT ID" />
+            </div>
+            <div className={styles.amountRow}>
+              <input className={styles.input} placeholder="Payee company name" maxLength={BILLING_MAX.payeeName} value={billing.payeeName ?? ""} onChange={(e) => setBillingField("payeeName", e.target.value)} aria-label="Payee company name" />
+              <input className={styles.input} placeholder="Payee VAT ID" maxLength={BILLING_MAX.payeeVatId} value={billing.payeeVatId ?? ""} onChange={(e) => setBillingField("payeeVatId", e.target.value)} aria-label="Payee VAT ID" />
+            </div>
+            <span className={styles.muted}>Printed on the receipt as you enter it. Squirrel doesn&apos;t verify it. It is stored with the job, so anyone who looks the job up on-chain can read it.</span>
+          </>
+        ) : (
+          <span className={styles.muted}>Business details are stored by the backend, which is offline right now.</span>
+        )}
       </div>
 
       <div className={styles.formGroup}>

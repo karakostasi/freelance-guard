@@ -20,7 +20,7 @@ import { useMyJobs } from "../hooks/useMyJobs";
 import { deriveJourney, simulatedPayloads } from "../lib/chainFlow";
 import { FUNDING_STAGES, ROUTING_STAGE, journeyStages, type FlowState, type PayoutRoute } from "../lib/fiatFlow";
 import { STATUS_CLASS, STATUS_LABEL, currentMilestone, type Job } from "../lib/jobs";
-import { parseDescription } from "../lib/documents";
+import { parseDescription, receiptPath } from "../lib/documents";
 import { SpecView } from "./DocView";
 import { toEur, tokenOf } from "../lib/tokens";
 import { escrowAbi, escrowAddress } from "../wagmi";
@@ -207,7 +207,7 @@ function JobJourney({ id, job, mode, onModeChange }: { id: number; job: Job; mod
           </div>
         )}
 
-        <MilestoneDetails job={job} index={index} trace={trace} onRetry={() => refetch()} loading={isFetching} />
+        <MilestoneDetails job={job} index={index} trace={trace} onRetry={() => refetch()} loading={isFetching} receiptHref={`#${receiptPath(id, index)}`} />
 
         <NextStep
           id={id}

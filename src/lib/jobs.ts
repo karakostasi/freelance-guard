@@ -92,6 +92,14 @@ export function roleOf(job: Job, me: string | undefined): Role {
   return { label: "Arbiter", className: styles.roleArbiter, amountLabel: "Escrow" };
 }
 
+/** How a paid milestone was released, in words. `releaser` is the lowercase address that sent the release transaction, when known. */
+export function paidOutcome(job: Job, kind: "Approved" | "Resolved" | undefined, releaser: string | undefined) {
+  if (kind === "Resolved") return "Resolved by the arbiter in favour of the payee";
+  if (releaser === job.payee.toLowerCase()) return "Claimed by the payee after the review period";
+  if (releaser === job.payer.toLowerCase()) return "Approved by the payer";
+  return "Paid to the payee";
+}
+
 export const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
 export const formatDate = (unix: bigint) => new Date(Number(unix) * 1000).toLocaleString();
@@ -111,6 +119,9 @@ export function timeInfo(m: Milestone, reviewPeriod: bigint | undefined, now: bi
 }
 
 export { deliverableUrl } from "./documents";
+
+/** The network the escrow runs on, as printed on receipts. Keep in step with the explorer links below. */
+export const NETWORK_LABEL = "Base Sepolia (test network)";
 
 export const txUrl = (hash: string) => `https://sepolia.basescan.org/tx/${hash}`;
 export const addressUrl = (address: string) => `https://sepolia.basescan.org/address/${address}`;

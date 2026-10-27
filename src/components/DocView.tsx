@@ -1,7 +1,7 @@
 import { Fragment, useState } from "react";
 import { Download, Paperclip, ShieldAlert, ShieldCheck } from "lucide-react";
 import { useDoc } from "../hooks/useDoc";
-import { deliverableUrl, formatBytes, parseDeliverable, parseDescription, type DocFile } from "../lib/documents";
+import { deliverableUrl, formatBytes, parseDeliverable, parseDescription, type Billing, type DocFile } from "../lib/documents";
 import { fileUrl, verifyFile } from "../lib/files";
 import styles from "../App.module.css";
 
@@ -47,7 +47,27 @@ function FileLine({ file }: { file: DocFile }) {
   );
 }
 
-/** A stored document: its note, and its files with download and integrity-check buttons. */
+/** A job's business details, as the payer entered them. */
+function BillingLines({ billing }: { billing: Billing }) {
+  const party = (name?: string, vatId?: string) => [name, vatId ? `VAT ${vatId}` : ""].filter(Boolean).join(" · ");
+  const rows = [
+    ["Reference", billing.reference],
+    ["Payer", party(billing.payerName, billing.payerVatId)],
+    ["Payee", party(billing.payeeName, billing.payeeVatId)],
+  ].filter((row): row is [string, string] => !!row[1]);
+  return (
+    <dl className={styles.docBilling}>
+      {rows.map(([label, value]) => (
+        <Fragment key={label}>
+          <dt>{label}</dt>
+          <dd>{value}</dd>
+        </Fragment>
+      ))}
+    </dl>
+  );
+}
+
+/** A stored document: its business details and note, and its files with download and integrity-check buttons. */
 export function DocView({ reference }: { reference: string }) {
   const { data: doc, isLoading, error } = useDoc(reference);
   if (isLoading) return <span className={styles.muted}>Loading attachments…</span>;
@@ -60,6 +80,7 @@ export function DocView({ reference }: { reference: string }) {
   }
   return (
     <div className={styles.doc}>
+      {doc.billing && <BillingLines billing={doc.billing} />}
       {doc.text && (
         <p className={styles.docText}>
           <Linkified text={doc.text} />

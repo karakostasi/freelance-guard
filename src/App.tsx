@@ -4,6 +4,7 @@ import { FlowPage } from "./components/FlowPage";
 import { JobsPage } from "./components/JobsPage";
 import { Landing } from "./components/Landing";
 import { ProfileMenu } from "./components/ProfileMenu";
+import { ReceiptPage } from "./components/ReceiptPage";
 import { navigate, useHashRoute } from "./hooks/useHashRoute";
 import logo from "./assets/logo.svg";
 import styles from "./App.module.css";
@@ -15,7 +16,7 @@ export default function App() {
 
   return (
     <main className={styles.page}>
-      <header className={styles.header}>
+      <header className={`${styles.header} ${styles.noPrint}`}>
         <a className={`${styles.brand} ${styles.brandLink}`} href="#/" aria-label="Home">
           <img src={logo} alt="" className={styles.logo} />
           <h1>Squirrel</h1>
@@ -33,7 +34,8 @@ export default function App() {
         </div>
       </header>
       {route.page === "home" && <Landing />}
-      {!isConnected && route.page !== "home" && (
+      {route.page === "receipt" && <ReceiptPage jobId={route.jobId} milestone={route.milestone} />}
+      {!isConnected && route.page !== "home" && route.page !== "receipt" && (
         <div className={styles.connectPrompt}>
           <p>Connect your wallet to continue.</p>
           <button className={styles.button} onClick={() => connect({ connector: connectors[0] })}>

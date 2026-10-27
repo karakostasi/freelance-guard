@@ -1,0 +1,37 @@
+/* A receipt looks like paper on every theme, so it prints and saves as a PDF the way it reads on screen. */
+.paper { max-width: 720px; margin: 1.5rem auto; padding: 2rem; border-radius: 12px; border: 1px solid #d8dce6; background: #fff; color: #14171d; box-shadow: 0 10px 40px rgba(0, 0, 0, .3); }
+.paper a { color: #3b5bdb; overflow-wrap: anywhere; }
+.head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; padding-bottom: 1rem; border-bottom: 2px solid #14171d; }
+.brand { display: flex; align-items: center; gap: .6rem; font-size: 1.25rem; font-weight: 700; }
+.brand img { width: 36px; height: 36px; }
+.title { margin: 0; font-size: 1.4rem; text-align: right; }
+.number { display: block; color: #6b7280; font-size: .9rem; text-align: right; }
+.jobNo { margin-left: .4rem; color: #6b7280; font-size: .85rem; }
+.amount { display: flex; flex-direction: column; gap: .15rem; padding: 1.25rem 0; border-bottom: 1px solid #e5e7ee; }
+.amountValue { font-size: 2rem; font-weight: 700; letter-spacing: -.01em; }
+.label { color: #6b7280; font-size: .75rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.facts { display: grid; grid-template-columns: max-content 1fr; gap: .5rem 1.25rem; margin: 0; padding: 1.25rem 0; border-bottom: 1px solid #e5e7ee; }
+.facts dt { color: #6b7280; }
+.facts dd { margin: 0; overflow-wrap: anywhere; }
+.parties { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; padding: 1.25rem 0; border-bottom: 1px solid #e5e7ee; }
+.party { display: flex; flex-direction: column; gap: .2rem; min-width: 0; }
+.partyName { font-weight: 600; }
+.wallet { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .8rem; overflow-wrap: anywhere; color: #4b5563; }
+.proof { display: grid; grid-template-columns: max-content 1fr; gap: .4rem 1.25rem; margin: 0; padding: 1.25rem 0; font-size: .85rem; }
+.proof dt { color: #6b7280; }
+.proof dd { margin: 0; overflow-wrap: anywhere; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .8rem; }
+.note { margin: 0; padding-top: 1rem; border-top: 1px solid #e5e7ee; color: #6b7280; font-size: .8rem; line-height: 1.5; }
+.actions { display: flex; gap: .75rem; justify-content: center; flex-wrap: wrap; margin: 1.5rem 0; }
+.message { max-width: 720px; margin: 3rem auto; text-align: center; display: flex; flex-direction: column; gap: .75rem; align-items: center; }
+
+@media (max-width: 560px) {
+  .paper { padding: 1.25rem; }
+  .parties { grid-template-columns: 1fr; }
+  .facts, .proof { grid-template-columns: 1fr; gap: .1rem; }
+  .facts dd, .proof dd { margin-bottom: .5rem; }
+}
+
+@media print {
+  .paper { margin: 0; max-width: none; border: 0; border-radius: 0; box-shadow: none; padding: 0; }
+}

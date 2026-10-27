@@ -26,3 +26,7 @@ h1, h2, h3 { letter-spacing: -0.01em; }
 :focus-visible { outline: 2px solid var(--accent-3); outline-offset: 2px; }
 
 * { scrollbar-color: #2a2f3b transparent; }
+
+@media print {
+  body { background: #fff; }
+}

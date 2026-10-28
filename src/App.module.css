@@ -7,6 +7,9 @@
 .button:hover:not(:disabled) { filter: brightness(1.12); transform: translateY(-1px); }
 .button:disabled { opacity: .5; cursor: not-allowed; box-shadow: none; }
 .error { color: #ff6b6b; }
+.buttonGood { background: linear-gradient(135deg, #2fbf80, #3ecf8e); color: #06130d; box-shadow: 0 4px 14px rgba(62, 207, 142, .25); }
+.textButton { padding: 0; border: 0; background: none; color: #38bdf8; font: inherit; font-size: .9rem; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.problemBox { display: flex; flex-direction: column; align-items: flex-start; gap: .5rem; padding: .9rem 1rem; border-radius: 10px; border: 1px solid #353b4b; background: #1e222c; }
 .badge { font-size: .75rem; padding: .1rem .5rem; border-radius: 999px; background: #2a2f3b; }
 .muted { opacity: .6; font-size: .85rem; }
 /* Says why a button is disabled. Not an error, so not red, but easy to see. */
@@ -33,46 +36,33 @@
 .rolePayer { color: #b39dff; background: rgba(139, 108, 255, .16); }
 .rolePayee { color: #4cc9f0; background: rgba(76, 201, 240, .16); }
 .roleArbiter { color: #aab; background: rgba(170, 170, 187, .16); }
-.modalHeader { display: flex; align-items: center; gap: .75rem; padding-right: 2.5rem; }
-.modalHeader h2 { margin: 0; }
 .suffixField { position: relative; display: flex; flex-direction: column; }
 .suffixField .input { padding-right: 3.5rem; }
 .suffix { position: absolute; right: .75rem; top: 50%; transform: translateY(-50%); opacity: .6; pointer-events: none; }
 .nav { display: flex; gap: .5rem; }
-.navLink { display: inline-flex; align-items: center; gap: .4rem; padding: .4rem .9rem; border-radius: 999px; border: 1px solid #333; background: none; color: inherit; font: inherit; cursor: pointer; }
+.navLink { display: inline-flex; align-items: center; gap: .4rem; white-space: nowrap; padding: .4rem .9rem; border-radius: 999px; border: 1px solid #333; background: none; color: inherit; font: inherit; cursor: pointer; }
 .navLink:hover { border-color: #4f7cff; }
 .navActive { background: var(--gradient); border-color: transparent; color: #fff; }
 .brandLink { color: inherit; text-decoration: none; }
-.amountRow { display: grid; grid-template-columns: 1fr 130px; gap: .5rem; }
+.amountRow { display: grid; grid-template-columns: minmax(0, 1fr) 130px; gap: .5rem; }
 .unfunded { --c: #8a8fa0; }
 
 .milestones { display: flex; flex-direction: column; gap: .75rem; margin-top: .25rem; }
 .milestone { display: flex; flex-direction: column; align-items: flex-start; gap: .35rem; padding: .85rem 1rem; border-radius: 10px; border: 1px solid #2a2f3b; border-left: 4px solid var(--c, #8a8fa0); background: #181b22; }
-.milestoneHead { display: flex; align-items: center; justify-content: space-between; gap: .75rem; width: 100%; }
 .segments { display: flex; gap: 3px; width: 100%; }
 .segment { flex: 1; height: 6px; border-radius: 3px; background: var(--c, #8a8fa0); }
 .presets { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
 .chipButton { display: inline-flex; align-items: center; gap: .3rem; padding: .25rem .7rem; border-radius: 999px; border: 1px solid #444; background: none; color: inherit; font: inherit; font-size: .85rem; cursor: pointer; }
 .chipButton:hover:not(:disabled) { border-color: #4f7cff; }
 .chipButton:disabled { opacity: .4; cursor: not-allowed; }
-.milestoneRow { display: grid; grid-template-columns: 1fr 90px 110px 32px; gap: .5rem; align-items: center; }
+.milestoneRow { display: grid; grid-template-columns: minmax(0, 1fr) 90px 110px 32px; gap: .5rem; align-items: center; }
 .milestoneAmount { grid-column: 1 / -1; margin-top: -.25rem; }
 .iconButton { border: 1px solid transparent; border-radius: 8px; background: none; color: inherit; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: .25rem; opacity: .7; transition: border-color .15s, box-shadow .15s; }
 .iconButton:hover:not(:disabled), .iconButton:focus-visible { outline: none; opacity: 1; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(79, 124, 255, .2); }
 .iconButton:disabled { opacity: .25; cursor: not-allowed; }
 
-.formGroup { display: flex; flex-direction: column; gap: .5rem; padding: 1rem 0; border-top: 1px solid #2a2f3b; }
-.formGroup:first-of-type { border-top: 0; padding-top: 0; }
 .groupTitle { margin: 0; font-size: .8rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; opacity: .6; }
-.optionCards { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
-.optionCard { display: flex; align-items: flex-start; gap: .6rem; padding: .85rem 1rem; border-radius: 10px; border: 1px solid #333; background: #181b22; cursor: pointer; transition: border-color .15s; }
-.optionCard:hover { border-color: #555; }
-.optionCard > span { display: flex; flex-direction: column; gap: .25rem; }
-.optionCard input { margin-top: .2rem; accent-color: #4f7cff; }
-.optionCardActive { border-color: #4f7cff; box-shadow: 0 0 0 1px #4f7cff; background: rgba(79, 124, 255, .08); }
-@media (max-width: 560px) { .optionCards { grid-template-columns: 1fr; } }
 .chipActive { border-color: #4f7cff; background: rgba(79, 124, 255, .16); color: #b4c6ff; cursor: default; }
-.optionCardDisabled { opacity: .5; cursor: not-allowed; }
 
 /* The yield choice. It changes what the payer pays, so it is a card with a switch that stands out. */
 .yieldCard { display: flex; align-items: center; gap: .9rem; padding: .9rem 1rem; border-radius: 10px; border: 1px solid #3a4a42; background: #181b22; cursor: pointer; transition: border-color .15s, background .15s; }
@@ -89,7 +79,6 @@
 .switch input:checked + .switchTrack::after { transform: translateX(18px); }
 .switch input:focus-visible + .switchTrack { outline: 2px solid var(--accent-3); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { .switchTrack, .switchTrack::after, .yieldCard { transition: none; } }
-.drawerForm { display: flex; flex-direction: column; }
 .headerRight { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
 .profileButton { width: 38px; height: 38px; padding: 0; border-radius: 50%; border: 2px solid #2a2f3b; cursor: pointer; transition: border-color .15s; }
 .profileButton:hover, .profileButton[aria-expanded="true"] { border-color: #4f7cff; }
@@ -132,7 +121,6 @@ a.chipButton { text-decoration: none; }
 .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: .75rem; }
 .tile { display: flex; flex-direction: column; align-items: flex-start; gap: .45rem; min-width: 0; padding: .85rem 1rem; border-radius: 12px; border: 1px solid #262b38; background: linear-gradient(180deg, rgba(255, 255, 255, .03), transparent), #171a22; }
 .tileLabel { font-size: .7rem; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; opacity: .6; }
-.tileValue { font-size: 1.2rem; }
 .partyRow { display: flex; align-items: center; gap: .6rem; width: 100%; min-width: 0; }
 .partyText { display: flex; align-items: center; gap: .4rem; flex: 1; min-width: 0; flex-wrap: wrap; }
 .partyAddress { font-family: ui-monospace, monospace; font-weight: 600; }
@@ -196,6 +184,13 @@ select.input:disabled { cursor: not-allowed; }
 .nudges { margin-bottom: 1rem; display: flex; flex-direction: column; gap: .5rem; }
 .nudge { text-align: left; padding: .6rem .9rem; border-radius: 8px; color: inherit; font: inherit; cursor: pointer; background: rgba(74, 222, 128, .12); border: 1px solid #4ade80; }
 .nudge:hover { background: rgba(74, 222, 128, .2); }
+
+/* Phones: the three buttons keep to one line each, without their icons, so they fit beside the account. */
+@media (max-width: 560px) {
+  .navLink { padding: .35rem .65rem; font-size: .9rem; }
+  .navLink svg { display: none; }
+  .nav { gap: .35rem; }
+}
 
 @media print {
   .noPrint { display: none !important; }

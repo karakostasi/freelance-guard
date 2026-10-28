@@ -183,7 +183,7 @@ const rm = (status, o = {}) => ({ title: "", amount: 1n, duration: 1, deadline: 
 const rjob = (...milestones) => ({ payer: C, payee: F, token: "0x0", description: "", milestones });
 const remind = (j, who, now) => reminderFor(j, who, RP, now);
 const submitted = rjob(rm(2, { submittedAt: T0 }));
-check(remind(submitted, C, T0 + DAYS)?.text === "Review ends in 2d 0h. Approve or dispute" && remind(submitted, C, T0 + DAYS).tone === "info", "the payer sees the review countdown");
+check(remind(submitted, C, T0 + DAYS)?.text === "Review ends in 2d 0h. Approve or report a problem" && remind(submitted, C, T0 + DAYS).tone === "info", "the payer sees the review countdown");
 check(remind(submitted, C, T0 + 2n * DAYS + 3600n)?.tone === "warn", "under a day left turns the countdown into a warning");
 check(remind(submitted, F, T0 + DAYS)?.text === "Payer review ends in 2d 0h", "the payee sees when the payer's review ends");
 check(remind(submitted, F, T0 + RP)?.tone === "action" && remind(submitted, F, T0 + RP).text.includes("Claim your payment"), "once the review period ends the payee is told to claim");

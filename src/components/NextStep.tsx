@@ -1,12 +1,16 @@
 import { useAccount } from "wagmi";
 import { RotateCcw } from "lucide-react";
 import { JobActions } from "./JobActions";
+import { DeliverableView } from "./DocView";
+import { useDoc } from "../hooks/useDoc";
 import { useEscrowConfig } from "../hooks/useEscrowConfig";
 import { useNow } from "../hooks/useNow";
-import { STATUS, STATUS_CLASS, euro, formatDuration, milestoneName, type Job } from "../lib/jobs";
+import { parseDescription, receiptPath } from "../lib/documents";
+import { STATUS, amountFor, euro, formatDay, formatDuration, hasVerifier, milestoneName, type Job } from "../lib/jobs";
+import { formatAmount } from "../lib/tokens";
 import type { FlowState, PayoutRoute } from "../lib/fiatFlow";
 import styles from "../App.module.css";
-import page from "./FlowPage.module.css";
+import s from "./NextStep.module.css";
 
 export type PayoutControls = {
   state: FlowState;
@@ -19,86 +23,138 @@ export type PayoutControls = {
   auto?: boolean;
 };
 
-/** Plain-language "what happens next" for a job, with the real action buttons for whoever has to act. */
-export function NextStep({ id, index, job, payout }: { id: number; index: number; job: Job; payout: PayoutControls }) {
+type Tone = "action" | "wait" | "done";
+
+/**
+ * The one thing to do next on a job, in a sentence, with the button for whoever has to act. Everything else about the
+ * milestone (dispute, refund, the facts and the transactions) is below it. On the payment flow page `payout` adds the
+ * payout routing to a paid milestone.
+ */
+export function NextStep({ id, index, job, payout }: { id: number; index: number; job: Job; payout?: PayoutControls }) {
   const { address } = useAccount();
   const { reviewPeriod, arbiter } = useEscrowConfig();
   const now = useNow();
+  const { ref } = parseDescription(job.description);
+  const { data: doc } = useDoc(ref);
 
   const me = address?.toLowerCase();
   const ms = job.milestones[index];
   const isPayer = me === job.payer.toLowerCase();
   const isPayee = me === job.payee.toLowerCase();
+  const isVerifier = !!me && hasVerifier(job) && me === job.verifier.toLowerCase();
   const isArbiter = !!me && arbiter?.toLowerCase() === me;
   const status = STATUS[ms.status];
   const name = milestoneName(job, index);
   const the = name ? `the ${name}` : "";
+  // The business names the payer typed in, when there are any. Otherwise just the role.
+  const payeeName = doc?.billing?.payeeName || "The payee";
+  const payerName = doc?.billing?.payerName || "The payer";
 
   const deadline = ms.deadline;
   const reviewEnd = reviewPeriod !== undefined ? ms.submittedAt + reviewPeriod : undefined;
   const left = (to: bigint) => (now >= to ? "ended" : `in ${formatDuration(to - now)}`);
+  const gross = formatAmount(job, ms.amount);
+  const net = formatAmount(job, amountFor(job, ms, job.payee));
+  const next = job.milestones.findIndex((m, i) => i > index && m.status < 4);
+  const nextText = next >= 0 ? ` Next up is ${job.milestones[next].title.trim().toLowerCase() || `stage ${next + 1}`}.` : "";
 
+  let tone: Tone = "wait";
+  let eyebrow = "";
   let title = "";
   let detail = "";
-  // True when the next move is the signed-in account's, so the banner can stand out.
-  let myTurn = false;
+  let showDeliverable = false;
   if (status === "Unfunded") {
-    myTurn = isPayer;
-    title = isPayer ? `Fund ${the || "this milestone"}` : `Waiting for the payer to fund ${the || "this milestone"}`;
-    detail = "The payee's clock starts once it's funded.";
+    tone = isPayer ? "action" : "wait";
+    eyebrow = isPayer ? "Your turn" : `Waiting for ${payerName.toLowerCase()}`;
+    title = isPayer ? `Fund ${the || "this payment"}` : `${payerName} still has to fund ${the || "this payment"}`;
+    detail = isPayer ? "The payee's clock starts once it is funded." : "You can start once it is funded.";
   } else if (status === "Funded") {
-    myTurn = isPayee;
-    title = isPayee ? `Deliver ${the || "the work"}` : `Waiting for the payee to deliver${name ? ` ${the}` : ""}`;
-    detail = now > deadline ? (isPayer ? "The deadline passed. You can take a refund." : "The deadline passed.") : `Due ${left(deadline)}.`;
+    const late = now > deadline;
+    if (isPayee) {
+      tone = "action";
+      eyebrow = "Your turn";
+      title = late ? `Deliver ${the || "the work"} now` : `Deliver ${the || "the work"} by ${formatDay(deadline)}`;
+      detail = `${gross} is held for you. After the platform fee, you receive ${net}.${late ? " The deadline passed, so the payer can take the money back." : ""}`;
+    } else if (isPayer && late) {
+      tone = "action";
+      eyebrow = "Your turn";
+      title = "The deadline passed";
+      detail = `${payeeName} did not deliver ${the || "the work"} in time. You can take your money back.`;
+    } else {
+      eyebrow = `Waiting for ${payeeName.toLowerCase()}`;
+      title = `${payeeName} is working on ${the || "the job"}`;
+      detail = `Due ${formatDay(deadline)}, ${left(deadline)}. ${gross} is held safely${isPayer ? " and goes to the payee only when you approve. If nothing arrives in time, you can take it back." : "."}`;
+    }
   } else if (status === "Submitted") {
-    myTurn = isPayer;
-    title = isPayer ? `Review ${the || "the work"}` : `Waiting for the payer's review${name ? ` of ${the}` : ""}`;
-    detail = reviewEnd === undefined ? "" : isPayee && now >= reviewEnd ? "The review period ended. You can claim your payment." : `Review period ${left(reviewEnd)}.`;
+    showDeliverable = true;
+    if (isPayer || isVerifier) {
+      tone = "action";
+      eyebrow = "Your turn";
+      title = `${payeeName} delivered ${the || "the work"}. Take a look.`;
+      detail = reviewEnd === undefined ? "" : now >= reviewEnd ? "The review period ended. The payee can claim the payment now, but you can still approve it." : `You have until ${formatDay(reviewEnd)}. After that, the payee can claim the payment.`;
+    } else {
+      eyebrow = `Waiting for ${payerName.toLowerCase()}`;
+      title = isPayee ? "Your delivery is with the payer" : `${payerName} is reviewing ${the || "the work"}`;
+      detail = reviewEnd === undefined ? "" : now >= reviewEnd ? (isPayee ? `The review period ended. You can claim your ${net} now.` : "The review period ended.") : `They have until ${formatDay(reviewEnd)} to approve or report a problem.${isPayee ? ` You then receive ${net}.` : ""}`;
+    }
   } else if (status === "Disputed") {
-    myTurn = isArbiter;
-    title = isArbiter ? "Resolve the dispute" : "Waiting for the arbiter";
-    detail = "The payer contested the work.";
+    tone = isArbiter ? "action" : "wait";
+    eyebrow = isArbiter ? "Your turn" : "With the arbiter";
+    title = isArbiter ? "Resolve the dispute" : isPayer ? "You reported a problem" : "The payer reported a problem";
+    detail = isArbiter ? "The payer contested the work. Decide who gets the money." : `The ${gross} stays locked. An arbiter looks at both sides and decides who gets the money.`;
   } else if (status === "Paid") {
-    const s = payout.state.status;
-    title = s === "done" ? "All done" : s === "running" ? "Routing the payout…" : payout.auto ? "Payment released. The payout starts automatically" : "Payment released. Choose where the money goes";
+    tone = "done";
+    const routing = payout?.state.status;
+    eyebrow = routing === "done" ? "All done" : "Paid";
+    title = isPayee ? `You received ${net}` : payout ? (routing === "done" ? "All done" : routing === "running" ? "Routing the payout…" : "Payment released") : `${name ? `The ${name}` : "The payment"} is paid`;
     detail =
-      s === "done"
+      payout && routing === "done"
         ? `${euro(payout.amountEur)} ${payout.route === "eurc" ? "kept as EURC in the wallet" : "sent to the bank account via SEPA Instant"}.`
-        : "The escrow released the funds to the payee.";
+        : `The escrow released ${gross} to the payee.${nextText}`;
   } else if (status === "Refunded") {
-    title = "Refunded";
-    detail = "The funds went back to the payer.";
+    tone = "wait";
+    eyebrow = "Refunded";
+    title = "The money went back to the payer";
+    detail = `${gross} was returned.${nextText}`;
   }
 
-  return (
-    <div className={`${page.next} ${STATUS_CLASS[ms.status]} ${myTurn ? page.nextTurn : ""}`}>
-      <div>
-        {myTurn && <span className={page.turnPill}>Your turn</span>}
-        <strong>{title}</strong>
-        {detail && <p className={styles.muted}>{detail}</p>}
-      </div>
-      <div className={page.nextActions}>
-        {status === "Paid" && payout.auto ? (
-          <span className={styles.muted}>Route: {payout.route === "eurc" ? "keep EURC" : "SEPA bank transfer"}</span>
-        ) : status === "Paid" ? (
-          <>
-            <select className={styles.input} value={payout.route} disabled={payout.state.status === "running"} onChange={(e) => payout.setRoute(e.target.value as PayoutRoute)}>
-              <option value="sepa">Off-ramp to SEPA</option>
-              <option value="eurc">Keep EURC</option>
-            </select>
-            <button className={styles.button} disabled={payout.state.status === "running"} onClick={payout.start}>
-              {payout.state.status === "done" ? "Run again" : "Route payout"}
+  const paidActions = status === "Paid" && (
+    <div className={s.actions}>
+      {payout?.auto ? (
+        <span className={styles.muted}>Route: {payout.route === "eurc" ? "keep EURC" : "SEPA bank transfer"}</span>
+      ) : payout ? (
+        <>
+          <select className={styles.input} value={payout.route} disabled={payout.state.status === "running"} onChange={(e) => payout.setRoute(e.target.value as PayoutRoute)} aria-label="Where the payout goes">
+            <option value="sepa">Off-ramp to SEPA</option>
+            <option value="eurc">Keep EURC</option>
+          </select>
+          <button className={styles.button} disabled={payout.state.status === "running"} onClick={payout.start}>
+            {payout.state.status === "done" ? "Run again" : "Route payout"}
+          </button>
+          {payout.state.status !== "idle" && payout.state.status !== "running" && (
+            <button className={styles.ghostButton} onClick={payout.reset} aria-label="Reset payout">
+              <RotateCcw size={14} />
             </button>
-            {payout.state.status !== "idle" && payout.state.status !== "running" && (
-              <button className={styles.ghostButton} onClick={payout.reset} aria-label="Reset payout">
-                <RotateCcw size={14} />
-              </button>
-            )}
-          </>
-        ) : (
-          <JobActions id={String(id)} index={index} job={job} />
-        )}
-      </div>
+          )}
+        </>
+      ) : null}
+      <a className={styles.chipButton} href={`#${receiptPath(id, index)}`}>
+        View the receipt
+      </a>
     </div>
+  );
+
+  return (
+    <section className={`${s.card} ${s[tone]}`} aria-label="Next step">
+      <span className={s.eyebrow}>{eyebrow}</span>
+      <h2 className={s.title}>{title}</h2>
+      {showDeliverable && ms.deliverable && (
+        <div className={s.deliverable}>
+          <DeliverableView value={ms.deliverable} />
+        </div>
+      )}
+      {detail && <p className={s.detail}>{detail}</p>}
+      {status === "Paid" || status === "Refunded" ? paidActions : <JobActions id={String(id)} index={index} job={job} />}
+    </section>
   );
 }

@@ -4,28 +4,10 @@
 .summary { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
 .block { display: flex; flex-direction: column; gap: .5rem; padding: 1rem; border-radius: 12px; border: 1px solid #2a2f3b; }
 
-.next { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; padding: 1rem 1.25rem; border-radius: 12px; border: 1px solid #2a2f3b; border-left: 4px solid var(--c, #4f7cff); background: color-mix(in srgb, var(--c, #4f7cff) 8%, #12141a); }
-.next p { margin: .25rem 0 0; }
-/* The banner when the next move is yours: a full colored frame, a glow that gently pulses, and a "Your turn" pill. */
-.nextTurn { border-color: var(--c, #4f7cff); border-left-width: 6px; background: color-mix(in srgb, var(--c, #4f7cff) 16%, #12141a); box-shadow: 0 0 0 3px color-mix(in srgb, var(--c, #4f7cff) 25%, transparent); animation: turnGlow 2.4s ease-in-out infinite; }
-.turnPill { display: inline-block; margin-right: .6rem; padding: .1rem .55rem; border-radius: 999px; background: var(--c, #4f7cff); color: #0f1115; font-size: .7rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; vertical-align: .1em; }
-@keyframes turnGlow { 50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--c, #4f7cff) 10%, transparent); } }
-@media (prefers-reduced-motion: reduce) { .nextTurn { animation: none; } }
-/* Top-aligned so a hint under one button (e.g. "Add a deliverable link") can't push it out of line with the input. */
-.nextActions { display: flex; align-items: flex-start; gap: .5rem; flex-wrap: wrap; }
-.nextActions input, .nextActions select, .nextActions button { box-sizing: border-box; min-height: 2.4rem; }
 
-.drawerOverlay { position: fixed; inset: 0; background: rgba(0, 0, 0, .5); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); display: flex; justify-content: flex-end; z-index: 20; }
-.drawer { box-sizing: border-box; width: 100%; max-width: 560px; height: 100%; padding: 1.5rem; display: flex; flex-direction: column; gap: .75rem; background: #12141a; border-left: 1px solid #333; overflow-y: auto; }
-.drawer > * { flex-shrink: 0; }
-.drawerHeader { display: flex; align-items: center; justify-content: space-between; }
-.drawerHeader h3 { margin: 0; }
 .iconButton { display: inline-flex; align-items: center; justify-content: center; padding: .35rem; border: 1px solid transparent; border-radius: 8px; background: none; color: inherit; cursor: pointer; opacity: .7; transition: border-color .15s, box-shadow .15s; }
 .iconButton:hover, .iconButton:focus-visible { outline: none; opacity: 1; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(79, 124, 255, .2); }
 
-.fab { position: fixed; right: 1.5rem; bottom: 1.5rem; z-index: 15; display: inline-flex; align-items: center; gap: .5rem; padding: .8rem 1.4rem; border: 0; border-radius: 999px; background: #4f7cff; color: #fff; font: inherit; font-weight: 600; cursor: pointer; box-shadow: 0 6px 20px rgba(79, 124, 255, .45); transition: transform .15s; }
-.fab:hover:not(:disabled) { transform: translateY(-2px); }
-.fab:disabled { opacity: .5; cursor: not-allowed; box-shadow: none; }
 
 .pickerRow { display: flex; align-items: center; gap: .75rem; }
 .pickerRow select { flex: 1; }
@@ -77,8 +59,6 @@
 
 /* The Jobs page: the same list, with the selected job or the hire form beside it. */
 .jobsLayout { display: grid; grid-template-columns: 280px minmax(0, 1fr) 320px; grid-template-areas: "side top wallet"; gap: 1.5rem; align-items: start; }
-.formWrap { max-width: 680px; }
-.formWrap > section { margin: 0; }
 
 /* Narrower screens: the wallet card drops under the details, then everything stacks. */
 @media (max-width: 1200px) {
@@ -87,8 +67,8 @@
   .jobsLayout { grid-template-columns: 280px minmax(0, 1fr); grid-template-areas: "side top" "side wallet"; }
 }
 @media (max-width: 900px) {
-  .jobsLayout { grid-template-columns: 1fr; grid-template-areas: "side" "top" "wallet"; }
-  .layout { grid-template-columns: 1fr; grid-template-areas: "side" "top" "wallet" "stepper"; }
+  .jobsLayout { grid-template-columns: minmax(0, 1fr); grid-template-areas: "side" "top" "wallet"; }
+  .layout { grid-template-columns: minmax(0, 1fr); grid-template-areas: "side" "top" "wallet" "stepper"; }
   .sidebar { min-height: 0; }
   .sidebarInner { position: static; max-height: 280px; }
 }
@@ -101,3 +81,8 @@
 .spin { animation: spin 1s linear infinite; }
 .txPending { display: inline-flex; align-items: center; gap: .35rem; font-size: .85rem; opacity: .65; }
 .traceInfo { display: flex; align-items: center; gap: .5rem; margin: 0; padding: .5rem .75rem; border-radius: 8px; background: rgba(79, 124, 255, .1); color: #b4c6ff; font-size: .85rem; }
+
+/* The Jobs page before there is a job. */
+.empty { display: flex; flex-direction: column; align-items: flex-start; gap: .75rem; padding: 1.5rem; border-radius: 14px; border: 1px dashed #353b4b; }
+.empty h2 { margin: 0; }
+.empty p { margin: 0; }

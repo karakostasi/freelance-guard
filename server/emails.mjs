@@ -48,7 +48,7 @@ export function messagesFor(eventName, args, job, { reviewPeriod, arbiter, appUr
       note(payee, `Your work on job #${id} was submitted`, `Your delivery for job #${id}${ms} is with the payer for review.${window ? ` They have ${window} to approve or dispute it, and after that you can claim the payment.` : ""}`),
     ];
   }
-  if (eventName === "Approved" || (eventName === "Resolved" && args.paidFreelancer)) {
+  if (eventName === "Approved" || (eventName === "Resolved" && args.paidPayee)) {
     const by = eventName === "Resolved" ? "The arbiter decided in favour of the payee." : "";
     // The page is built by the frontend: "#/receipt/<job>/<milestone>", numbered from 1 (src/lib/documents.ts receiptPath).
     const receipt = `\n\nReceipt: ${appUrl}/#/receipt/${id}/${Number(args.milestone) + 1}`;

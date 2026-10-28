@@ -1,5 +1,6 @@
 import styles from "../App.module.css";
 import { formatDuration } from "./format";
+import { milestoneFeeShare, surchargeOn } from "./fees";
 
 export { formatDuration };
 
@@ -12,6 +13,8 @@ export type Milestone = {
   submittedAt: bigint;
   status: number;
   deliverable: string;
+  /** 0 when the money is idle in the escrow, otherwise the vault epoch it went into. */
+  epoch: number;
 };
 
 export type Job = {
@@ -21,21 +24,43 @@ export type Job = {
   token: string;
   description: string;
   milestones: Milestone[];
+  /** What the payee pays for the whole job, shared between the milestones by amount. Fixed when the job was created. */
+  fee: bigint;
+  /** What the payer pays on top of each milestone when funding it, in basis points. Zero when the job takes the yield. */
+  surchargeBps: number;
+  /** May approve submitted milestones for the payer. The zero address when there is none. */
+  verifier: string;
+  /** The job's money sits in the token's vault while in escrow. */
+  yield: boolean;
 };
 
-/**
- * The tuple `getJob` returns. The contract still calls the two parties `client` and `freelancer`;
- * `jobFromChain` is the one place those names are translated to the app's `payer` and `payee`.
- */
-export type RawJob = readonly [{ client: string; freelancer: string; token: string; description: string }, readonly Milestone[]];
+/** The tuple `getJob` returns. */
+export type RawJob = readonly [
+  { payer: string; payee: string; token: string; description: string; total: bigint; fee: bigint; surchargeBps: number; verifier: string; yield: boolean },
+  readonly Milestone[],
+];
 
 export const jobFromChain = ([head, milestones]: RawJob): Job => ({
-  payer: head.client,
-  payee: head.freelancer,
+  payer: head.payer,
+  payee: head.payee,
   token: head.token,
   description: head.description,
-  milestones: [...milestones],
+  fee: head.fee,
+  surchargeBps: Number(head.surchargeBps),
+  verifier: head.verifier,
+  yield: head.yield,
+  milestones: milestones.map((m) => ({ ...m, epoch: Number(m.epoch) })),
 });
+
+const NO_ONE = "0x0000000000000000000000000000000000000000";
+
+export const hasVerifier = (job: Job) => job.verifier !== NO_ONE;
+
+/** The payee's share of the job fee for one milestone, taken from its payment. Rounds down, like the contract. */
+export const milestoneFee = (job: Job, ms: Milestone) => milestoneFeeShare(job.fee, ms.amount, jobTotal(job));
+
+/** What the payer pays on top of a milestone when funding it. */
+export const milestoneSurcharge = (job: Job, ms: Milestone) => surchargeOn(ms.amount, job.surchargeBps);
 
 export const STATUS = ["Unfunded", "Funded", "Submitted", "Disputed", "Paid", "Refunded"];
 
@@ -84,11 +109,12 @@ export function jobSummary(job: Job) {
 
 export type Role = { label: string; className: string; amountLabel: string };
 
-/** Which side of the job `me` is on. Anyone who is neither party is the arbiter. */
+/** Which side of the job `me` is on. Anyone who is neither a party nor the verifier is the arbiter. */
 export function roleOf(job: Job, me: string | undefined): Role {
   const addr = me?.toLowerCase();
   if (addr === job.payer.toLowerCase()) return { label: "Payer", className: styles.rolePayer, amountLabel: "You pay" };
   if (addr === job.payee.toLowerCase()) return { label: "Payee", className: styles.rolePayee, amountLabel: "You earn" };
+  if (addr && hasVerifier(job) && addr === job.verifier.toLowerCase()) return { label: "Verifier", className: styles.roleArbiter, amountLabel: "Escrow" };
   return { label: "Arbiter", className: styles.roleArbiter, amountLabel: "Escrow" };
 }
 
@@ -96,6 +122,7 @@ export function roleOf(job: Job, me: string | undefined): Role {
 export function paidOutcome(job: Job, kind: "Approved" | "Resolved" | undefined, releaser: string | undefined) {
   if (kind === "Resolved") return "Resolved by the arbiter in favour of the payee";
   if (releaser === job.payee.toLowerCase()) return "Claimed by the payee after the review period";
+  if (releaser && hasVerifier(job) && releaser === job.verifier.toLowerCase()) return "Approved by the verifier";
   if (releaser === job.payer.toLowerCase()) return "Approved by the payer";
   return "Paid to the payee";
 }

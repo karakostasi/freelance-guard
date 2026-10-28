@@ -1,5 +1,5 @@
 import { ExternalLink, FileText, LoaderCircle } from "lucide-react";
-import { STATUS, STATUS_CLASS, STATUS_LABEL, euro, formatDate, formatDuration, jobTotal, paidOutcome, txUrl, type Job } from "../lib/jobs";
+import { STATUS, STATUS_CLASS, STATUS_LABEL, euro, formatDate, formatDuration, jobTotal, milestoneFee, paidOutcome, txUrl, type Job } from "../lib/jobs";
 import { formatAmount, formatUnitsOf, tokenOf, toEur } from "../lib/tokens";
 import type { JobTrace, TxInfo } from "../hooks/useJobTrace";
 import { DeliverableView } from "./DocView";
@@ -36,6 +36,7 @@ export function MilestoneDetails({ job, index, trace, onRetry, loading, compact,
   const status = STATUS[ms.status];
   const token = tokenOf(job);
   const eur = toEur(token, ms.amount);
+  const fee = milestoneFee(job, ms);
   const left = (to: bigint) => (now >= to ? "ended" : `in ${formatDuration(to - now)}`);
 
   const funded = ms.status > 0;
@@ -87,6 +88,16 @@ export function MilestoneDetails({ job, index, trace, onRetry, loading, compact,
       )}
 
       <dl className={page.facts}>
+        <dt>Platform fee</dt>
+        <dd>
+          {formatUnitsOf(token, fee)} <span className={page.factLabel}>· paid by the payee out of this payment, who receives {formatUnitsOf(token, ms.amount - fee)}</span>
+        </dd>
+        {job.yield && (
+          <>
+            <dt>Yield</dt>
+            <dd>While in escrow, the payer&apos;s money earns yield for Squirrel. It is returned in full.</dd>
+          </>
+        )}
         {status === "Unfunded" ? (
           <>
             <dt>Time to deliver</dt>

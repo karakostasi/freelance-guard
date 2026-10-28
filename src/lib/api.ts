@@ -9,7 +9,15 @@ export type PaymentRun = {
   payee: string;
   amount: string;
   token: "eth" | "eurc";
+  /** The job amount in euros. What the payee is owed, before the platform fee. */
   amountEur: number;
+  /** What the payer pays on top of the amount, in the job's token, and the payee's fee. */
+  surcharge: string;
+  fee: string;
+  /** What the bank transfer has to be: the job plus the surcharge. */
+  transferEur: number;
+  /** What the payee received after the fee, once the first milestone is paid. */
+  payoutEur?: number;
   route: PayoutRoute;
   status: string;
   jobId: number | null;

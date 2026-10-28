@@ -6,7 +6,8 @@ try {
 const { DEPLOYER_PRIVATE_KEY } = process.env;
 
 module.exports = {
-  solidity: "0.8.24",
+  // The optimizer is needed to stay under the 24 KB contract size limit.
+  solidity: { version: "0.8.24", settings: { optimizer: { enabled: true, runs: 200 } } },
   networks: {
     // The flow test runs its own chain on another port and points this at it.
     localhost: { url: process.env.LOCAL_RPC_URL || "http://127.0.0.1:8545" },

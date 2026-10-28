@@ -51,13 +51,16 @@ export function useFiatFunding(onFunded: (jobId: number) => void) {
       // Stage 3: escrow deposit (real)
       await simulate(2, 0);
       start(2, 1);
+      const items = form.milestones.map((m) => ({ title: m.title, amount: parseEther(m.amount), duration: Math.round(Number(m.days) * 86400) }));
+      // The escrow prices the job: the payer sends the amount plus the surcharge.
+      const [, , surcharge] = (await readContract(config, { address: escrowAddress, abi: escrowAbi as Abi, functionName: "quote", args: [zeroAddress, items.map((i) => i.amount), false] })) as readonly [bigint, bigint, bigint];
       const hash = await writeContractAsync({
         address: escrowAddress,
         abi: escrowAbi,
         functionName: "createJob",
         // Every milestone is funded right away: a bank transfer is one payment for the total.
-        args: [form.payee, zeroAddress, form.description, form.milestones.map((m) => ({ title: m.title, amount: parseEther(m.amount), duration: Math.round(Number(m.days) * 86400) })), true],
-        value: parseEther(form.amount),
+        args: [form.payee, zeroAddress, form.description, items, { verifier: zeroAddress, useYield: false, fundNow: true }],
+        value: parseEther(form.amount) + surcharge,
       });
       finish(2, 1, {
         signer: address,

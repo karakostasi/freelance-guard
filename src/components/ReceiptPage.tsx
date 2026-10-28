@@ -5,7 +5,7 @@ import { escrowAbi, escrowAddress } from "../wagmi";
 import { useDoc } from "../hooks/useDoc";
 import { useJobTrace } from "../hooks/useJobTrace";
 import { jobTitle, parseDescription, receiptNumber } from "../lib/documents";
-import { NETWORK_LABEL, addressUrl, jobFromChain, paidOutcome, txUrl, type RawJob } from "../lib/jobs";
+import { NETWORK_LABEL, addressUrl, jobFromChain, milestoneFee, paidOutcome, txUrl, type RawJob } from "../lib/jobs";
 import { formatAmount } from "../lib/tokens";
 import logo from "../assets/logo.svg";
 import styles from "../App.module.css";
@@ -83,6 +83,7 @@ export function ReceiptPage({ jobId, milestone }: { jobId?: string; milestone?: 
   const paidOn = released ? new Date(released.blockTime * 1000).toLocaleString("en-GB", { dateStyle: "long", timeStyle: "long" }) : isFetching ? "Looking up the payment…" : "Not available";
   const billing = doc?.billing;
   const multi = job.milestones.length > 1;
+  const fee = milestoneFee(job, ms);
 
   return (
     <>
@@ -98,7 +99,7 @@ export function ReceiptPage({ jobId, milestone }: { jobId?: string; milestone?: 
         </header>
 
         <div className={r.amount}>
-          <span className={r.label}>Amount paid</span>
+          <span className={r.label}>Amount</span>
           <span className={r.amountValue}>{formatAmount(job, ms.amount)}</span>
         </div>
 
@@ -112,6 +113,8 @@ export function ReceiptPage({ jobId, milestone }: { jobId?: string; milestone?: 
               {number} of {job.milestones.length}: {ms.title || "Untitled"}
             </Row>
           )}
+          <Row label="Platform fee">{formatAmount(job, fee)} (paid by the payee, out of this payment)</Row>
+          <Row label="Received by the payee">{formatAmount(job, ms.amount - fee)}</Row>
           {billing?.reference && <Row label="Reference">{billing.reference}</Row>}
           <Row label="Released">{paidOutcome(job, released?.kind, released?.from.toLowerCase())}</Row>
         </dl>

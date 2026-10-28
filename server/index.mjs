@@ -256,8 +256,8 @@ const server = createServer(async (req, res) => {
     if (req.method === "POST" && path === "/api/payments") {
       const { body } = await json(req);
       validatePayment(body);
-      const run = createRun(body);
-      return send(res, 201, { run: publicRun(run), bank: { iban: "DE89 3704 0044 0532 0130 00", name: "Squirrel (sandbox)", reference: run.ref, amountEur: run.amountEur } });
+      const run = await createRun(body);
+      return send(res, 201, { run: publicRun(run), bank: { iban: "DE89 3704 0044 0532 0130 00", name: "Squirrel (sandbox)", reference: run.ref, amountEur: run.transferEur } });
     }
 
     // Stand-in for the user's banking app: it triggers the same signed webhook a real bank would send.
@@ -265,7 +265,7 @@ const server = createServer(async (req, res) => {
       const { body } = await json(req);
       const run = Object.values(db.runs).find((r) => r.ref === body.reference);
       if (!run) throw Object.assign(new Error("Unknown reference"), { status: 404 });
-      const payload = JSON.stringify({ reference: run.ref, amountEur: run.amountEur, iban: "DE89 3704 0044 0532 0130 00" });
+      const payload = JSON.stringify({ reference: run.ref, amountEur: run.transferEur ?? run.amountEur, iban: "DE89 3704 0044 0532 0130 00" });
       const r = await fetch(`http://127.0.0.1:${PORT}/webhooks/bank`, { method: "POST", headers: { "content-type": "application/json", "x-signature": sign(payload) }, body: payload });
       return send(res, r.status, await r.json());
     }

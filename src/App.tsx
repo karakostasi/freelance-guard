@@ -5,6 +5,7 @@ import { JobsPage } from "./components/JobsPage";
 import { NewJobPage } from "./components/NewJobPage";
 import { Landing } from "./components/Landing";
 import { ProfileMenu } from "./components/ProfileMenu";
+import { ThemeToggle } from "./components/ThemeToggle";
 import { ReceiptPage } from "./components/ReceiptPage";
 import { navigate, useHashRoute } from "./hooks/useHashRoute";
 import logo from "./assets/logo.svg";
@@ -34,7 +35,10 @@ export default function App() {
               <Workflow size={16} /> Payment flow
             </button>
           </nav>
-          <ProfileMenu />
+          <div className={styles.account}>
+            <ThemeToggle />
+            <ProfileMenu />
+          </div>
         </div>
       </header>
       {route.page === "home" && <Landing />}

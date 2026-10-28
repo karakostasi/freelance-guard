@@ -2,7 +2,7 @@
 .title { margin: 0; margin-right: auto; }
 .subtitle { margin: 0; margin-right: auto; }
 .summary { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
-.block { display: flex; flex-direction: column; gap: .5rem; padding: 1rem; border-radius: 12px; border: 1px solid #2a2f3b; }
+.block { display: flex; flex-direction: column; gap: .5rem; padding: 1rem; border-radius: 12px; border: 1px solid var(--line); }
 
 
 .iconButton { display: inline-flex; align-items: center; justify-content: center; padding: .35rem; border: 1px solid transparent; border-radius: 8px; background: none; color: inherit; cursor: pointer; opacity: .7; transition: border-color .15s, box-shadow .15s; }
@@ -14,7 +14,7 @@
 .pickerLabel { font-size: .8rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; opacity: .6; }
 
 .msTabs { display: flex; gap: .5rem; flex-wrap: wrap; }
-.msTab { display: inline-flex; align-items: center; gap: .45rem; padding: .45rem .9rem; border-radius: 999px; border: 1px solid #2a2f3b; background: none; color: inherit; font: inherit; cursor: pointer; transition: border-color .15s, background .15s; }
+.msTab { display: inline-flex; align-items: center; gap: .45rem; padding: .45rem .9rem; border-radius: 999px; border: 1px solid var(--line); background: none; color: inherit; font: inherit; cursor: pointer; transition: border-color .15s, background .15s; }
 .msTab:hover { border-color: var(--c); }
 .msTabActive { border-color: var(--c); background: color-mix(in srgb, var(--c) 14%, transparent); }
 .msDot { width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
@@ -22,19 +22,19 @@
 .msTitle { max-width: 14ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* The job's spec and attached files. It scrolls when long, so it never pushes the payment steps far down. */
-.spec { display: flex; flex-direction: column; gap: .4rem; max-height: 12rem; overflow-y: auto; padding: .75rem 1.25rem; border-radius: 12px; border: 1px solid #2a2f3b; background: #14171d; }
+.spec { display: flex; flex-direction: column; gap: .4rem; max-height: 12rem; overflow-y: auto; padding: .75rem 1.25rem; border-radius: 12px; border: 1px solid var(--line); background: var(--panel-2); }
 
 /* Details of the selected milestone. The column's own gap spaces it evenly between the cards above and below. */
-.msDetails { display: flex; flex-direction: column; gap: .85rem; padding: 1rem 1.25rem; border-radius: 12px; border: 1px solid #2a2f3b; border-left: 4px solid var(--c, #8a8fa0); background: #14171d; }
+.msDetails { display: flex; flex-direction: column; gap: .85rem; padding: 1rem 1.25rem; border-radius: 12px; border: 1px solid var(--line); border-left: 4px solid var(--c, #8a8fa0); background: var(--panel-2); }
 .facts { display: grid; grid-template-columns: max-content 1fr; gap: .4rem 1.25rem; margin: 0; }
 .facts dt { opacity: .6; }
 .facts dd { margin: 0; min-width: 0; }
 .factLabel { opacity: .6; }
 .wrap { overflow-wrap: anywhere; }
-.txLink { display: inline-flex; align-items: center; gap: .25rem; color: #8fa8ff; text-decoration: none; }
+.txLink { display: inline-flex; align-items: center; gap: .25rem; color: var(--link); text-decoration: none; }
 .txLink:hover { text-decoration: underline; }
 @media (max-width: 560px) { .facts { grid-template-columns: 1fr; gap: 0; } .facts dd { margin-bottom: .5rem; } }
-.traceNotice { margin: 0; padding: .5rem .75rem; border-radius: 8px; background: rgba(245, 185, 66, .1); color: #f5b942; font-size: .85rem; overflow-wrap: anywhere; }
+.traceNotice { margin: 0; padding: .5rem .75rem; border-radius: 8px; background: rgba(245, 185, 66, .1); color: var(--warn-text); font-size: .85rem; overflow-wrap: anywhere; }
 .linkButton { border: 0; background: none; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; padding: 0; }
 .linkButton:disabled { opacity: .6; cursor: default; }
 
@@ -46,12 +46,12 @@
 .stepperRow { grid-area: stepper; min-width: 0; }
 .sidebar { grid-area: side; align-self: stretch; position: relative; min-height: 260px; }
 /* Absolutely placed, so the list scrolls inside the sidebar instead of stretching the row. */
-.sidebarInner { position: absolute; inset: 0; display: flex; flex-direction: column; gap: .75rem; padding: 1rem; border-radius: 12px; border: 1px solid #2a2f3b; background: #12141a; overflow-y: auto; }
+.sidebarInner { position: absolute; inset: 0; display: flex; flex-direction: column; gap: .75rem; padding: 1rem; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); overflow-y: auto; }
 .sidebarTitle { display: flex; align-items: center; justify-content: space-between; margin: 0; font-size: .8rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; opacity: .8; }
 .jobList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .5rem; }
-.jobItem { display: flex; flex-direction: column; align-items: flex-start; gap: .3rem; width: 100%; padding: .7rem .8rem; border-radius: 10px; border: 1px solid #262b38; border-left: 4px solid var(--c, #8a8fa0); background: #171a22; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: border-color .15s, background .15s; }
-.jobItem:hover { border-color: var(--c, #555); }
-.jobItemActive { background: color-mix(in srgb, var(--c, #4f7cff) 14%, #171a22); border-color: var(--c, #4f7cff); box-shadow: 0 0 0 1px var(--c, #4f7cff); }
+.jobItem { display: flex; flex-direction: column; align-items: flex-start; gap: .3rem; width: 100%; padding: .7rem .8rem; border-radius: 10px; border: 1px solid var(--line-2); border-left: 4px solid var(--c, #8a8fa0); background: var(--card); color: inherit; font: inherit; text-align: left; cursor: pointer; transition: border-color .15s, background .15s; }
+.jobItem:hover { border-color: var(--c, var(--line-6)); }
+.jobItemActive { background: color-mix(in srgb, var(--c, #4f7cff) 14%, var(--card)); border-color: var(--c, #4f7cff); box-shadow: 0 0 0 1px var(--c, #4f7cff); }
 .jobItemTop { display: flex; align-items: center; justify-content: space-between; gap: .5rem; width: 100%; min-width: 0; }
 .jobItemBottom { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
 .jobItem > span:last-child { width: 100%; }
@@ -80,9 +80,9 @@
 @keyframes spin { to { transform: rotate(360deg); } }
 .spin { animation: spin 1s linear infinite; }
 .txPending { display: inline-flex; align-items: center; gap: .35rem; font-size: .85rem; opacity: .65; }
-.traceInfo { display: flex; align-items: center; gap: .5rem; margin: 0; padding: .5rem .75rem; border-radius: 8px; background: rgba(79, 124, 255, .1); color: #b4c6ff; font-size: .85rem; }
+.traceInfo { display: flex; align-items: center; gap: .5rem; margin: 0; padding: .5rem .75rem; border-radius: 8px; background: rgba(79, 124, 255, .1); color: var(--accent-text); font-size: .85rem; }
 
 /* The Jobs page before there is a job. */
-.empty { display: flex; flex-direction: column; align-items: flex-start; gap: .75rem; padding: 1.5rem; border-radius: 14px; border: 1px dashed #353b4b; }
+.empty { display: flex; flex-direction: column; align-items: flex-start; gap: .75rem; padding: 1.5rem; border-radius: 14px; border: 1px dashed var(--line-4); }
 .empty h2 { margin: 0; }
 .empty p { margin: 0; }

@@ -1,7 +1,7 @@
 .landing { display: flex; flex-direction: column; gap: 3.5rem; padding: 1rem 0 3rem; }
 
 .hero { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 1rem; max-width: 760px; margin: 2rem auto 0; }
-.eyebrow { font-size: .8rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: #8fa8ff; padding: .2rem .75rem; border-radius: 999px; background: rgba(79, 124, 255, .14); }
+.eyebrow { font-size: .8rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--link); padding: .2rem .75rem; border-radius: 999px; background: rgba(79, 124, 255, .14); }
 .headline { margin: 0; font-size: clamp(2rem, 5vw, 3.25rem); line-height: 1.1; }
 .lead { margin: 0; font-size: 1.1rem; line-height: 1.6; opacity: .8; }
 .cta { display: flex; align-items: center; justify-content: center; gap: .75rem; flex-wrap: wrap; margin-top: .5rem; }
@@ -22,7 +22,7 @@
 
 /* Why: bento grid */
 .bento { display: grid; grid-template-columns: repeat(6, 1fr); gap: 1rem; }
-.tile { position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: flex-start; gap: .5rem; padding: 1.5rem; min-height: 170px; border-radius: 16px; border: 1px solid color-mix(in srgb, var(--accent) 30%, #2a2f3b); background: radial-gradient(circle at 0 0, color-mix(in srgb, var(--accent) 18%, transparent), transparent 60%), #14171d; transition: transform .2s, border-color .2s; }
+.tile { position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: flex-start; gap: .5rem; padding: 1.5rem; min-height: 170px; border-radius: 16px; border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line)); background: radial-gradient(circle at 0 0, color-mix(in srgb, var(--accent) 18%, transparent), transparent 60%), var(--panel-2); transition: transform .2s, border-color .2s; }
 .tile:hover { transform: translateY(-3px); border-color: var(--accent); }
 .tile strong { font-size: 1.15rem; }
 .tile p { margin: 0; opacity: .7; }
@@ -39,4 +39,7 @@
   .span2, .span3, .span4 { grid-column: auto; }
 }
 
-.final { display: flex; flex-direction: column; align-items: center; gap: 1rem; padding: 2.5rem 1rem; border-radius: 16px; border: 1px solid #2a2f3b; background: linear-gradient(135deg, rgba(79, 124, 255, .12), rgba(138, 92, 255, .12)); text-align: center; }
+.final { display: flex; flex-direction: column; align-items: center; gap: 1rem; padding: 2.5rem 1rem; border-radius: 16px; border: 1px solid var(--line); background: linear-gradient(135deg, rgba(79, 124, 255, .12), rgba(138, 92, 255, .12)); text-align: center; }
+
+/* On the light theme the bright accents of the tiles would be too faint as text, so they are darkened. */
+:global(:root[data-theme="light"]) .tileIcon, :global(:root[data-theme="light"]) .chip { color: color-mix(in srgb, var(--accent) 62%, #000); }

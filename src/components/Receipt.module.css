@@ -1,5 +1,5 @@
 /* A receipt looks like paper on every theme, so it prints and saves as a PDF the way it reads on screen. */
-.paper { max-width: 720px; margin: 1.5rem auto; padding: 2rem; border-radius: 12px; border: 1px solid #d8dce6; background: #fff; color: #14171d; box-shadow: 0 10px 40px rgba(0, 0, 0, .3); }
+.paper { max-width: 720px; margin: 1.5rem auto; padding: 2rem; border-radius: 12px; border: 1px solid #d8dce6; background: #fff; color: #14171d; box-shadow: var(--shadow-paper); }
 .paper a { color: #3b5bdb; overflow-wrap: anywhere; }
 .head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; padding-bottom: 1rem; border-bottom: 2px solid #14171d; }
 .brand { display: flex; align-items: center; gap: .6rem; font-size: 1.25rem; font-weight: 700; }

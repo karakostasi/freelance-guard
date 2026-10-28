@@ -28,7 +28,7 @@
 | `surchargeBps` | Τι πληρώνει ο payer όταν το job **δεν** μπαίνει σε vault. Όριο `MAX_SURCHARGE_BPS = 100` | 25 |
 | `vault` | ERC-4626 vault. `0` σημαίνει ότι δεν υπάρχει yield για το token | USDC: mock (testnet). EURC, ETH: `0` |
 
-Έλεγχοι στον setter: `minFee × 20 ≤ minJob` (το floor δεν ξεπερνά το 5% του μικρότερου job), το ETH δεν παίρνει vault, και αλλαγή vault μόνο όταν δεν υπάρχουν ενεργά jobs μέσα του (αλλιώς μέσω `exitVault`, παράγραφος 6).
+Έλεγχοι στον setter: `minFee × 20 ≤ minJob` (το floor δεν ξεπερνά το 5% του μικρότερου job), το ETH δεν παίρνει vault, και το vault μπαίνει μόνο όταν το token δεν έχει ήδη vault, και το `asset()` του πρέπει να είναι το token. Αλλαγή ή αφαίρεση vault γίνεται πάντα μέσω `exitVault` (παράγραφος 6), όχι με `configureToken`.
 
 **Στιγμιότυπο στη δημιουργία.** Το `createJob` αποθηκεύει στο job το `total`, το `fee`, το `surchargeBps` και το `yield`. Αλλαγές του owner μετά δεν αγγίζουν υπάρχοντα jobs. Ο payer και ο payee βλέπουν από την αρχή τι θα πληρώσουν.
 
@@ -93,12 +93,13 @@ fee milestone i    = ⌊fee job × amount_i / total⌋            αφαιρεί
 | `claimAfterTimeout`, `resolve(true)` | payee, arbiter | Όπως τώρα, με fee στο `_pay` |
 | `refundExpired`, `resolve(false)` | payer, arbiter | Επιστρέφουν `amount` ολόκληρο. Η επιβάρυνση μένει στην πλατφόρμα |
 | `setVerifier(id, v)` | payer | Νέα. Ανά πάσα στιγμή, και για milestones που είναι ήδη `Submitted`. Το `v = 0` τον αφαιρεί. Δεν επιτρέπεται `v == payee`. Δεν υπάρχει όριο όταν κλείσουν όλα τα milestones, γιατί τότε δεν υπάρχει τίποτα να εγκρίνει |
-| `quote(token, amounts[], useYield)` | κανείς (view) | Νέα. Επιστρέφει `total`, `fee job` και `συνολική επιβάρυνση` με τους ίδιους τύπους. Το frontend και ο server τη χρησιμοποιούν, ώστε ο υπολογισμός να υπάρχει σε ένα μέρος |
+| `quote(token, amounts[], useYield)` | κανείς (view) | Νέα. Επιστρέφει `total`, `fee job` και `συνολική επιβάρυνση` (0 αν `useYield`) με τους ίδιους τύπους. Το frontend και ο server τη χρησιμοποιούν, ώστε ο υπολογισμός να υπάρχει σε ένα μέρος |
 | `configureToken(token, cfg)` | owner | Νέα. Ένα atomic call ώστε να αλλάζουν μαζί `vault` και `surchargeBps` |
 | `setFeeBps`, `setTreasury`, `setPaused` | owner | Νέες. Το `setPaused(true)` μπλοκάρει μόνο `createJob` και `fundMilestone`. Πληρωμές και refunds δουλεύουν πάντα |
-| `withdrawFees(token)` | όλοι | Νέα. Στέλνει στο `treasury` το `accruedFees`, μόνο αν το idle υπόλοιπο μένει μεγαλύτερο από το κεφάλαιο μερών που πρέπει να είναι idle |
-| `harvest(token)` | όλοι | Νέα. Βγάζει το yield από το vault στα `accruedFees` |
+| `withdrawFees(token)` | όλοι | Νέα. Στέλνει στο `treasury` το `accruedFees`, αλλά κρατά πίσω ό,τι χρειάζονται τα ανοιχτά milestones: τα idle και το `shortfall` του vault. Αν περισσεύει λιγότερο από το `accruedFees` στέλνει μόνο ό,τι περισσεύει, και αν δεν περισσεύει τίποτα κάνει revert `Insolvent`. Έτσι μετά από απώλεια δεν κολλά για πάντα |
+| `harvest(token)` | όλοι | Νέα. Βγάζει το yield από το vault στα `accruedFees`. Αφήνει στο vault `VAULT_DUST` base units |
 | `exitVault(token)` | owner | Νέα. Έκτακτη έξοδος, παράγραφος 6 |
+| `shortfall(token)`, `harvestable(token)` | κανείς (view) | Νέες. Πόσο λείπει από το vault σε σχέση με όσα χρωστά το contract εκεί, και πόσο θα έβγαζε τώρα το `harvest` |
 
 Οι συναρτήσεις που κινούν χρήματα (`createJob`, `fundMilestone`, `approve`, `claimAfterTimeout`, `resolve`, `refundExpired`, `withdrawFees`) παίρνουν απλό reentrancy guard, γιατί στέλνουν ETH ή καλούν tokens και αργότερα vault. Οι `submitWork` και `dispute` δεν κάνουν εξωτερικές κλήσεις και δεν το χρειάζονται. Το πρότυπο checks-effects-interactions του τωρινού κώδικα (status πριν το `_send`) μένει.
 
@@ -107,17 +108,22 @@ fee milestone i    = ⌊fee job × amount_i / total⌋            αφαιρεί
 Το vault μιλάει το interface ERC-4626, ώστε να αλλάζει χωρίς αλλαγή στο contract (mock τώρα, Aave ή άλλο αργότερα). Ένα job που αρνήθηκε το yield **δεν αγγίζει ποτέ το vault**: τα χρήματά του μένουν idle και ισχύει `idle ≥ activeTotal − vaultDue + accruedFees`.
 
 **Ροές**
-- **Χρηματοδότηση milestone σε job με `yield`:** εισπράττεται `amount`, κατατίθεται στο vault, `ms.epoch = vaultEpoch`, `vaultDue += amount`, `activeTotal += amount`. Μετά την κατάθεση ελέγχεται ότι τα assets του contract στο vault ανέβηκαν τουλάχιστον κατά `amount − 2` base units, αλλιώς revert.
-- **Πληρωμή ή refund:** αν `ms.epoch != 0` και `ms.epoch == vaultEpoch`, γίνεται `vault.withdraw(amount, this, this)` (ακριβές ποσό εξόδου, όπως ορίζει το ERC-4626), `vaultDue -= amount`. Αλλιώς πληρώνεται από idle. Μετά στέλνεται το ποσό, με το fee αφαιρεμένο στην πληρωμή.
-- **`harvest`:** `επιπλέον = vaultAssets − vaultDue − margin`. Αν είναι θετικό, βγαίνει από το vault και προστίθεται στα `accruedFees`. Το `margin` (λίγα base units) αφήνει χώρο για στρογγυλοποίηση στο burn των shares, ώστε η τελευταία ανάληψη να μην αποτυγχάνει.
-- **`exitVault`:** κάνει `redeem` όλα τα shares στο idle, αυξάνει το `vaultEpoch`, μηδενίζει `vaultDue`, και θέτει `vault = 0` (το yield κλείνει για το token). Τα milestones που ήταν μέσα έχουν παλιό epoch και πληρώνονται πλέον από idle. Το vault μπορεί να ξαναρυθμιστεί αργότερα με `configureToken`, χωρίς να μπερδευτούν τα παλιά milestones.
+- **Χρηματοδότηση milestone σε job με `yield`:** εισπράττεται `amount`, κατατίθεται στο vault, `ms.epoch = vaultEpoch`, `vaultDue += amount`, `activeTotal += amount`. Μετά την κατάθεση ελέγχεται ότι το vault πήρε ακριβώς το `amount` και ότι τα assets του contract εκεί ανέβηκαν τουλάχιστον κατά `amount − VAULT_DUST`, αλλιώς revert `VaultMisbehaved`. Μια κλήση κατάθεσης καλύπτει όλα τα milestones ενός `fundNow`.
+- **Πληρωμή ή refund:** αν `ms.epoch != 0` και `ms.epoch == vaultEpoch`, γίνεται `vault.withdraw(amount, this, this)` (ακριβές ποσό εξόδου, όπως ορίζει το ERC-4626), `vaultDue -= amount`. Αλλιώς πληρώνεται από idle. Μετά στέλνεται το ποσό, με το fee αφαιρεμένο στην πληρωμή. Αν το vault έχει λιγότερα από το `amount` (στρογγυλοποιήσεις), δες «Στρογγυλοποίηση» πιο κάτω.
+- **`harvest`:** `επιπλέον = vaultAssets − vaultDue − VAULT_DUST`. Αν είναι θετικό, βγαίνει από το vault και προστίθεται στα `accruedFees`. Το `VAULT_DUST` (1.000 base units, δηλαδή 0,001 USDC) μένει στο vault για στρογγυλοποιήσεις.
+- **`exitVault`:** κάνει `redeem` όλα τα shares στο idle, αυξάνει το `vaultEpoch`, μηδενίζει `vaultDue`, και θέτει `vault = 0` (το yield κλείνει για το token). Ό,τι επέστρεψε το vault πάνω από το `vaultDue` πάει στα `accruedFees`. Αν επέστρεψε λιγότερο, τα `accruedFees` που δεν έχουν αποσυρθεί μειώνονται κατά την απώλεια (μέχρι να μηδενιστούν). Δουλεύει μόνο αν το vault μπορεί να πληρώσει όλα τα shares: με ρευστότητα που λείπει κάνει revert. Τα milestones που ήταν μέσα έχουν παλιό epoch και πληρώνονται πλέον από idle. Το vault μπορεί να ξαναρυθμιστεί αργότερα με `configureToken`, χωρίς να μπερδευτούν τα παλιά milestones. Ένα job που ζήτησε yield και χρηματοδοτείται όσο το token δεν έχει vault μπαίνει idle, χωρίς επιβάρυνση (η πλατφόρμα χάνει το yield). Μπαίνει στο νέο vault αν έχει ήδη ρυθμιστεί.
+
+**Στρογγυλοποίηση.** Κάθε κατάθεση και ανάληψη μπορεί να χάσει 1–2 base units στο vault, και οι απώλειες αθροίζονται μέχρι να τις καλύψει το yield. Για να μην κολλά η τελευταία πληρωμή:
+- το `harvest` αφήνει `VAULT_DUST` στο vault,
+- αν το vault έχει λιγότερα από το `amount` κατά το πολύ `VAULT_DUST`, η διαφορά καλύπτεται πρώτα από τα `accruedFees`. Ό,τι δεν καλύπτεται το χάνει αυτός που παίρνει το milestone (το πολύ 0,001 USDC), και ισχύει και σε refund,
+- μεγαλύτερη διαφορά είναι απώλεια: η πληρωμή κάνει revert `VaultShort` και το milestone περιμένει (ή `exitVault`).
 
 **Απώλεια στο vault.** Αν το vault χάσει αξία, το κεφάλαιο μερών δεν καλύπτεται πλήρως. Στο v2:
 - τα `accruedFees` που δεν έχουν αποσυρθεί απορροφούν πρώτα την απώλεια (το υπόλοιπο του contract είναι κοινό), και η `withdrawFees` σταματά όταν το idle δεν αρκεί,
-- υπάρχει view `shortfall(token)`,
+- υπάρχει view `shortfall(token)`, και η `withdrawFees` κρατά πίσω τόσο όσο το `shortfall`,
 - αυτόματο haircut στα μέρη **δεν** υπάρχει. Ποιος καλύπτει το υπόλοιπο είναι απόφαση πριν από mainnet (νομικά, ασφάλιση). Δες ανοιχτά.
 
-**Ρευστότητα.** Το Aave μπορεί να μην έχει διαθέσιμα USDC τη στιγμή της ανάληψης. Τότε η πληρωμή κάνει revert και ξαναδοκιμάζεται, χωρίς να χαθεί τίποτα. Το `exitVault` είναι το σχέδιο διαφυγής. Ρευστό buffer (ένα μέρος να μένει idle) **δεν** μπαίνει στο v2: προσθέτει λογική sweep και δεν αλλάζει το testnet. Αναφέρθηκε στο business plan, οπότε η παράλειψη είναι συνειδητή.
+**Ρευστότητα.** Το Aave μπορεί να μην έχει διαθέσιμα USDC τη στιγμή της ανάληψης. Τότε η πληρωμή κάνει revert και ξαναδοκιμάζεται, χωρίς να χαθεί τίποτα. Το `exitVault` είναι το σχέδιο διαφυγής. Το `exitVault` δουλεύει μόνο αν το vault πληρώνει όλα τα shares, άρα δεν είναι διαφυγή για έλλειψη ρευστότητας, είναι για απώλεια ή για vault που θέλουμε να αφήσουμε. Ρευστό buffer (ένα μέρος να μένει idle) **δεν** μπαίνει στο v2: προσθέτει λογική sweep και δεν αλλάζει το testnet. Αναφέρθηκε στο business plan, οπότε η παράλειψη είναι συνειδητή.
 
 **Mock vault** (`contracts/mocks/MockVault.sol`): υλοποιεί το υποσύνολο του ERC-4626 που χρησιμοποιεί το contract και έχει hooks για tests και demo:
 - `accrueYield(amount)`: μεγαλώνει την αξία των shares (μπαίνουν assets από το mintable `MockERC20`),
@@ -147,10 +153,10 @@ fee milestone i    = ⌊fee job × amount_i / total⌋            αφαιρεί
 **ABI.** Αλλάζουν οι υπογραφές `createJob`, `getJob`, και τα events. Το `npm run compile` ξαναγράφει το `abi/FreelanceEscrow.json`.
 
 **Events.**
-- `JobCreated`: προστίθενται `fee`, `surchargeBps`, `verifier` (και `yield` στο βήμα 3).
+- `JobCreated`: προστίθενται `fee`, `surchargeBps`, `verifier`, `yield`.
 - `MilestoneFunded`: προστίθεται `surcharge`.
 - `MilestonePaid(id, milestone, payee, gross, fee)`: νέο, εκπέμπεται σε κάθε πληρωμή (`approve`, `claimAfterTimeout`, `resolve`). Τα υπάρχοντα `Approved` και `Resolved` μένουν, γιατί το `useJobTrace` τα χρησιμοποιεί για να βρει πώς απελευθερώθηκε μια πληρωμή.
-- νέα στο βήμα 1: `FeesWithdrawn`, `TokenConfigured`, `FeeBpsSet`, `TreasurySet`, `PausedSet`, `OwnershipTransferStarted`, `OwnershipTransferred`. στο βήμα 2: `VerifierSet(id, verifier)`. Αργότερα: `YieldHarvested`, `VaultExited`. Το `Approved` δεν λέει ποιος ενέκρινε, φαίνεται από τον αποστολέα της συναλλαγής.
+- νέα στο βήμα 1: `FeesWithdrawn`, `TokenConfigured`, `FeeBpsSet`, `TreasurySet`, `PausedSet`, `OwnershipTransferStarted`, `OwnershipTransferred`. στο βήμα 2: `VerifierSet(id, verifier)`. `YieldHarvested(token, amount)`, `VaultExited(token, vault, recovered, due)`. Το `TokenConfigured` έχει και το `vault`, και το `JobCreated` το `yield`. Το `Approved` δεν λέει ποιος ενέκρινε, φαίνεται από τον αποστολέα της συναλλαγής.
 
 **Frontend**
 - `HireForm`: πεδίο verifier (προεπιλογή η διεύθυνση του verifier της πλατφόρμας, με επιλογή "χωρίς"), επιλογή yield με προεπιλογή ενεργό για USDC και "αρνούμαι το yield (+0,25%)", ζωντανή εμφάνιση του fee και της επιβάρυνσης από το `quote`. Για ETH το value γίνεται `amount + επιβάρυνση`.
@@ -182,7 +188,7 @@ fee milestone i    = ⌊fee job × amount_i / total⌋            αφαιρεί
 Ένα deployment, αλλά η δουλειά σε βήματα, με tests σε κάθε βήμα:
 1. `owner`, whitelist, `TokenConfig`, fee payee, επιβάρυνση, `quote`, `MilestonePaid`, μετονομασία σε `payer`/`payee`. **Έγινε** (2026-10-28, branch `contract-v2`, δεν έχει γίνει commit). Μένει εκτός το `abi/` και το frontend, δες το βήμα 4.
 2. `verifier` και `setVerifier`. **Έγινε** (2026-10-28, branch `contract-v2`, δεν έχει γίνει commit). Το `JobOptions` έχει `verifier` πριν από το `fundNow`, το `Job` έχει `verifier` στο τέλος, και υπάρχει το σφάλμα `BadVerifier`.
-3. Vault, `MockVault`, `harvest`, `exitVault`, `withdrawFees`.
+3. Vault, `MockVault`, `harvest`, `exitVault`, `withdrawFees`. **Έγινε** (2026-10-28, branch `contract-v2`). Το `JobOptions` έχει `{verifier, useYield, fundNow}`, το `Job` έχει `yield` στο τέλος, το `Milestone` έχει `epoch`, και το `TokenConfig` έχει `vault`. Το contract χρειάζεται optimizer (18 KB με, 32 KB χωρίς, όριο 24 KB), που μπήκε στο `hardhat.config.cjs`.
 4. ABI, frontend, server, deploy script.
 5. Audit πριν από πραγματικά κεφάλαια.
 
@@ -198,3 +204,5 @@ fee milestone i    = ⌊fee job × amount_i / total⌋            αφαιρεί
 - **Απώλεια στο vault:** ποιος την καλύπτει πέρα από τα fees της πλατφόρμας (παράγραφος 6). Μπλοκάρει το mainnet.
 - **Χωρίς buffer ρευστότητας στο v2** (παράγραφος 6). Πρόταση: ναι, να ξαναδούμε με το Aave.
 - **Owner:** EOA στο testnet, multisig πριν από mainnet.
+- **Aave adapter:** το `MockVault` είναι το μόνο vault. Δεν έχει σχεδιαστεί ούτε ελεγχθεί adapter για το πραγματικό Aave (ERC-4626 πάνω από aTokens), ούτε το `VAULT_DUST` απέναντι σε αυτό. Μπλοκάρει το mainnet.
+- **Έξοδος με ανεπαρκή fees:** αν το `exitVault` γίνει με απώλεια μεγαλύτερη από τα `accruedFees`, το έλλειμμα μένει στο contract. Το καλύπτουν τα fees των επόμενων πληρωμών, και αν μείνουν μόνο refunds, το τελευταίο μπορεί να αποτύχει με `TransferFailed`. Είναι το ίδιο ανοιχτό θέμα της απώλειας.

@@ -2,7 +2,7 @@ const { expect } = require("chai");
 const { ethers, network } = require("hardhat");
 const { time } = require("@nomicfoundation/hardhat-network-helpers");
 const { anyValue } = require("@nomicfoundation/hardhat-chai-matchers/withArgs");
-const { REVIEW, DAY, item, opts, rules, deploy } = require("./helpers.cjs");
+const { REVIEW, DAY, item, opts, rules, rng, deploy } = require("./helpers.cjs");
 
 const U = (n) => ethers.parseUnits(String(n), 6); // USDC and EURC have 6 decimals
 const E = (n) => ethers.parseEther(String(n));
@@ -37,13 +37,13 @@ describe("FreelanceEscrow fees", () => {
     ];
     for (const [amounts, total, fee, surcharge] of cases) {
       it(`prices a job of ${total}`, async () => {
-        const q = await escrow.quote(usdcAddr, amounts.map(U));
+        const q = await escrow.quote(usdcAddr, amounts.map(U), false);
         expect([q.total, q.fee, q.surcharge]).to.deep.equal([U(total), U(fee), U(surcharge)]);
       });
     }
 
     it("does not quote a token that is not enabled", async () => {
-      await expect(escrow.quote(other.address, [1n])).to.be.revertedWithCustomError(escrow, "TokenNotAllowed");
+      await expect(escrow.quote(other.address, [1n], false)).to.be.revertedWithCustomError(escrow, "TokenNotAllowed");
     });
   });
 
@@ -51,7 +51,7 @@ describe("FreelanceEscrow fees", () => {
     it("takes the amounts plus the surcharge when funding now, and records the terms", async () => {
       await expect(create([item("a", U(12000)), item("b", U(8000))]))
         .to.emit(escrow, "JobCreated")
-        .withArgs(1, payer.address, payee.address, usdcAddr, U(20000), 2, U(50), 25, ethers.ZeroAddress)
+        .withArgs(1, payer.address, payee.address, usdcAddr, U(20000), 2, U(50), 25, ethers.ZeroAddress, false)
         .and.to.emit(escrow, "MilestoneFunded");
       expect(await usdc.balanceOf(escrowAddr)).to.equal(U(20050));
       expect(await escrow.accruedFees(usdcAddr)).to.equal(U(50));
@@ -241,7 +241,7 @@ describe("FreelanceEscrow fees", () => {
       const createEth = (items, value, fundNow = true) => escrow.connect(payer).createJob(payee.address, ethers.ZeroAddress, "x", items, opts({ fundNow }), { value });
 
       it("charges the surcharge on top of the amount and pays the fee out of the payment", async () => {
-        const q = await escrow.quote(ethers.ZeroAddress, [E(1)]);
+        const q = await escrow.quote(ethers.ZeroAddress, [E(1)], false);
         expect([q.fee, q.surcharge]).to.deep.equal([E("0.01"), E("0.0025")]);
         await expect(createEth([item("a", E(1))], E(1))).to.be.revertedWith("wrong amount");
         await createEth([item("a", E(1))], E("1.0025"));
@@ -273,14 +273,7 @@ describe("FreelanceEscrow fees", () => {
   describe("accounting", () => {
     it("always holds exactly the open milestones plus the unwithdrawn fees", async () => {
       await escrow.configureToken(ethers.ZeroAddress, rules({ surchargeBps: 25, minFee: E("0.01"), minJob: E("0.2") }));
-      // mulberry32, so the run is the same every time. (A plain LCG has low bits that just alternate.)
-      let state = 20261028;
-      const rnd = (n) => {
-        state = (state + 0x6d2b79f5) | 0;
-        let t = Math.imul(state ^ (state >>> 15), 1 | state);
-        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-        return Math.floor((((t ^ (t >>> 14)) >>> 0) / 4294967296) * n);
-      };
+      const rnd = rng(20261028);
       const balanceOf = (token) => (token === ethers.ZeroAddress ? ethers.provider.getBalance(escrowAddr) : usdc.balanceOf(escrowAddr));
       const done = {};
       const attempt = (name, call) => call.then(() => (done[name] = (done[name] ?? 0) + 1), () => {});
@@ -326,7 +319,7 @@ describe("FreelanceEscrow fees", () => {
           const items = Array.from({ length: 1 + rnd(3) }, (_, i) => item(`m${i}`, eth ? E(0.1 + rnd(5) / 10) : U(500 + rnd(9000)), 4 + rnd(8)));
           const token = eth ? ethers.ZeroAddress : usdcAddr;
           const fundNow = rnd(2) === 0;
-          const q = await escrow.quote(token, items.map((i) => i.amount));
+          const q = await escrow.quote(token, items.map((i) => i.amount), false);
           const who = rnd(2) === 0 ? verifier.address : ethers.ZeroAddress;
           await attempt("createJob", escrow.connect(payer).createJob(payee.address, token, "x", items, opts({ verifier: who, fundNow }), { value: eth && fundNow ? q.total + q.surcharge : 0n }));
         } else if (op === 1) {

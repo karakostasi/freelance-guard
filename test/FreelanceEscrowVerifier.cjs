@@ -1,7 +1,7 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { time } = require("@nomicfoundation/hardhat-network-helpers");
-const { REVIEW, item, opts, deploy } = require("./helpers.cjs");
+const { REVIEW, item, opts, rules, deploy } = require("./helpers.cjs");
 
 const ONE = ethers.parseEther("1");
 
@@ -25,7 +25,7 @@ describe("FreelanceEscrow verifier", () => {
     it("is recorded with the job and announced", async () => {
       await expect(create())
         .to.emit(escrow, "JobCreated")
-        .withArgs(1, payer.address, payee.address, ethers.ZeroAddress, 2n * ONE, 2, 0, 0, verifier.address);
+        .withArgs(1, payer.address, payee.address, ethers.ZeroAddress, 2n * ONE, 2, 0, 0, verifier.address, false);
       expect((await escrow.jobs(1)).verifier).to.equal(verifier.address);
       expect((await escrow.getJob(1))[0].verifier).to.equal(verifier.address);
     });
@@ -164,7 +164,7 @@ describe("FreelanceEscrow verifier", () => {
       await no(v.submitWork(1, 1, "x"));
       await no(v.fundMilestone(1, 1));
       await no(v.setVerifier(1, v.runner.address));
-      await no(v.configureToken(ethers.ZeroAddress, { enabled: true, surchargeBps: 0, minFee: 0, minJob: 0 }));
+      await no(v.configureToken(ethers.ZeroAddress, rules()));
       await time.increase(REVIEW);
       await no(v.claimAfterTimeout(1, 0));
     });

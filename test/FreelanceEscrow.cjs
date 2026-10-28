@@ -136,7 +136,7 @@ describe("FreelanceEscrow (ETH)", () => {
     it("emits events with the milestone index", async () => {
       await expect(create(items, true, P + D + F))
         .to.emit(escrow, "JobCreated")
-        .withArgs(1, payer.address, payee.address, ethers.ZeroAddress, P + D + F, 3, 0, 0, ethers.ZeroAddress)
+        .withArgs(1, payer.address, payee.address, ethers.ZeroAddress, P + D + F, 3, 0, 0, ethers.ZeroAddress, false)
         .and.to.emit(escrow, "MilestoneFunded");
       await expect(escrow.connect(payee).submitWork(1, 2, "x")).to.emit(escrow, "WorkSubmitted").withArgs(1, 2, "x");
     });

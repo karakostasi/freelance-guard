@@ -29,13 +29,22 @@ async function main() {
   const receipt = await escrow.deploymentTransaction().wait();
 
   const tokens = { ETH: ethers.ZeroAddress, USDC: process.env.USDC_ADDRESS || CIRCLE.USDC, EURC: process.env.EURC_ADDRESS || CIRCLE.EURC };
-  // Local chains have no real stablecoins, so deploy mock ones to test token jobs with.
-  if (["hardhat", "localhost"].includes(hre.network.name)) {
-    for (const symbol of ["EURC", "USDC"]) {
-      const mock = await ethers.deployContract("MockERC20", [`Mock ${symbol}`, symbol, 6]);
-      await mock.waitForDeployment();
-      tokens[symbol] = await mock.getAddress();
-      console.log(`Mock ${symbol} deployed to`, tokens[symbol], `(set VITE_${symbol}_ADDRESS and ${symbol}_ADDRESS to this; mint with ${symbol.toLowerCase()}.mint)`);
+  // The vault that earns yield on USDC. Only USDC has one, and ETH and EURC never do.
+  const vaults = { USDC: process.env.USDC_VAULT_ADDRESS || ethers.ZeroAddress };
+  // Local chains have no real stablecoins, so deploy mock ones to test token jobs with. On a testnet, MOCK_USDC=1 does
+  // the same for USDC only, because Circle's test USDC can't be minted and a mock vault needs a token it can mint yield in.
+  const local = ["hardhat", "localhost"].includes(hre.network.name);
+  for (const symbol of ["EURC", "USDC"]) {
+    if (!(local || (symbol === "USDC" && process.env.MOCK_USDC === "1"))) continue;
+    const mock = await ethers.deployContract("MockERC20", [`Mock ${symbol}`, symbol, 6]);
+    await mock.waitForDeployment();
+    tokens[symbol] = await mock.getAddress();
+    console.log(`Mock ${symbol} deployed to`, tokens[symbol], `(set VITE_${symbol}_ADDRESS and ${symbol}_ADDRESS to this; mint with ${symbol.toLowerCase()}.mint)`);
+    if (symbol === "USDC" && !process.env.USDC_VAULT_ADDRESS) {
+      const vault = await ethers.deployContract("MockVault", [tokens.USDC]);
+      await vault.waitForDeployment();
+      vaults.USDC = await vault.getAddress();
+      console.log("Mock USDC vault deployed to", vaults.USDC, "(vault.accrueYield(amount) or vault.setRatePerYear(bps) makes it earn)");
     }
   }
 
@@ -43,8 +52,9 @@ async function main() {
   for (const [symbol, address] of Object.entries(tokens)) {
     const minJob = units(MIN_JOB_EUR, symbol);
     const minFee = [units(MIN_FEE_EUR, symbol), minJob / 20n].reduce((a, b) => (a < b ? a : b));
-    await (await escrow.configureToken(address, { enabled: true, surchargeBps: SURCHARGE_BPS, minFee, minJob })).wait();
-    console.log(`Enabled ${symbol}: fee at least ${ethers.formatUnits(minFee, DECIMALS[symbol])}, job at least ${ethers.formatUnits(minJob, DECIMALS[symbol])}`);
+    const vault = vaults[symbol] ?? ethers.ZeroAddress;
+    await (await escrow.configureToken(address, { enabled: true, surchargeBps: SURCHARGE_BPS, minFee, minJob, vault })).wait();
+    console.log(`Enabled ${symbol}: fee at least ${ethers.formatUnits(minFee, DECIMALS[symbol])}, job at least ${ethers.formatUnits(minJob, DECIMALS[symbol])}, ${vault === ethers.ZeroAddress ? "no yield" : "yield from " + vault}`);
   }
 
   if (process.env.OWNER_ADDRESS && process.env.OWNER_ADDRESS !== deployer.address) {

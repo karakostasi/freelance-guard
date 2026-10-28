@@ -1,0 +1,29 @@
+const { ethers } = require("hardhat");
+
+const REVIEW = 3 * 24 * 3600;
+const DAY = 24 * 3600;
+
+const item = (title, amount, days = 7) => ({ title, amount, duration: days * DAY });
+
+/** The options of createJob: no verifier and not funded, unless overridden. */
+const opts = (overrides = {}) => ({ verifier: ethers.ZeroAddress, fundNow: false, ...overrides });
+
+/** Token rules for the escrow, with no fee and no limits unless overridden. */
+const rules = (overrides = {}) => ({ enabled: true, surchargeBps: 0, minFee: 0n, minJob: 0n, ...overrides });
+
+/**
+ * Deploys the escrow. By default it charges nothing (no fee, no surcharge, no minimums) and ETH plus the
+ * given tokens are enabled, so the tests of the escrow mechanics see exact amounts. Pass `free: false` to
+ * get the contract as deployed, with its default fee and nothing enabled.
+ */
+async function deploy({ free = true, tokens = [] } = {}) {
+  const [owner, payer, payee, arbiter, other, treasury] = await ethers.getSigners();
+  const escrow = await ethers.deployContract("FreelanceEscrow", [owner.address, arbiter.address, treasury.address, REVIEW]);
+  if (free) {
+    await escrow.setFeeBps(0);
+    for (const token of [ethers.ZeroAddress, ...tokens]) await escrow.configureToken(token, rules());
+  }
+  return { escrow, owner, payer, payee, arbiter, other, treasury };
+}
+
+module.exports = { REVIEW, DAY, item, opts, rules, deploy };

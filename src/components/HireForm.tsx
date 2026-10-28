@@ -4,6 +4,7 @@ import { erc20Abi, formatUnits, isAddress, parseUnits, zeroAddress } from "viem"
 import { Check, Plus, X } from "lucide-react";
 import { escrowAbi, escrowAddress } from "../wagmi";
 import { useBackendStatus } from "../hooks/useBackend";
+import { useQuote, useTokenConfig } from "../hooks/useQuote";
 import type { FundingForm } from "../hooks/useFiatFunding";
 import { useRefreshOnConfirm } from "../hooks/useRefreshOnConfirm";
 import { BILLING_MAX, buildDescription, cleanBilling, type Billing } from "../lib/documents";
@@ -68,6 +69,8 @@ export function HireForm({ variant = "page", onBank, onCreated }: { variant?: "p
   const [spec, setSpec] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [billing, setBilling] = useState<Billing>({});
+  const [yieldChoice, setYieldChoice] = useState(true);
+  const [verifier, setVerifier] = useState("");
 
   const bank = payWith === "bank";
   // A bank transfer is one payment for the total, so it always funds everything. Offline only ETH works.
@@ -88,6 +91,7 @@ export function HireForm({ variant = "page", onBank, onCreated }: { variant?: "p
     setSpec("");
     setFiles([]);
     setBilling({});
+    setVerifier("");
   };
 
   // Clear the form only once the job exists on-chain, so a rejected tx keeps the input.
@@ -113,13 +117,26 @@ export function HireForm({ variant = "page", onBank, onCreated }: { variant?: "p
   if (rows.length > 0) amounts[rows.length - 1] = totalUnits - amounts.slice(0, -1).reduce((a, b) => a + b, 0n);
 
   const rowsValid = rows.length > 0 && percentSum === 100n && percents.every((p) => p > 0n) && rows.every((r) => Number(r.days) > 0 && r.title.trim());
+
+  // A token with a vault can earn yield while the money is in escrow. The payer then pays no surcharge. Only wallet
+  // payments can take it: a bank transfer is always paid in EURC or ETH, which have none.
+  const config = useTokenConfig(token);
+  const hasYield = !bank && !!config && config.vault !== zeroAddress;
+  const useYield = hasYield && yieldChoice;
+  // The escrow prices the job: the fee the payee pays out of the payments, and the surcharge the payer pays on top.
+  const quote = useQuote(token, amounts, useYield, totalUnits > 0n && rowsValid && amounts.every((a) => a > 0n));
+  // Funding as you go locks nothing now, and each milestone adds its own surcharge when it is funded.
+  const surcharge = fundNow ? (quote.surcharge ?? 0n) : 0n;
+  const due = totalUnits + surcharge;
+  const verifierValid = verifier === "" || (isAddress(verifier) && verifier.toLowerCase() !== payee.toLowerCase());
+
   // The deposit is signed in this wallet for both ways of paying, so it needs the funds at hand.
-  const short = fundNow && balance !== undefined && totalUnits > balance;
-  const valid = isAddress(payee) && title.trim().length > 0 && totalUnits > 0n && rowsValid && !short;
+  const short = fundNow && balance !== undefined && due > balance;
+  const valid = isAddress(payee) && title.trim().length > 0 && totalUnits > 0n && rowsValid && !short && !quote.problem && verifierValid;
   const busy = !!working || confirming;
   // The split matches a preset until the rows are edited, then it is a custom split.
   const activePreset = PRESETS.find((p) => sameRows(p.rows, rows))?.label ?? null;
-  const eur = token.eurPer > 0 ? toEur(token, totalUnits) : 0;
+  const eur = token.eurPer > 0 ? toEur(token, due) : 0;
 
   const setBillingField = (key: keyof Billing, value: string) => setBilling((b) => ({ ...b, [key]: value }));
 
@@ -161,7 +178,7 @@ export function HireForm({ variant = "page", onBank, onCreated }: { variant?: "p
     try {
       const description = await makeDescription();
       if (fundNow && token.address) {
-        await ensureAllowance(token.address, address!, totalUnits, () => setWorking("Approve the token in your wallet…"));
+        await ensureAllowance(token.address, address!, due, () => setWorking("Approve the token in your wallet…"));
       }
       setWorking("Confirm in your wallet…");
       const items = rows.map((r, i) => ({ title: r.title.trim(), amount: amounts[i], duration: Math.round(Number(r.days) * DAY) }));
@@ -170,8 +187,8 @@ export function HireForm({ variant = "page", onBank, onCreated }: { variant?: "p
           address: escrowAddress,
           abi: escrowAbi,
           functionName: "createJob",
-          args: [payee, token.address ?? zeroAddress, description, items, fundNow],
-          value: fundNow && !token.address ? totalUnits : 0n,
+          args: [payee, token.address ?? zeroAddress, description, items, { verifier: verifier || zeroAddress, useYield, fundNow }],
+          value: fundNow && !token.address ? due : 0n,
         }),
       );
       onCreated?.();
@@ -204,6 +221,17 @@ export function HireForm({ variant = "page", onBank, onCreated }: { variant?: "p
             {token.symbol === "ETH" && " (demo rate)"}
           </span>
         )}
+        {quote.problem && <span className={styles.error}>{quote.problem}</span>}
+        {quote.fee !== undefined && !quote.problem && totalUnits > 0n && (
+          <span className={styles.muted}>
+            Platform fee {formatUnitsOf(token, quote.fee)}, paid by the payee out of the payments.{" "}
+            {useYield
+              ? "You pay no surcharge: while your money is in escrow it earns yield for Squirrel."
+              : fundNow
+                ? `You pay ${formatUnitsOf(token, surcharge)} on top.`
+                : `You pay a ${(Number(config?.surchargeBps ?? 0) / 100).toString()}% surcharge on top of each milestone when you fund it.`}
+          </span>
+        )}
         {balance !== undefined && (
           <span className={styles.muted}>
             Your balance: {formatBalance(balance, token.decimals)} {token.symbol}
@@ -234,6 +262,11 @@ export function HireForm({ variant = "page", onBank, onCreated }: { variant?: "p
             </span>
           </label>
         </div>
+        {hasYield && (
+          <label className={styles.muted}>
+            <input type="checkbox" checked={yieldChoice} onChange={(e) => setYieldChoice(e.target.checked)} /> Let the escrowed money earn yield for Squirrel, and pay no surcharge. Untick to pay a {(Number(config?.surchargeBps ?? 0) / 100).toString()}% surcharge instead.
+          </label>
+        )}
         {bank && backendOnline && (
           <select className={styles.input} value={route} onChange={(e) => setRoute(e.target.value as PayoutRoute)} aria-label="Payee payout">
             <option value="sepa">Payee is paid out by SEPA bank transfer</option>
@@ -332,6 +365,11 @@ export function HireForm({ variant = "page", onBank, onCreated }: { variant?: "p
         <h3 className={styles.groupTitle}>Details</h3>
         <input className={styles.input} placeholder="Job title" maxLength={MAX_TITLE} value={title} onChange={(e) => setTitle(e.target.value)} aria-label="Job title" />
         <textarea className={styles.input} placeholder="What should be delivered? (optional)" rows={3} value={spec} onChange={(e) => setSpec(e.target.value)} />
+        <input className={styles.input} placeholder="Verifier address (optional)" value={verifier} onChange={(e) => setVerifier(e.target.value.trim())} aria-label="Verifier address" />
+        {verifier !== "" && !verifierValid && <span className={styles.error}>The verifier must be an address, and not the payee.</span>}
+        {verifierValid && verifier !== "" && (
+          <span className={styles.muted}>A verifier can approve delivered work for you. Once it approves a milestone, you can no longer dispute it. You can remove the verifier at any time.</span>
+        )}
         {backendOnline ? (
           <FileDrop files={files} onChange={setFiles} disabled={busy} />
         ) : (

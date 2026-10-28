@@ -8,6 +8,7 @@ import { BILLING_MAX, buildDescription, cleanBilling, deliverableUrl, formatByte
 import { computeReputation, jobKey } from "../src/lib/reputation.ts";
 import { reminderFor } from "../src/lib/reminders.ts";
 import { formatBalance } from "../src/lib/format.ts";
+import { milestoneFeeShare, surchargeOn } from "../src/lib/fees.ts";
 import { ETH_GAS_BUFFER, checkSend, maxSendable, parseAmount } from "../src/lib/send.ts";
 import { cleanEmail, confirmToken, messagesFor, notifyParties, readEmailToken, unsubscribeToken } from "../server/emails.mjs";
 import { sendMail } from "../server/mail.mjs";
@@ -220,11 +221,11 @@ check(to(submission, ME).text.includes("3 days") && to(submission, ME).text.incl
 check(to(messagesFor("Approved", { id: 4n, milestone: 0n }, escrowJob, opts), YOU).subject === "Payment released for job #4" && messagesFor("Approved", { id: 4n, milestone: 0n }, escrowJob, opts).length === 2, "a payment release goes to both");
 const released = messagesFor("Approved", { id: 4n, milestone: 1n }, escrowJob, opts);
 check(released.every((m) => m.text.includes(`Receipt: https://app/#${receiptPath(4, 1)}`)), "a payment release links both people to the receipt, at the address the frontend uses");
-check(messagesFor("Resolved", { id: 4n, milestone: 0n, paidFreelancer: true }, escrowJob, opts).every((m) => m.text.includes("Receipt: https://app/#/receipt/4/1")), "an arbiter's payment links to the receipt too");
+check(messagesFor("Resolved", { id: 4n, milestone: 0n, paidPayee: true }, escrowJob, opts).every((m) => m.text.includes("Receipt: https://app/#/receipt/4/1")), "an arbiter's payment links to the receipt too");
 check(messagesFor("Refunded", { id: 4n, milestone: 0n }, escrowJob, opts).every((m) => !m.text.includes("Receipt")), "a refund has no receipt link");
-const arbitrated = messagesFor("Resolved", { id: 4n, milestone: 0n, paidFreelancer: true }, escrowJob, opts);
+const arbitrated = messagesFor("Resolved", { id: 4n, milestone: 0n, paidPayee: true }, escrowJob, opts);
 check(arbitrated.length === 2 && to(arbitrated, YOU).text.includes("arbiter decided"), "the arbiter paying the payee is announced as a payment");
-check(messagesFor("Resolved", { id: 4n, milestone: 0n, paidFreelancer: false }, escrowJob, opts).length === 0, "an arbiter refund is announced by the Refunded event, not twice");
+check(messagesFor("Resolved", { id: 4n, milestone: 0n, paidPayee: false }, escrowJob, opts).length === 0, "an arbiter refund is announced by the Refunded event, not twice");
 check(messagesFor("Refunded", { id: 4n, milestone: 0n }, escrowJob, opts).length === 2, "a refund goes to both");
 const dispute = messagesFor("Disputed", { id: 4n, milestone: 0n }, escrowJob, opts);
 check(dispute.length === 3 && to(dispute, ARB).subject.includes("needs your decision"), "a dispute also asks the arbiter to decide");
@@ -258,6 +259,20 @@ const mailed = await sendMail({ to: "a@b.co", subject: "s", text: "t" }, { fetch
 check(mailed.sent && calls[0].url === "https://api.resend.com/emails" && calls[0].init.headers.authorization === "Bearer k" && JSON.parse(calls[0].init.body).from === "Me <me@x.io>" && JSON.parse(calls[0].init.body).to[0] === "a@b.co", "with a key the email goes to Resend");
 await sendMail({ to: "a@b.co", subject: "s", text: "t" }, { fetchImpl: fakeFetch, env: { RESEND_API_KEY: "k" } });
 check((await rejects(sendMail({ to: "a@b.co", subject: "s", text: "t" }, { fetchImpl: fakeFetch, env: { RESEND_API_KEY: "k" } })))?.message.includes("422"), "a refusal from the email service is an error");
+}
+
+console.log("\nFees (the same numbers as the contract tests, in 6-decimal units)");
+{
+  const U = (n) => BigInt(Math.round(n * 1e6));
+  // A 12,000 + 8,000 job has a fee of 50, shared 30 and 20.
+  check(milestoneFeeShare(U(50), U(12000), U(20000)) === U(30) && milestoneFeeShare(U(50), U(8000), U(20000)) === U(20), "a job fee is shared between milestones by amount");
+  check(milestoneFeeShare(U(40), U(1000), U(2000)) === U(20), "the minimum fee is shared the same way");
+  // 40 over three equal thirds rounds down, so the payee keeps the dust.
+  check(milestoneFeeShare(40n, 1n, 3n) === 13n && 3n * 13n === 39n, "the share rounds down");
+  check(milestoneFeeShare(U(50), U(1), 0n) === 0n, "a job with no total has no fee share");
+  check(surchargeOn(U(12000), 25) === U(30) && surchargeOn(U(8000), 25) === U(20), "the surcharge is 0.25% of each milestone");
+  check(surchargeOn(U(12000), 0) === 0n, "a job that takes the yield pays no surcharge");
+  check(surchargeOn(399n, 25) === 0n && surchargeOn(400n, 25) === 1n, "the surcharge rounds down");
 }
 
 console.log(failures ? `\n${failures} check(s) failed` : "\nAll checks passed");

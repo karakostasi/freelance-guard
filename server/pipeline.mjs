@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { encodeFunctionData, parseEther, parseUnits } from "viem";
+import { encodeFunctionData, formatUnits, parseEther, parseUnits } from "viem";
 import { db, save } from "./db.mjs";
 import { abi, client, ESCROW_ADDRESS, txInfo } from "./chain.mjs";
 import * as providers from "./providers.mjs";
@@ -28,8 +28,8 @@ async function step(run, stage, id, fn) {
   return payload;
 }
 
-function ledger(run, debit, credit, note) {
-  const entry = { id: randomUUID().slice(0, 8), runId: run.id, debit, credit, amountEur: run.amountEur, note, at: new Date().toISOString() };
+function ledger(run, debit, credit, note, amountEur = run.transferEur ?? run.amountEur) {
+  const entry = { id: randomUUID().slice(0, 8), runId: run.id, debit, credit, amountEur, note, at: new Date().toISOString() };
   db.ledger.push(entry);
   save();
   return entry;
@@ -47,6 +47,35 @@ export function assetOf(run) {
     return { address: t.address, symbol: t.symbol, decimals: t.decimals, units: parseUnits(run.amount, t.decimals) };
   }
   return { address: ZERO, symbol: "ETH", decimals: 18, units: parseEther(run.amount) };
+}
+
+const eurPer = (kind) => (kind === "eth" ? providers.EUR_PER_ETH : 1);
+const toEur = (kind, units, decimals) => Math.round(Number(formatUnits(units, decimals)) * eurPer(kind) * 100) / 100;
+
+/** What the payer sends to the escrow for a run: the job amount plus the surcharge, in base units. */
+export const dueUnits = (run) => assetOf(run).units + parseUnits(run.surcharge ?? "0", assetOf(run).decimals);
+
+const REVERTS = {
+  JobTooSmall: "This amount is below the minimum job size",
+  TokenNotAllowed: "This token is not accepted",
+};
+
+/** What the escrow charges for a job, read from the contract so the rules live in one place. */
+async function quoteFor(kind, plan) {
+  const asset = assetOf({ token: kind, amount: "0" });
+  try {
+    const [total, fee, surcharge] = await client.readContract({
+      address: ESCROW_ADDRESS,
+      abi,
+      functionName: "quote",
+      args: [asset.address, plan.map((m) => unitsFor(kind, m.amount)), false],
+    });
+    return { total, fee, surcharge, decimals: asset.decimals };
+  } catch (e) {
+    const name = e.walk?.((x) => x?.data?.errorName)?.data?.errorName;
+    if (REVERTS[name]) throw badRequest(REVERTS[name]);
+    throw e;
+  }
 }
 
 const ZERO = "0x0000000000000000000000000000000000000000";
@@ -86,9 +115,11 @@ export function milestonePlan({ token, amount, days, milestones }) {
   return plan;
 }
 
-export function createRun({ payer, payee, amount, token, milestones, days, description, route }) {
+export async function createRun({ payer, payee, amount, token, milestones, days, description, route }) {
   const id = randomUUID().slice(0, 8);
   const kind = token === "eurc" ? "eurc" : "eth";
+  const plan = milestonePlan({ token, amount, days, milestones });
+  const quote = await quoteFor(kind, plan);
   const run = {
     id,
     ref: `SQ-${id.toUpperCase()}`,
@@ -97,8 +128,13 @@ export function createRun({ payer, payee, amount, token, milestones, days, descr
     payee,
     token: kind,
     amount: String(amount),
-    amountEur: Math.round(Number(amount) * (kind === "eth" ? providers.EUR_PER_ETH : 1) * 100) / 100,
-    milestones: milestonePlan({ token, amount, days, milestones }),
+    // The job amount is what the payee is owed. The payer also pays the escrow's surcharge, so the bank transfer is
+    // `transferEur`. (The payee's fee comes out of what they receive.)
+    amountEur: toEur(kind, quote.total, quote.decimals),
+    surcharge: formatUnits(quote.surcharge, quote.decimals),
+    fee: formatUnits(quote.fee, quote.decimals),
+    transferEur: toEur(kind, quote.total + quote.surcharge, quote.decimals),
+    milestones: plan,
     description: description ?? "",
     route: route === "eurc" ? "eurc" : "sepa",
     status: "awaiting_bank",
@@ -116,7 +152,8 @@ export const publicRun = ({ events: _events, tx: _tx, approval: _approval, ...ru
 /** The bank says the euros arrived (signature already verified by the caller). */
 export function bankReceived(run, { amountEur }) {
   if (run.status !== "awaiting_bank") throw new Error(`Payment is ${run.status}, not waiting for a bank transfer`);
-  if (Number(amountEur) + 0.005 < run.amountEur) throw new Error(`Received ${amountEur} EUR, expected ${run.amountEur} EUR`);
+  const expected = run.transferEur ?? run.amountEur;
+  if (Number(amountEur) + 0.005 < expected) throw new Error(`Received ${amountEur} EUR, expected ${expected} EUR`);
   run.status = "processing";
   save();
 
@@ -147,13 +184,15 @@ export function bankReceived(run, { amountEur }) {
     const items = run.milestones.map((m) => ({ title: m.title, amount: unitsFor(run.token, m.amount), duration: Math.round(m.days * 86400) }));
     const asset = assetOf(run);
     const isToken = asset.address !== ZERO;
-    const data = encodeFunctionData({ abi, functionName: "createJob", args: [run.payee, asset.address, run.description, items, true] });
-    run.tx = { to: ESCROW_ADDRESS, data, value: isToken ? "0" : asset.units.toString() };
+    const due = dueUnits(run);
+    const options = { verifier: ZERO, useYield: false, fundNow: true };
+    const data = encodeFunctionData({ abi, functionName: "createJob", args: [run.payee, asset.address, run.description, items, options] });
+    run.tx = { to: ESCROW_ADDRESS, data, value: isToken ? "0" : due.toString() };
     // A token job needs the escrow to be allowed to pull the tokens first.
     run.approval = isToken
       ? {
           to: asset.address,
-          data: encodeFunctionData({ abi: [{ type: "function", name: "approve", stateMutability: "nonpayable", inputs: [{ name: "spender", type: "address" }, { name: "amount", type: "uint256" }], outputs: [{ type: "bool" }] }], functionName: "approve", args: [ESCROW_ADDRESS, asset.units] }),
+          data: encodeFunctionData({ abi: [{ type: "function", name: "approve", stateMutability: "nonpayable", inputs: [{ name: "spender", type: "address" }, { name: "amount", type: "uint256" }], outputs: [{ type: "bool" }] }], functionName: "approve", args: [ESCROW_ADDRESS, due] }),
         }
       : null;
     await step(run, "escrow", "userop", async () => ({
@@ -163,6 +202,7 @@ export function bankReceived(run, { amountEur }) {
       callData: data,
       asset: asset.symbol,
       amountUnits: asset.units.toString(),
+      surchargeUnits: (due - asset.units).toString(),
       milestones: items.length,
       milestoneTitles: run.milestones.map((m) => m.title),
     }));
@@ -209,12 +249,11 @@ export async function onChainEvent(log) {
   const info = () => txInfo(log.transactionHash, log.blockNumber);
 
   if (eventName === "JobCreated") {
-    // Event args keep the contract's names: `client` is the payer, `freelancer` the payee.
     const run = byStatus("awaiting_deposit", (r) => {
       const asset = assetOf(r);
       return (
-        r.payer.toLowerCase() === args.client.toLowerCase() &&
-        r.payee.toLowerCase() === args.freelancer.toLowerCase() &&
+        r.payer.toLowerCase() === args.payer.toLowerCase() &&
+        r.payee.toLowerCase() === args.payee.toLowerCase() &&
         asset.address.toLowerCase() === args.token.toLowerCase() &&
         args.milestoneCount === BigInt(r.milestones.length) &&
         asset.units === args.total
@@ -228,7 +267,7 @@ export async function onChainEvent(log) {
       type: "step_done",
       stage: "escrow",
       step: "signature",
-      payload: { source: "chain", signer: args.client, txHash: log.transactionHash, gasMode: run.gasMode ?? "wallet", note: run.gasMode === "sponsored" ? "Gas sponsored by a paymaster." : "Gas paid by the signing wallet." },
+      payload: { source: "chain", signer: args.payer, txHash: log.transactionHash, gasMode: run.gasMode ?? "wallet", note: run.gasMode === "sponsored" ? "Gas sponsored by a paymaster." : "Gas paid by the signing wallet." },
     });
     await step(run, "escrow", "deposit", async () => ({
       ...tx,
@@ -236,6 +275,8 @@ export async function onChainEvent(log) {
       jobId: run.jobId,
       asset: assetOf(run).symbol,
       amountUnits: args.total.toString(),
+      feeUnits: args.fee.toString(),
+      surchargeBps: Number(args.surchargeBps),
     }));
 
     await step(run, "activated", "funded", async () => {
@@ -257,6 +298,15 @@ export async function onChainEvent(log) {
   // Payment runs only ever cover the first (and only) milestone of the job they created.
   if (args.milestone !== undefined && args.milestone !== 0n) return;
 
+  // The escrow says what the payee really gets (the amount less the fee) just before it says the milestone was approved.
+  if (eventName === "MilestonePaid") {
+    const asset = assetOf(run);
+    run.payoutEur = toEur(run.token, args.gross - args.fee, asset.decimals);
+    run.feeEur = toEur(run.token, args.fee, asset.decimals);
+    save();
+    return;
+  }
+
   if (eventName === "WorkSubmitted" && run.status === "funded") {
     run.status = "work";
     const tx = await info();
@@ -266,7 +316,7 @@ export async function onChainEvent(log) {
     return;
   }
 
-  const paid = eventName === "Approved" || (eventName === "Resolved" && args.paidFreelancer);
+  const paid = eventName === "Approved" || (eventName === "Resolved" && args.paidPayee);
   if (paid && run.status !== "released" && run.status !== "paid_out") {
     run.status = "released";
     const tx = await info();
@@ -276,14 +326,16 @@ export async function onChainEvent(log) {
     await step(run, "release", "release", async () => ({ ...tx, function: eventName === "Resolved" ? "resolve" : "approve / claimAfterTimeout", jobId: run.jobId }));
 
     // Payout routing runs by itself once the escrow has released the funds.
+    // The payee is paid what is left after the platform fee.
+    const payoutEur = run.payoutEur ?? run.amountEur;
     await step(run, "routing", "route", async () => ({ source: "sandbox", route: run.route, fee: run.route === "eurc" ? "0.00" : "0.15" }));
     await step(run, "routing", "convert", async () => {
-      ledger(run, "escrow_locked", "payout_pending", `Payout via ${run.route}`);
-      return { source: "sandbox", amountEur: run.amountEur, from: "escrow_locked", to: "payout_pending" };
+      ledger(run, "escrow_locked", "payout_pending", `Payout via ${run.route}`, payoutEur);
+      return { source: "sandbox", amountEur: payoutEur, from: "escrow_locked", to: "payout_pending" };
     });
-    await step(run, "settlement", "settle", () => providers.offramp.send({ route: run.route, amountEur: run.amountEur }));
+    await step(run, "settlement", "settle", () => providers.offramp.send({ route: run.route, amountEur: payoutEur }));
     await step(run, "settlement", "receipt", async () => {
-      ledger(run, "payout_pending", "paid_out", "Payout settled");
+      ledger(run, "payout_pending", "paid_out", "Payout settled", payoutEur);
       return { source: "backend", invoice: `INV-${run.jobId}`, status: "PAID_OUT" };
     });
     run.status = "paid_out";

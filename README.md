@@ -12,7 +12,15 @@ Milestone escrow for business payments on Ethereum. A payer's payment is locked 
 
 ## Terminology
 
-The app calls the two sides the **payer** (funds the escrow) and the **payee** (delivers and gets paid). The contract predates that and still uses `client` and `freelancer` in its storage, events and function arguments. The frontend translates once, in `jobFromChain` (`src/lib/jobs.ts`), and the backend reads the event arguments by their contract names.
+The two sides are the **payer** (funds the escrow) and the **payee** (delivers and gets paid). The contract uses the same names. A job can also name a **verifier**, an address that may approve delivered milestones for the payer.
+
+## Pricing
+
+The rules are in `docs/business-model.md` and the contract design in `docs/contract-v2-design.md`.
+
+- The **payee** pays a fee out of each released milestone: the larger of a per-token minimum and 0.25% of the job, shared between the milestones by amount. There is no fee on a refund.
+- The **payer** pays a 0.25% surcharge on top of each milestone when funding it, which is not refunded. A job that takes the **yield** (USDC only, test network only) pays no surcharge. While it is in escrow its money sits in an ERC-4626 vault, the platform keeps what the vault earns, and the amount is returned in full.
+- The terms are fixed when the job is created, so later changes by the owner never touch an existing job. Only tokens the owner enabled can be used (`configureToken`). `quote(token, amounts, useYield)` prices a job with the same rules as `createJob`, and the frontend and backend call it.
 
 ## Layout
 
@@ -38,21 +46,22 @@ Connect MetaMask to `http://127.0.0.1:8545` (chain id 31337).
 
 A job has 1 to 20 milestones, each with a title, an amount and the number of days the payee has to deliver. Every milestone is funded, delivered, approved and paid (or refunded) on its own, so a dispute on one milestone doesn't block the others.
 
-- `createJob(freelancer, token, description, milestones, fundNow)` creates the job. With `fundNow` every milestone is funded in the same transaction (send the total as ETH, or approve the total for a token). Without it, the payer funds milestones one at a time with `fundMilestone(id, index)`.
+- `createJob(payee, token, description, milestones, { verifier, useYield, fundNow })` creates the job. With `fundNow` every milestone is funded in the same transaction (send the total plus the surcharge as ETH, or approve it for a token). Without it, the payer funds milestones one at a time with `fundMilestone(id, index)`, sending the milestone plus its surcharge.
 - The payee's deadline for a milestone starts when that milestone is funded, not when the job is created.
 - `token` is `address(0)` for ETH, or an ERC-20 address. A job uses one token. The payer approves the escrow first, and payouts and refunds are in the same token. Fee-on-transfer tokens are rejected.
-- All actions take the job id and the milestone index: `submitWork`, `approve`, `claimAfterTimeout`, `dispute`, `resolve`, `refundExpired`.
+- All actions take the job id and the milestone index: `submitWork`, `approve` (the payer or the verifier), `claimAfterTimeout`, `dispute`, `resolve`, `refundExpired`. The payer can change or remove the verifier at any time with `setVerifier(id, address)`. Once a verifier approves a milestone the payer can no longer dispute it.
 
 One form creates a job, on the Jobs page and in the "Fund a job" drawer of the Payment flow page. It has a split builder (1 payment, 50 / 50, 30 / 40 / 30, or custom shares) and a choice of how to pay:
 - **From my wallet:** an on-chain transaction, with ETH, EURC or USDC, funding everything now or milestone by milestone.
 - **Bank transfer in euros:** the backend runs the live payment flow (sandbox bank steps, then a real deposit signed in the wallet). It pays everything at once, with ETH or EURC, and the live steps follow the first milestone. Other milestones show the real on-chain data.
 
-On Base Sepolia the app uses Circle's test EURC and USDC. Get free test tokens at faucet.circle.com. Verify the addresses against Circle's docs, or override them with `VITE_EURC_ADDRESS`, `VITE_USDC_ADDRESS` and `EURC_ADDRESS`. On a local chain, `npm run deploy:local` also deploys a mock EURC and prints its address.
+On Base Sepolia the app uses Circle's test EURC and USDC. Get free test tokens at faucet.circle.com. Verify the addresses against Circle's docs, or override them with `VITE_EURC_ADDRESS`, `VITE_USDC_ADDRESS` and `EURC_ADDRESS`. On a local chain, `npm run deploy:local` also deploys a mock EURC, a mock USDC and a mock vault for it, and prints their addresses. Circle's test USDC can't be minted, so to try the yield on a test network deploy with `MOCK_USDC=1` (a mock USDC and its vault) or set `USDC_VAULT_ADDRESS` to a vault of your own. The vault's `accrueYield(amount)` and `setRatePerYear(bps)` make it earn.
 
-**Upgrading an existing deployment:** the contract changed (milestones, a new `createJob` signature and new events), so it needs a new deployment. Order matters:
+**Upgrading an existing deployment:** the contract changed (fees, a token whitelist, a new `createJob` signature and new events), so it needs a new deployment. Order matters:
 1. `npm run deploy:base-sepolia`, then note the new address and deploy block.
-2. Set the new address in Vercel (`VITE_ESCROW_ADDRESS`, `VITE_ESCROW_DEPLOY_BLOCK`), Render (`ESCROW_ADDRESS`) and your local `.env`.
-3. Merge and redeploy. Jobs on the old contract no longer show, and the backend ignores their payment runs.
+2. The deployer is the owner and sets up ETH, USDC and EURC (the smallest fee and job come from `MIN_FEE_EUR` and `MIN_JOB_EUR`, the launch values are 40 and 2000). Set `ARBITER_ADDRESS`, `TREASURY_ADDRESS` and `OWNER_ADDRESS` to addresses you control before a real deployment.
+3. Set the new address in Vercel (`VITE_ESCROW_ADDRESS`, `VITE_ESCROW_DEPLOY_BLOCK`), Render (`ESCROW_ADDRESS`) and your local `.env`.
+4. Merge and redeploy. Jobs on the old contract no longer show, and the backend ignores their payment runs.
 
 ## Payment flow backend (optional)
 
@@ -116,7 +125,7 @@ On the Jobs and Payment flow pages a wallet card is always visible on the right:
 
 - `npm test` runs the contract tests (Hardhat).
 - `npm run test:unit` checks the document format, balance formatting, send rules, sign-in sessions and file stores (no chain or network needed).
-- `npm run test:flow` is an end-to-end check of the payment flow. It starts its own throwaway chain and backend on ports 8645 and 8799 (override with `TEST_CHAIN_PORT` and `TEST_API_PORT`), so it never touches your dev servers. It drives real ETH and EURC payments, including a 3-milestone split, plus the upload, sign-in, download and quota rules, through the API and the contract, and takes about half a minute.
+- `npm run test:flow` is an end-to-end check of the payment flow. It starts its own throwaway chain and backend on ports 8645 and 8799 (override with `TEST_CHAIN_PORT` and `TEST_API_PORT`), so it never touches your dev servers. It drives real ETH and EURC payments, including a 3-milestone split and the surcharge and fee, a wallet job that takes the yield with a verifier, plus the upload, sign-in, download and quota rules, through the API and the contract, and takes about half a minute.
 - `npm run lint` and `npm run build` check the frontend.
 
 GitHub Actions runs all of them on every pull request and on pushes to `main` (`.github/workflows/ci.yml`), and also checks that the committed ABI in `abi/` matches the contract. If that check fails, run `npm run compile` and commit the result.
@@ -125,6 +134,7 @@ CI installs with `npm ci`, so it uses exactly the versions in `package-lock.json
 
 ## Known limitations
 
-- Jobs can be paid in ETH or ERC-20 tokens (EURC and USDC are listed). Fee-on-transfer tokens are rejected, and each job is in a single token.
+- Jobs can be paid in ETH or ERC-20 tokens the owner enabled (EURC and USDC are listed). Fee-on-transfer tokens are rejected, and each job is in a single token.
+- The yield works with a mock vault only, on test networks. There is no adapter for a real lending market, and who covers a loss in a vault is not decided (`docs/contract-v2-design.md`).
 - Dispute resolution is a single arbiter address, all-or-nothing (no split).
 - No marketplace listings/profiles yet, jobs are created directly with the payee's address.

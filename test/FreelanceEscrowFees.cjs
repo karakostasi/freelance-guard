@@ -42,8 +42,10 @@ describe("FreelanceEscrow fees", () => {
       });
     }
 
-    it("does not quote a token that is not enabled", async () => {
+    it("does not quote a token that is not enabled, or a job below the minimum", async () => {
       await expect(escrow.quote(other.address, [1n], false)).to.be.revertedWithCustomError(escrow, "TokenNotAllowed");
+      await expect(escrow.quote(usdcAddr, [U(1999)], false)).to.be.revertedWithCustomError(escrow, "JobTooSmall");
+      await expect(escrow.quote(usdcAddr, [U(1000), U(1000)], false)).not.to.be.reverted;
     });
   });
 
@@ -319,7 +321,8 @@ describe("FreelanceEscrow fees", () => {
           const items = Array.from({ length: 1 + rnd(3) }, (_, i) => item(`m${i}`, eth ? E(0.1 + rnd(5) / 10) : U(500 + rnd(9000)), 4 + rnd(8)));
           const token = eth ? ethers.ZeroAddress : usdcAddr;
           const fundNow = rnd(2) === 0;
-          const q = await escrow.quote(token, items.map((i) => i.amount), false);
+          // A job below the minimum has no quote, and createJob refuses it too: try it with a made-up one.
+          const q = await escrow.quote(token, items.map((i) => i.amount), false).catch(() => ({ total: 0n, surcharge: 0n }));
           const who = rnd(2) === 0 ? verifier.address : ethers.ZeroAddress;
           await attempt("createJob", escrow.connect(payer).createJob(payee.address, token, "x", items, opts({ verifier: who, fundNow }), { value: eth && fundNow ? q.total + q.surcharge : 0n }));
         } else if (op === 1) {

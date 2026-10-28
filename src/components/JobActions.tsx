@@ -9,7 +9,7 @@ import { useBackendStatus } from "../hooks/useBackend";
 import { ensureAllowance } from "../lib/erc20";
 import { uploadDoc, uploadFile } from "../lib/files";
 import { FileDrop } from "./FileDrop";
-import { STATUS, formatDuration, milestoneName, type Job } from "../lib/jobs";
+import { STATUS, formatDuration, hasVerifier, milestoneName, milestoneSurcharge, type Job } from "../lib/jobs";
 import { tokenOf } from "../lib/tokens";
 import styles from "../App.module.css";
 
@@ -31,6 +31,7 @@ export function JobActions({ id, index, job }: { id: string; index: number; job:
   const me = address?.toLowerCase();
   const isPayer = me === job.payer.toLowerCase();
   const isPayee = me === job.payee.toLowerCase();
+  const isVerifier = !!me && hasVerifier(job) && me === job.verifier.toLowerCase();
   const isArbiter = !!me && arbiter?.toLowerCase() === me;
   const status = STATUS[ms.status];
   // For multi-milestone jobs the buttons name the step, e.g. "Submit draft".
@@ -69,9 +70,11 @@ export function JobActions({ id, index, job }: { id: string; index: number; job:
 
   const fund = () => {
     const token = tokenOf(job);
-    if (!token.address) return send("fundMilestone", [n, m], ms.amount);
+    // The payer pays the milestone plus its surcharge (none for a job that takes the yield).
+    const due = ms.amount + milestoneSurcharge(job, ms);
+    if (!token.address) return send("fundMilestone", [n, m], due);
     // Tokens need the escrow to be allowed to pull them first.
-    return send("fundMilestone", [n, m], undefined, () => ensureAllowance(token.address!, address!, ms.amount, () => setWorking("Approve the token in your wallet…")));
+    return send("fundMilestone", [n, m], undefined, () => ensureAllowance(token.address!, address!, due, () => setWorking("Approve the token in your wallet…")));
   };
 
   // Each action is disabled (with a hint) when the contract would revert.
@@ -105,10 +108,11 @@ export function JobActions({ id, index, job }: { id: string; index: number; job:
           {(reviewEnd === undefined || now < reviewEnd) && <p className={styles.muted}>If the payer doesn&apos;t respond, you can claim the payment once the review period ends.</p>}
         </>
       )}
-      {isPayer && status === "Submitted" && (
+      {(isPayer || isVerifier) && status === "Submitted" && (
         <>
           {action(name ? `Approve ${name} & pay` : "Approve & pay", () => send("approve", [n, m]))}
-          {action("Dispute", () => send("dispute", [n, m]), reviewEnd !== undefined && now >= reviewEnd ? "Review period ended" : "")}
+          {isPayer && action("Dispute", () => send("dispute", [n, m]), reviewEnd !== undefined && now >= reviewEnd ? "Review period ended" : "")}
+          {isPayer && hasVerifier(job) && <p className={styles.muted}>This job has a verifier. If it approves first, you can no longer dispute.</p>}
         </>
       )}
       {isPayer && status === "Funded" && action(name ? `Refund ${name}` : "Refund", () => send("refundExpired", [n, m]), now <= deadline ? `Available in ${formatDuration(deadline - now + 1n)}` : "")}

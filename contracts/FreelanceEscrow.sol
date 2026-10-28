@@ -195,7 +195,8 @@ contract FreelanceEscrow {
         return (jobs[id], _milestones[id]);
     }
 
-    /// @notice What a job with these milestone amounts would cost, using the same rules as createJob.
+    /// @notice What a job with these milestone amounts would cost, using the same rules as createJob (it reverts for a
+    ///         token that is not enabled, a job below the minimum, or yield on a token without a vault).
     ///         `fee` is paid by the payee out of the payments, `surcharge` by the payer on top of the
     ///         amounts when funding every milestone. With `useYield` there is no surcharge.
     function quote(address token, uint256[] calldata amounts, bool useYield) external view returns (uint256 total, uint256 fee, uint256 surcharge) {
@@ -206,6 +207,7 @@ contract FreelanceEscrow {
             total += amounts[i];
             if (!useYield) surcharge += (amounts[i] * cfg.surchargeBps) / BPS;
         }
+        if (total < cfg.minJob) revert JobTooSmall();
         fee = _jobFee(cfg.minFee, total);
     }
 

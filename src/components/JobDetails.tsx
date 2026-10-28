@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
 import { Check, Copy, ExternalLink, X } from "lucide-react";
 import { useAccount, useReadContract } from "wagmi";
-import { escrowAbi, escrowAddress } from "../wagmi";
+import { writeContract } from "wagmi/actions";
+import { zeroAddress } from "viem";
+import { config, escrowAbi, escrowAddress } from "../wagmi";
+import { useRefreshOnConfirm } from "../hooks/useRefreshOnConfirm";
 import { formatAmount } from "../lib/tokens";
 import { avatarGradient } from "../lib/avatar";
-import { STATUS_CLASS, STATUS_LABEL, addressUrl, jobFromChain, jobTotal, roleOf, short, type Job, type RawJob } from "../lib/jobs";
+import { STATUS_CLASS, STATUS_LABEL, addressUrl, hasVerifier, isDone, jobFromChain, jobTotal, roleOf, short, type Job, type RawJob } from "../lib/jobs";
 import { navigate } from "../hooks/useHashRoute";
 import { SpecView } from "./DocView";
 import { ReputationBadge } from "./ReputationBadge";
@@ -44,6 +47,32 @@ function Party({ label, address, you, tone, role }: { label: string; address: st
       </div>
       <ReputationBadge address={address} role={role} />
     </div>
+  );
+}
+
+/** The job's verifier, when it has one. The payer can take it away, which works at any time. */
+function VerifierLine({ id, job, isPayer }: { id: string; job: Job; isPayer: boolean }) {
+  const [txHash, setTxHash] = useState<`0x${string}` | undefined>();
+  const [error, setError] = useState<string | null>(null);
+  const confirming = useRefreshOnConfirm(txHash);
+  const remove = async () => {
+    setError(null);
+    try {
+      setTxHash(await writeContract(config, { address: escrowAddress, abi: escrowAbi, functionName: "setVerifier", args: [BigInt(id), zeroAddress] }));
+    } catch (e) {
+      setError((e as Error).message.split("\n")[0]);
+    }
+  };
+  return (
+    <p className={styles.muted}>
+      Verifier <a href={addressUrl(job.verifier)} target="_blank" rel="noreferrer noopener" title={job.verifier}>{short(job.verifier)}</a> can approve delivered work for the payer.{" "}
+      {isPayer && !job.milestones.every(isDone) && (
+        <button className={styles.chipButton} onClick={remove} disabled={confirming}>
+          {confirming ? "Removing…" : "Remove verifier"}
+        </button>
+      )}
+      {error && <span className={styles.error}> {error}</span>}
+    </p>
   );
 }
 
@@ -121,8 +150,11 @@ export function JobDetails({ id, onClose }: { id: string; onClose: () => void })
                 <span className={styles.muted}>
                   {job.milestones.filter((m) => m.status === 4).length} of {job.milestones.length} milestone{job.milestones.length > 1 ? "s" : ""} paid
                 </span>
+                <span className={styles.muted}>Platform fee {formatAmount(job, job.fee)}, paid by the payee out of the payments{job.yield ? "" : job.surchargeBps > 0 ? `, and a ${job.surchargeBps / 100}% surcharge paid by the payer` : ""}.</span>
               </div>
             </div>
+
+            {hasVerifier(job) && <VerifierLine id={id} job={job} isPayer={!!isPayer} />}
 
             {hasSpec && (
               <>

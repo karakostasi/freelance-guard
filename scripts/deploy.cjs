@@ -11,8 +11,8 @@ const CIRCLE = { USDC: "0x036CbD53842c5426634e7929541eC2318f3dCF7e", EURC: "0x80
 const SURCHARGE_BPS = 25;
 // Smallest fee and smallest job, in euros. The defaults are small so a demo works with test funds. The launch values
 // are 40 and 2000: set MIN_FEE_EUR=40 and MIN_JOB_EUR=2000.
-const MIN_FEE_EUR = Number(process.env.MIN_FEE_EUR ?? 1);
-const MIN_JOB_EUR = Number(process.env.MIN_JOB_EUR ?? 20);
+const MIN_FEE_EUR = Number(process.env.MIN_FEE_EUR || 1);
+const MIN_JOB_EUR = Number(process.env.MIN_JOB_EUR || 20);
 
 const units = (eur, symbol) => ethers.parseUnits((eur / EUR_PER[symbol]).toFixed(6), DECIMALS[symbol]);
 

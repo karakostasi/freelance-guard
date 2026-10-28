@@ -6,12 +6,11 @@ const { DAY, item, opts, rules, rng, deploy } = require("./helpers.cjs");
 const U = (n) => ethers.parseUnits(String(n), 6); // USDC has 6 decimals
 const MAX = ethers.MaxUint256;
 const DUST = 1000n; // VAULT_DUST in the contract
-const PAID = 4n;
 const REFUNDED = 5n;
 
 // Jobs that take the yield put their money in the token's vault while it is in escrow. Jobs that decline never touch it.
 describe("FreelanceEscrow vault", () => {
-  let escrow, owner, payer, payee, arbiter, other, treasury, stranger;
+  let escrow, payer, payee, arbiter, other, treasury, stranger;
   let usdc, vault, usdcAddr, vaultAddr, escrowAddr;
 
   // The launch rules for USDC, now with a vault: payee fee max(40, 0.25%), payer surcharge 0.25% if declining the yield.
@@ -19,7 +18,7 @@ describe("FreelanceEscrow vault", () => {
   const newVault = async () => ethers.deployContract("MockVault", [usdcAddr]);
 
   beforeEach(async () => {
-    ({ escrow, owner, payer, payee, arbiter, other, treasury } = await deploy({ free: false }));
+    ({ escrow, payer, payee, arbiter, other, treasury } = await deploy({ free: false }));
     [, , , , , , stranger] = await ethers.getSigners();
     escrowAddr = await escrow.getAddress();
     usdc = await ethers.deployContract("MockERC20", ["Mock USDC", "USDC", 6]);

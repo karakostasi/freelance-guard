@@ -72,7 +72,9 @@ async function main() {
     const deployed = execFileSync("npx", ["hardhat", "run", "scripts/deploy.cjs", "--network", "localhost"], { env: { ...process.env, LOCAL_RPC_URL: RPC } }).toString();
     const escrow = deployed.match(/FreelanceEscrow deployed to (0x[0-9a-fA-F]{40})/)?.[1];
     const eurc = deployed.match(/Mock EURC deployed to (0x[0-9a-fA-F]{40})/)?.[1];
-    if (!escrow || !eurc) throw new Error(`Could not read the deployed addresses from:\n${deployed}`);
+    const usdc = deployed.match(/Mock USDC deployed to (0x[0-9a-fA-F]{40})/)?.[1];
+    const vault = deployed.match(/Mock USDC vault deployed to (0x[0-9a-fA-F]{40})/)?.[1];
+    if (!escrow || !eurc || !usdc || !vault) throw new Error(`Could not read the deployed addresses from:\n${deployed}`);
 
     launch("backend", "node", ["server/index.mjs"], {
       PORT: API_PORT,
@@ -88,7 +90,7 @@ async function main() {
     });
     await until(async () => (await fetch(`${API}/api/health`)).ok, "the backend");
 
-    await run({ escrow, eurc });
+    await run({ escrow, eurc, usdc, vault });
   } catch (e) {
     failures++;
     console.error("\nTest run aborted:", e.message);
@@ -101,10 +103,11 @@ async function main() {
   process.exit(failures ? 1 : 0);
 }
 
-async function run({ escrow, eurc }) {
+async function run({ escrow, eurc, usdc, vault }) {
   const erc20 = [
     { type: "function", name: "mint", stateMutability: "nonpayable", inputs: [{ type: "address" }, { type: "uint256" }], outputs: [] },
     { type: "function", name: "balanceOf", stateMutability: "view", inputs: [{ type: "address" }], outputs: [{ type: "uint256" }] },
+    { type: "function", name: "approve", stateMutability: "nonpayable", inputs: [{ type: "address" }, { type: "uint256" }], outputs: [{ type: "bool" }] },
   ];
   // Hardhat's well-known test accounts: #0 is the payer, #1 the payee.
   const payer = privateKeyToAccount("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80");
@@ -113,6 +116,8 @@ async function run({ escrow, eurc }) {
   const pub = createPublicClient(chain);
   const asPayer = createWalletClient({ account: payer, ...chain });
   const asPayee = createWalletClient({ account: payee, ...chain });
+  const verifier = privateKeyToAccount("0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a"); // #2
+  const asVerifier = createWalletClient({ account: verifier, ...chain });
   const mined = (hash) => pub.waitForTransactionReceipt({ hash });
 
   const post = async (path, body) => {
@@ -159,6 +164,8 @@ async function run({ escrow, eurc }) {
   check((await bad({ milestones: [{ title: "a", amount: "1000", days: 0 }] })).status === 400, "a milestone with zero days is rejected");
   check((await bad({ milestones: [{ title: "a", amount: "abc", days: 3 }] })).status === 400, "a garbage amount is rejected");
   check((await post("/api/payments", { ...base, amount: "1", token: "dai", milestones: [{ title: "a", amount: "1", days: 1 }] })).status === 400, "an unknown token is rejected");
+  const small = await bad({ amount: "10", milestones: [{ title: "a", amount: "10", days: 3 }] });
+  check(small.status === 400 && /minimum/.test(small.body.error), "a job below the escrow's minimum is rejected, with the reason");
 
   console.log("\nFile uploads");
   {
@@ -212,10 +219,12 @@ async function run({ escrow, eurc }) {
   console.log("\nETH payment, one milestone");
   {
     const { body } = await post("/api/payments", { ...base, amount: "0.01", token: "eth", route: "sepa", milestones: [{ title: "Whole job", amount: "0.01", days: 7 }] });
+    // The payer also pays a 0.25% surcharge: 0.01 ETH is 25 EUR, so the bank transfer is 25.06.
+    check(body.run.amountEur === 25 && body.bank.amountEur === 25.06 && body.run.surcharge === "0.000025", "the bank transfer covers the job and the escrow's surcharge");
     const stream = follow(body.run.id);
     await post("/api/sandbox/bank-transfer", { reference: body.run.ref });
     const action = await until(() => stream.events.find((e) => e.type === "action_required"), "the call to sign");
-    check(!action.approval && action.tx.value === parseEther("0.01").toString(), "an ETH job needs no approval and carries the value");
+    check(!action.approval && action.tx.value === parseEther("0.010025").toString(), "an ETH job needs no approval and carries the amount plus the surcharge");
     await mined(await asPayer.sendTransaction({ to: action.tx.to, data: action.tx.data, value: BigInt(action.tx.value) }));
     await until(() => stepDone(stream.events, "activated", "dashboard"), "the job to be funded");
     await mined(await asPayee.writeContract({ address: escrow, abi, functionName: "submitWork", args: [1n, 0n, "https://example.com/work"] }));
@@ -223,6 +232,8 @@ async function run({ escrow, eurc }) {
     await until(() => stream.events.find((e) => e.type === "done"), "the payout to finish");
     const finalRun = await (await fetch(`${API}/api/payments/${body.run.id}`)).json();
     check(finalRun.status === "paid_out", "the payment ends as paid out");
+    // The fee is 0.0004 ETH (1 EUR, more than 0.25% of this small job), so the payee gets 24 of the 25 EUR.
+    check(finalRun.payoutEur === 24 && finalRun.feeEur === 1, "the payout is the job amount less the platform fee");
     check(stream.events.filter((e) => e.type === "step_done").length === 20, "all 20 steps ran");
     check(stream.events.every((e, i) => e.seq === i), "the event stream has no gaps or repeats");
     await stream.stop();
@@ -243,6 +254,7 @@ async function run({ escrow, eurc }) {
       ],
     });
     check(body.run?.milestones?.length === 3 && body.run.amountEur === 1000, "a 3-milestone EURC payment is accepted (EUR 1000, 1:1)");
+    check(body.bank.amountEur === 1002.5 && body.run.surcharge === "2.5" && body.run.fee === "2.5", "the bank transfer is 1002.50: the job plus a 0.25% surcharge, and the payee's fee is 2.50");
     const stream = follow(body.run.id);
     await post("/api/sandbox/bank-transfer", { reference: body.run.ref });
     const action = await until(() => stream.events.find((e) => e.type === "action_required"), "the calls to sign");
@@ -254,7 +266,7 @@ async function run({ escrow, eurc }) {
     const [, milestones] = await pub.readContract({ address: escrow, abi, functionName: "getJob", args: [2n] });
     check(milestones.length === 3 && milestones.every((m) => m.status === 1), "all three milestones are funded on-chain");
     check(milestones.map((m) => m.title).join() === "Upfront,Draft,Delivery" && milestones[1].amount === parseUnits("400", 6), "titles and amounts match the plan");
-    check((await pub.readContract({ address: eurc, abi: erc20, functionName: "balanceOf", args: [escrow] })) === parseUnits("1000", 6), "the escrow holds the full 1000 EURC");
+    check((await pub.readContract({ address: eurc, abi: erc20, functionName: "balanceOf", args: [escrow] })) === parseUnits("1002.5", 6), "the escrow holds the 1000 EURC and the 2.5 surcharge");
     const linked = await (await fetch(`${API}/api/jobs/2/run`)).json();
     check(linked.status === "funded" && linked.token === "eurc", "the payment is linked to its job");
 
@@ -269,9 +281,49 @@ async function run({ escrow, eurc }) {
     await mined(await asPayer.writeContract({ address: escrow, abi, functionName: "approve", args: [2n, 0n] }));
     await until(() => stream.events.find((e) => e.type === "done"), "the first milestone's payout");
     const received = await pub.readContract({ address: eurc, abi: erc20, functionName: "balanceOf", args: [payee.address] });
-    check(received === parseUnits("700", 6), "the payee holds 700 EURC from the two paid milestones");
+    check(received === parseUnits("698.25", 6), "the payee holds 700 EURC less their share of the fee (1.00 and 0.75) from the two paid milestones");
+    const done = await (await fetch(`${API}/api/payments/${body.run.id}`)).json();
+    check(done.payoutEur === 299.25, "the payout of the first milestone is 300 less its 0.75 fee");
     check(stepDone(stream.events, "settlement", "settle")?.payload.rail === "base", "the payout was routed as EURC");
     await stream.stop();
+  }
+
+  // What the frontend does when the payer pays from a wallet: price the job, take the yield, name a verifier.
+  console.log("\nWallet job with yield and a verifier (USDC)");
+  {
+    const usdcBalance = (who) => pub.readContract({ address: usdc, abi: erc20, functionName: "balanceOf", args: [who] });
+    const zero = "0x0000000000000000000000000000000000000000";
+    await mined(await asPayer.writeContract({ address: usdc, abi: erc20, functionName: "mint", args: [payer.address, parseUnits("5000", 6)] }));
+    await mined(await asPayer.writeContract({ address: usdc, abi: erc20, functionName: "approve", args: [escrow, parseUnits("5000", 6)] }));
+
+    const config = await pub.readContract({ address: escrow, abi, functionName: "tokenConfig", args: [usdc] });
+    check(config[0] === true && config[4].toLowerCase() === vault.toLowerCase(), "USDC is enabled and has a vault");
+    const amounts = [parseUnits("600", 6), parseUnits("400", 6)];
+    const [, fee, surcharge] = await pub.readContract({ address: escrow, abi, functionName: "quote", args: [usdc, amounts, false] });
+    const [, , yieldSurcharge] = await pub.readContract({ address: escrow, abi, functionName: "quote", args: [usdc, amounts, true] });
+    check(fee === parseUnits("2.5", 6) && surcharge === parseUnits("2.5", 6) && yieldSurcharge === 0n, "the quote is a 2.50 fee, and a 2.50 surcharge unless the job takes the yield");
+
+    const items = amounts.map((amount, i) => ({ title: `m${i + 1}`, amount, duration: 86400 * 7 }));
+    const before = { payer: await usdcBalance(payer.address), vault: await usdcBalance(vault) };
+    await mined(await asPayer.writeContract({ address: escrow, abi, functionName: "createJob", args: [payee.address, usdc, "yield test", items, { verifier: verifier.address, useYield: true, fundNow: true }] }));
+    check(before.payer - (await usdcBalance(payer.address)) === parseUnits("1000", 6), "a job that takes the yield costs exactly its amount");
+    check((await usdcBalance(vault)) - before.vault === parseUnits("1000", 6), "the money is in the vault");
+    const id = await pub.readContract({ address: escrow, abi, functionName: "jobCount" });
+    const [head, milestones] = await pub.readContract({ address: escrow, abi, functionName: "getJob", args: [id] });
+    check(head.yield && head.surchargeBps === 0 && head.fee === fee && head.total === parseUnits("1000", 6) && head.verifier.toLowerCase() === verifier.address.toLowerCase(), "the job records its yield, fee and verifier");
+    check(milestones.every((m) => m.status === 1 && m.epoch === 1), "its milestones are funded and in the vault");
+
+    await mined(await asPayee.writeContract({ address: escrow, abi, functionName: "submitWork", args: [id, 0n, "ipfs://done"] }));
+    const rejected = await asPayee.writeContract({ address: escrow, abi, functionName: "approve", args: [id, 0n] }).then(() => false, () => true);
+    check(rejected, "the payee can't approve their own work");
+    await mined(await asVerifier.writeContract({ address: escrow, abi, functionName: "approve", args: [id, 0n] }));
+    check((await usdcBalance(payee.address)) === parseUnits("600", 6) - (parseUnits("2.5", 6) * 600n) / 1000n, "the verifier's approval pays the payee, less the fee share");
+    check((await usdcBalance(vault)) - before.vault === parseUnits("400", 6), "the paid milestone left the vault");
+
+    await mined(await asPayee.writeContract({ address: escrow, abi, functionName: "submitWork", args: [id, 1n, "ipfs://done 2"] }));
+    await mined(await asPayer.writeContract({ address: escrow, abi, functionName: "setVerifier", args: [id, zero] }));
+    const gone = await asVerifier.writeContract({ address: escrow, abi, functionName: "approve", args: [id, 1n] }).then(() => false, () => true);
+    check(gone, "after the payer removes the verifier, it can no longer approve");
   }
 }
 

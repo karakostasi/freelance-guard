@@ -51,9 +51,12 @@ A job has 1 to 20 milestones, each with a title, an amount and the number of day
 - `token` is `address(0)` for ETH, or an ERC-20 address. A job uses one token. The payer approves the escrow first, and payouts and refunds are in the same token. Fee-on-transfer tokens are rejected.
 - All actions take the job id and the milestone index: `submitWork`, `approve` (the payer or the verifier), `claimAfterTimeout`, `dispute`, `resolve`, `refundExpired`. The payer can change or remove the verifier at any time with `setVerifier(id, address)`. Once a verifier approves a milestone the payer can no longer dispute it.
 
-One form creates a job, on the Jobs page and in the "Fund a job" drawer of the Payment flow page. It has a split builder (1 payment, 50 / 50, 30 / 40 / 30, or custom shares) and a choice of how to pay:
+"Create a job" is a page of its own, in three steps: who you pay, for what and how much; the payment stages (1 payment, 50 / 50, 30 / 40 / 30, or custom shares); and a review that shows the one number you pay. A button that is off always says why under it. The options most people leave alone sit under "More options" on the second step:
 - **From my wallet:** an on-chain transaction, with ETH, EURC or USDC, funding everything now or milestone by milestone.
 - **Bank transfer in euros:** the backend runs the live payment flow (sandbox bank steps, then a real deposit signed in the wallet). It pays everything at once, with ETH or EURC, and the live steps follow the first milestone. Other milestones show the real on-chain data.
+- The verifier, the description and files, and the business details are there too.
+
+On the Jobs page a job opens with what it is worth to you (the payer sees what they pay, the payee what they earn after the fee), the one thing to do next with its main button, and its stages. Reporting a problem, the transactions and the details are one click away. The Payment flow page shows the same next step on top, and below it the journey as a row of boxes, with a Simple and a Detailed view.
 
 On Base Sepolia the app uses Circle's test EURC and USDC. Get free test tokens at faucet.circle.com. Verify the addresses against Circle's docs, or override them with `VITE_EURC_ADDRESS`, `VITE_USDC_ADDRESS` and `EURC_ADDRESS`. On a local chain, `npm run deploy:local` also deploys a mock EURC, a mock USDC and a mock vault for it, and prints their addresses. Circle's test USDC can't be minted, so to try the yield on a test network deploy with `MOCK_USDC=1` (a mock USDC and its vault) or set `USDC_VAULT_ADDRESS` to a vault of your own. The vault's `accrueYield(amount)` and `setRatePerYear(bps)` make it earn.
 

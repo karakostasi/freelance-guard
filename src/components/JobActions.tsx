@@ -10,7 +10,7 @@ import { ensureAllowance } from "../lib/erc20";
 import { uploadDoc, uploadFile } from "../lib/files";
 import { FileDrop } from "./FileDrop";
 import { STATUS, formatDuration, hasVerifier, milestoneName, milestoneSurcharge, type Job } from "../lib/jobs";
-import { tokenOf } from "../lib/tokens";
+import { formatAmount, tokenOf } from "../lib/tokens";
 import styles from "../App.module.css";
 
 /** The contract actions the connected account can take on one milestone right now. */
@@ -24,6 +24,7 @@ export function JobActions({ id, index, job }: { id: string; index: number; job:
   const [txHash, setTxHash] = useState<`0x${string}` | undefined>();
   const [working, setWorking] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [problem, setProblem] = useState(false);
   const confirming = useRefreshOnConfirm(txHash);
 
   const ms = job.milestones[index];
@@ -78,9 +79,9 @@ export function JobActions({ id, index, job }: { id: string; index: number; job:
   };
 
   // Each action is disabled (with a hint) when the contract would revert.
-  const action = (label: string, onClick: () => void, blockedReason = "") => (
+  const action = (label: string, onClick: () => void, blockedReason = "", good = false) => (
     <div className={styles.action}>
-      <button className={styles.button} disabled={busy || !!blockedReason} onClick={onClick}>
+      <button className={`${styles.button} ${good ? styles.buttonGood : ""}`} disabled={busy || !!blockedReason} onClick={onClick}>
         {label}
       </button>
       {blockedReason && <span className={styles.muted}>{blockedReason}</span>}
@@ -90,7 +91,6 @@ export function JobActions({ id, index, job }: { id: string; index: number; job:
   return (
     <>
       {status === "Unfunded" && isPayer && action(name ? `Fund ${name}` : "Fund this milestone", fund)}
-      {status === "Unfunded" && !isPayer && <p className={styles.muted}>Waiting for the payer to fund this milestone.</p>}
       {isPayee && status === "Funded" && (
         <>
           <input className={styles.input} placeholder={name ? `Link or note for your ${name}` : "Deliverable link or note"} value={deliverable} onChange={(e) => setDeliverable(e.target.value)} />
@@ -110,19 +110,32 @@ export function JobActions({ id, index, job }: { id: string; index: number; job:
       )}
       {(isPayer || isVerifier) && status === "Submitted" && (
         <>
-          {action(name ? `Approve ${name} & pay` : "Approve & pay", () => send("approve", [n, m]))}
-          {isPayer && action("Dispute", () => send("dispute", [n, m]), reviewEnd !== undefined && now >= reviewEnd ? "Review period ended" : "")}
-          {isPayer && hasVerifier(job) && <p className={styles.muted}>This job has a verifier. If it approves first, you can no longer dispute.</p>}
+          {action(name ? `Approve ${name} and pay ${formatAmount(job, ms.amount)}` : `Approve and pay ${formatAmount(job, ms.amount)}`, () => send("approve", [n, m]), "", true)}
+          {isPayer && (
+            <div className={styles.action}>
+              <button type="button" className={styles.textButton} aria-expanded={problem} onClick={() => setProblem((o) => !o)}>
+                Something is wrong
+              </button>
+              {problem && (
+                <div className={styles.problemBox}>
+                  <b>Report a problem</b>
+                  <span className={styles.muted}>The payment stays locked and the arbiter decides who gets the money. You can do this until the review period ends.</span>
+                  {action("Report a problem", () => send("dispute", [n, m]), reviewEnd !== undefined && now >= reviewEnd ? "The review period ended" : "")}
+                </div>
+              )}
+              {hasVerifier(job) && <span className={styles.muted}>This job has a verifier. If it approves first, you can no longer report a problem.</span>}
+            </div>
+          )}
         </>
       )}
-      {isPayer && status === "Funded" && action(name ? `Refund ${name}` : "Refund", () => send("refundExpired", [n, m]), now <= deadline ? `Available in ${formatDuration(deadline - now + 1n)}` : "")}
+      {/* Until the deadline passes there is nothing to do: the card above says when. After it, taking the money back is the way on. */}
+      {isPayer && status === "Funded" && now > deadline && action(name ? `Take back the ${name} payment` : "Take the money back", () => send("refundExpired", [n, m]), "", true)}
       {status === "Disputed" && isArbiter && (
         <>
           {action("Pay payee", () => send("resolve", [n, m, true]))}
           {action("Refund payer", () => send("resolve", [n, m, false]))}
         </>
       )}
-      {status === "Disputed" && !isArbiter && <p className={styles.muted}>Waiting for the arbiter to resolve this dispute.</p>}
       {busy && <p>{working || "Waiting for transaction…"}</p>}
       {error && <p className={styles.error}>{error}</p>}
     </>

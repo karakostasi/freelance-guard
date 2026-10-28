@@ -64,8 +64,8 @@ export const milestoneSurcharge = (job: Job, ms: Milestone) => surchargeOn(ms.am
 
 export const STATUS = ["Unfunded", "Funded", "Submitted", "Disputed", "Paid", "Refunded"];
 
-/** Human-friendly labels, indexed like STATUS. STATUS itself stays the contract's enum names. */
-export const STATUS_LABEL = ["Not funded", "In progress", "Submitted", "Disputed", "Delivered", "Refunded"];
+/** Human-friendly labels, indexed like STATUS: "Delivered" is work the payee has submitted, "Paid" what was released. STATUS itself stays the contract's enum names. */
+export const STATUS_LABEL = ["Not funded", "In progress", "Delivered", "Disputed", "Paid", "Refunded"];
 
 export const STATUS_CLASS = [styles.unfunded, styles.funded, styles.submitted, styles.disputed, styles.paid, styles.refunded];
 
@@ -130,6 +130,15 @@ export function paidOutcome(job: Job, kind: "Approved" | "Resolved" | undefined,
 export const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
 export const formatDate = (unix: bigint) => new Date(Number(unix) * 1000).toLocaleString();
+
+/** A day without the time, for deadlines in a sentence: "3 Nov". */
+export const formatDay = (unix: bigint) => new Date(Number(unix) * 1000).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+
+/**
+ * What a milestone is worth to `me`: the payee gets it less their share of the platform fee, everyone else sees
+ * the full amount.
+ */
+export const amountFor = (job: Job, ms: Milestone, me: string | undefined) => (me && me.toLowerCase() === job.payee.toLowerCase() ? ms.amount - milestoneFee(job, ms) : ms.amount);
 
 /** One-line timing hint for a milestone, or "" when nothing is time-sensitive. */
 export function timeInfo(m: Milestone, reviewPeriod: bigint | undefined, now: bigint) {

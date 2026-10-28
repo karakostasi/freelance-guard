@@ -1,7 +1,8 @@
 import { useAccount, useConnect } from "wagmi";
-import { Briefcase, Workflow } from "lucide-react";
+import { Briefcase, Plus, Workflow } from "lucide-react";
 import { FlowPage } from "./components/FlowPage";
 import { JobsPage } from "./components/JobsPage";
+import { NewJobPage } from "./components/NewJobPage";
 import { Landing } from "./components/Landing";
 import { ProfileMenu } from "./components/ProfileMenu";
 import { ReceiptPage } from "./components/ReceiptPage";
@@ -23,6 +24,9 @@ export default function App() {
         </a>
         <div className={styles.headerRight}>
           <nav className={styles.nav}>
+            <button className={`${styles.navLink} ${route.page === "new" ? styles.navActive : ""}`} onClick={() => navigate("/new")} aria-current={route.page === "new" ? "page" : undefined}>
+              <Plus size={16} /> Create a job
+            </button>
             <button className={`${styles.navLink} ${route.page === "jobs" ? styles.navActive : ""}`} onClick={() => navigate("/jobs")}>
               <Briefcase size={16} /> Jobs
             </button>
@@ -45,7 +49,8 @@ export default function App() {
         </div>
       )}
       {isConnected && route.page === "flow" && <FlowPage jobId={route.jobId} />}
-      {isConnected && route.page === "jobs" && <JobsPage />}
+      {isConnected && route.page === "new" && <NewJobPage />}
+      {isConnected && route.page === "jobs" && <JobsPage jobId={route.jobId} />}
     </main>
   );
 }

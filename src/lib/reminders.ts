@@ -37,7 +37,7 @@ export function reminderFor(job: Job, me: string | undefined, reviewPeriod: bigi
   if (m.status === SUBMITTED && reviewPeriod !== undefined) {
     const end = m.submittedAt + reviewPeriod;
     if (now >= end) return isPayee ? result("Review period ended. Claim your payment", "action") : result("Review period ended. The payee can claim payment", "warn");
-    return isPayer ? result(`Review ends in ${formatDuration(end - now)}. Approve or dispute`, soon(end)) : result(`Payer review ends in ${formatDuration(end - now)}`, "info");
+    return isPayer ? result(`Review ends in ${formatDuration(end - now)}. Approve or report a problem`, soon(end)) : result(`Payer review ends in ${formatDuration(end - now)}`, "info");
   }
   return undefined;
 }

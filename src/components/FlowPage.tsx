@@ -2,13 +2,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useWatchContractEvent } from "wagmi";
 import type { Abi } from "viem";
-import { Check, Plus, RotateCcw } from "lucide-react";
+import { Check, RotateCcw } from "lucide-react";
 import { FlowStepper, type FlowMode } from "./FlowStepper";
 import { NextStep } from "./NextStep";
 import { JobList } from "./JobList";
 import { WalletCard } from "./WalletCard";
 import { MilestoneDetails } from "./MilestoneDetails";
-import { PayDrawer } from "./PayDrawer";
 import { useBackendFunding } from "../hooks/useBackendFunding";
 import { useBackendStatus } from "../hooks/useBackend";
 import { useBackendRun } from "../hooks/useBackendRun";
@@ -41,7 +40,6 @@ function useLiveEscrowEvents() {
 export function FlowPage({ jobId: routeJobId }: { jobId?: string }) {
   const [mode, setMode] = useState<FlowMode>("simple");
   const [selectedId, setSelectedId] = useState(routeJobId ?? "");
-  const [drawerOpen, setDrawerOpen] = useState(false);
   const mine = useMyJobs();
   useLiveEscrowEvents();
 
@@ -98,17 +96,9 @@ export function FlowPage({ jobId: routeJobId }: { jobId?: string }) {
         )}
       </div>
 
-      <button className={page.fab} disabled={live.running} onClick={() => setDrawerOpen(true)}>
-        <Plus size={18} /> Fund a job
-      </button>
-
-      {drawerOpen && (
-        <PayDrawer onClose={() => setDrawerOpen(false)} onBank={startPayment} />
-      )}
-
       <div className={page.layout}>
         <WalletCard className={page.wallet} />
-        <JobList jobs={mine} selectedId={id} onSelect={setSelectedId} emptyText={'No jobs for this account yet. Use "Fund a job" to create one.'} />
+        <JobList jobs={mine} selectedId={id} onSelect={setSelectedId} emptyText={'No jobs for this account yet. Use "Create a job" to start one.'} />
         {showingLive ? (
           <>
             <div className={page.top}>

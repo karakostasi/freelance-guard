@@ -4,7 +4,17 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0d0f14" />
     <title>Squirrel</title>
+    <script>
+      // Apply a saved light theme before the page paints, so it doesn't flash dark first.
+      try {
+        if (localStorage.getItem("squirrel-theme") === "light") {
+          document.documentElement.dataset.theme = "light";
+          document.querySelector('meta[name="theme-color"]').setAttribute("content", "#f4f6fb");
+        }
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

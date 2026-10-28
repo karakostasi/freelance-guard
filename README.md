@@ -22,6 +22,10 @@ The rules are in `docs/business-model.md` and the contract design in `docs/contr
 - The **payer** pays a 0.25% surcharge on top of each milestone when funding it, which is not refunded. A job that takes the **yield** (USDC only, test network only) pays no surcharge. While it is in escrow its money sits in an ERC-4626 vault, the platform keeps what the vault earns, and the amount is returned in full.
 - The terms are fixed when the job is created, so later changes by the owner never touch an existing job. Only tokens the owner enabled can be used (`configureToken`). `quote(token, amounts, useYield)` prices a job with the same rules as `createJob`, and the frontend and backend call it.
 
+## Themes
+
+There are two, dark (the original look, and the default) and light. The sun and moon button in the header switches between them, and the choice is remembered in the browser. The colours are tokens in `src/index.css`: the dark values are in `:root` and the light ones in `:root[data-theme="light"]`, so a new colour belongs there and not in a component's CSS. `index.html` applies a saved light theme before the page paints. Receipts stay white paper in both.
+
 ## Layout
 
 - `contracts/` Solidity (`FreelanceEscrow.sol`)

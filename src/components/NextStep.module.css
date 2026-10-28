@@ -1,15 +1,15 @@
 /* The next step on a job: one sentence and one main button. */
-.card { display: flex; flex-direction: column; align-items: flex-start; gap: .8rem; padding: 1.25rem; border-radius: 14px; border: 1px solid #262b38; background: #171a22; }
-.action { border-color: #f5b942; background: linear-gradient(180deg, rgba(245, 185, 66, .09), transparent), #171a22; }
-.wait { border-color: #4f7cff; background: linear-gradient(180deg, rgba(79, 124, 255, .09), transparent), #171a22; }
-.done { border-color: #3ecf8e; background: linear-gradient(180deg, rgba(62, 207, 142, .09), transparent), #171a22; }
-.eyebrow { font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #98a0b3; }
-.action .eyebrow { color: #f5b942; }
-.wait .eyebrow { color: #38bdf8; }
-.done .eyebrow { color: #3ecf8e; }
+.card { display: flex; flex-direction: column; align-items: flex-start; gap: .8rem; padding: 1.25rem; border-radius: 14px; border: 1px solid var(--line-2); background: var(--card); }
+.action { border-color: #f5b942; background: linear-gradient(180deg, rgba(245, 185, 66, .09), transparent), var(--card); }
+.wait { border-color: #4f7cff; background: linear-gradient(180deg, rgba(79, 124, 255, .09), transparent), var(--card); }
+.done { border-color: #3ecf8e; background: linear-gradient(180deg, rgba(62, 207, 142, .09), transparent), var(--card); }
+.eyebrow { font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.action .eyebrow { color: var(--warn-text); }
+.wait .eyebrow { color: var(--sky-text); }
+.done .eyebrow { color: var(--good-text); }
 .title { margin: 0; font-size: 1.35rem; text-wrap: balance; overflow-wrap: anywhere; }
-.detail { margin: 0; color: #98a0b3; overflow-wrap: anywhere; }
-.deliverable { width: 100%; padding: .7rem .9rem; border-radius: 10px; border: 1px solid #262b38; background: #1e222c; font-size: .9rem; }
+.detail { margin: 0; color: var(--muted); overflow-wrap: anywhere; }
+.deliverable { box-sizing: border-box; width: 100%; padding: .7rem .9rem; border-radius: 10px; border: 1px solid var(--line-2); background: var(--raised); font-size: .9rem; }
 .card > input { width: 100%; max-width: 480px; }
 .actions { display: flex; align-items: flex-start; flex-wrap: wrap; gap: .5rem; }
 .actions input, .actions select, .actions button { box-sizing: border-box; min-height: 2.4rem; }

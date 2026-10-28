@@ -1,20 +1,137 @@
-/* Design tokens: the app's accent colors live here. */
+/* Design tokens. The dark theme is the default. The light one replaces the colours below when <html> has
+   data-theme="light" (see src/hooks/useTheme.ts). Names say what a colour is for, not what it looks like. */
 :root {
   --accent: #4f7cff;
   --accent-2: #8a5cff;
   --accent-3: #38bdf8;
   --gradient: linear-gradient(135deg, var(--accent), var(--accent-2));
+
+  /* surfaces */
+  --bg: #0d0f14;
+  --panel: #12141a;
+  --panel-2: #14171d;
+  --card: #171a22;
+  --card-2: #181b22;
+  --raised: #1e222c;
+  --hover: #232733;
+  --input-bg: rgba(24, 27, 34, .85);
+  --header-bg: rgba(15, 17, 21, .85);
+  --overlay: rgba(0, 0, 0, .6);
+  /* lines */
+  --line: #2a2f3b;
+  --line-2: #262b38;
+  --line-3: #333;
+  --line-4: #353b4b;
+  --line-5: #444;
+  --line-6: #555;
+  --line-7: #4a5266;
+  --track: #4a505e;
+  --yield-line: #3a4a42;
+  /* text */
+  --text: #e8eaf0;
+  --muted: #98a0b3;
+  --muted-2: #aab;
+  --muted-3: #9aa3b5;
+  --placeholder: #7b8194;
+  --link: #8fa8ff;
+  --accent-text: #b4c6ff;
+  --cyan-text: #4cc9f0;
+  --sky-text: #38bdf8;
+  --good-text: #3ecf8e;
+  --good-text-2: #4ade80;
+  --warn-text: #f5b942;
+  --warn-text-2: #fbbf24;
+  --warn-text-3: #f2c46d;
+  --bad-text: #ff6b6b;
+  --bad-text-2: #ff5c5c;
+  --bad-text-3: #f87171;
+  --violet-text: #b39dff;
+  --brand-from: #fff;
+  --brand-to: #b4c6ff;
+  --mode-on: #4f7cff;
+  --mode-filter: brightness(1.35);
+  /* what a milestone's status is called in colour */
+  --st-funded: #4f7cff;
+  --st-submitted: #f5b942;
+  --st-disputed: #ff8a3d;
+  --st-paid: #3ecf8e;
+  --st-refunded: #ff5c5c;
+  --st-unfunded: #8a8fa0;
+  /* depth */
+  --shadow-menu: 0 12px 32px rgba(0, 0, 0, .5);
+  --shadow-modal: 0 24px 64px rgba(0, 0, 0, .55);
+  --shadow-paper: 0 10px 40px rgba(0, 0, 0, .3);
+  --glow-1: rgba(79, 124, 255, 0.14);
+  --glow-2: rgba(138, 92, 255, 0.1);
   color-scheme: dark;
+}
+
+/* The light theme: white surfaces on a pale cool page, the same blue as the accent, and darker twins of the colours that
+   are only bright enough to read on dark. */
+:root[data-theme="light"] {
+  --bg: #f4f6fb;
+  --panel: #ffffff;
+  --panel-2: #f8f9fc;
+  --card: #ffffff;
+  --card-2: #ffffff;
+  --raised: #f1f4fa;
+  --hover: #edf0f7;
+  --input-bg: #ffffff;
+  --header-bg: rgba(255, 255, 255, .85);
+  --overlay: rgba(24, 32, 56, .4);
+  --line: #dde2ec;
+  --line-2: #e4e8f1;
+  --line-3: #cfd5e2;
+  --line-4: #c8cfde;
+  --line-5: #bdc5d6;
+  --line-6: #a8b1c5;
+  --line-7: #a3adc2;
+  --track: #b9c1d2;
+  --yield-line: #bfe6d3;
+  --text: #141824;
+  --muted: #586075;
+  --muted-2: #5f6779;
+  --muted-3: #6a7287;
+  --placeholder: #8c94a8;
+  --link: #3558d6;
+  --accent-text: #2f55d4;
+  --cyan-text: #0a7ea8;
+  --sky-text: #0b78ab;
+  --good-text: #0c7a52;
+  --good-text-2: #0c7a52;
+  --warn-text: #9a6200;
+  --warn-text-2: #9a6200;
+  --warn-text-3: #9a6200;
+  --bad-text: #c42b2b;
+  --bad-text-2: #c42b2b;
+  --bad-text-3: #c42b2b;
+  --violet-text: #6a4fd8;
+  --brand-from: #141824;
+  --brand-to: #3a63e6;
+  --mode-on: #3558d6;
+  --mode-filter: none;
+  --st-funded: #3a63e6;
+  --st-submitted: #b87400;
+  --st-disputed: #d9640f;
+  --st-paid: #159a69;
+  --st-refunded: #d93a3a;
+  --st-unfunded: #7d8499;
+  --shadow-menu: 0 12px 32px rgba(30, 40, 70, .18);
+  --shadow-modal: 0 24px 64px rgba(30, 40, 70, .22);
+  --shadow-paper: 0 10px 40px rgba(30, 40, 70, .14);
+  --glow-1: rgba(79, 124, 255, .10);
+  --glow-2: rgba(138, 92, 255, .07);
+  color-scheme: light;
 }
 
 body {
   margin: 0;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  color: #e8eaf0;
+  color: var(--text);
   background:
-    radial-gradient(900px 500px at 85% -10%, rgba(79, 124, 255, 0.14), transparent 70%),
-    radial-gradient(700px 400px at 0% 0%, rgba(138, 92, 255, 0.1), transparent 70%),
-    #0d0f14;
+    radial-gradient(900px 500px at 85% -10%, var(--glow-1), transparent 70%),
+    radial-gradient(700px 400px at 0% 0%, var(--glow-2), transparent 70%),
+    var(--bg);
   background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
 }
@@ -25,7 +142,7 @@ h1, h2, h3 { letter-spacing: -0.01em; }
 
 :focus-visible { outline: 2px solid var(--accent-3); outline-offset: 2px; }
 
-* { scrollbar-color: #2a2f3b transparent; }
+* { scrollbar-color: var(--line) transparent; }
 
 @media print {
   body { background: #fff; }

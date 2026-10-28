@@ -12,6 +12,7 @@ import { ensureAllowance } from "../lib/erc20";
 import { uploadDoc, uploadFile } from "../lib/files";
 import { FileDrop } from "./FileDrop";
 import type { PayoutRoute } from "../lib/fiatFlow";
+import { surchargeOn } from "../lib/fees";
 import { euro } from "../lib/jobs";
 import { ETH, TOKENS, formatBalance, formatUnitsOf, toEur } from "../lib/tokens";
 import { ReputationBadge } from "./ReputationBadge";
@@ -132,7 +133,21 @@ export function HireForm({ variant = "page", onBank, onCreated }: { variant?: "p
 
   // The deposit is signed in this wallet for both ways of paying, so it needs the funds at hand.
   const short = fundNow && balance !== undefined && due > balance;
-  const valid = isAddress(payee) && title.trim().length > 0 && totalUnits > 0n && rowsValid && !short && !quote.problem && verifierValid;
+  // The first thing that stops the job from being created, in words, so a disabled button is never a mystery.
+  const missing = (() => {
+    if (!isAddress(payee)) return payee ? "That isn't a valid payee address." : "Enter the payee's address.";
+    if (totalUnits <= 0n) return "Enter the total amount.";
+    if (percentSum !== 100n) return "The milestone shares must add up to 100%.";
+    if (!rowsValid) return "Give every milestone a title, a share and the days to deliver.";
+    if (title.trim().length === 0) return "Add a job title.";
+    if (short) return `Not enough ${token.symbol} in this wallet for the full amount.`;
+    if (quote.problem) return quote.problem;
+    if (!verifierValid) return "The verifier must be an address, and not the payee.";
+    return "";
+  })();
+  const valid = missing === "";
+  // What a payer who takes the yield saves on the surcharge.
+  const saved = hasYield ? amounts.reduce((sum, a) => sum + surchargeOn(a, config?.surchargeBps ?? 0), 0n) : 0n;
   const busy = !!working || confirming;
   // The split matches a preset until the rows are edited, then it is a custom split.
   const activePreset = PRESETS.find((p) => sameRows(p.rows, rows))?.label ?? null;
@@ -215,6 +230,29 @@ export function HireForm({ variant = "page", onBank, onCreated }: { variant?: "p
             ))}
           </select>
         </div>
+        {hasYield && (
+          <label className={`${styles.yieldCard} ${useYield ? styles.yieldCardOn : ""}`}>
+            <span className={styles.yieldText}>
+              <span className={styles.yieldTitle}>
+                <strong>Earn yield, pay no surcharge</strong>
+                {saved > 0n && (
+                  <span className={styles.yieldSave}>
+                    {useYield ? "Saves" : "Save"} {formatUnitsOf(token, saved)}
+                  </span>
+                )}
+              </span>
+              <span className={styles.muted}>
+                {useYield
+                  ? "While the job is in escrow, your money earns yield for Squirrel, and you get it back in full. You pay no surcharge."
+                  : `You pay a ${(Number(config?.surchargeBps ?? 0) / 100).toString()}% surcharge on top of each milestone. Switch on and your escrowed money earns yield for Squirrel instead, and you pay none.`}
+              </span>
+            </span>
+            <span className={styles.switch}>
+              <input type="checkbox" role="switch" checked={useYield} onChange={(e) => setYieldChoice(e.target.checked)} aria-label="Earn yield on the escrowed money instead of paying a surcharge" />
+              <span className={styles.switchTrack} />
+            </span>
+          </label>
+        )}
         {totalUnits > 0n && eur > 0 && (
           <span className={styles.muted}>
             {token.symbol === "ETH" ? "≈" : "="} {euro(eur)}
@@ -224,12 +262,11 @@ export function HireForm({ variant = "page", onBank, onCreated }: { variant?: "p
         {quote.problem && <span className={styles.error}>{quote.problem}</span>}
         {quote.fee !== undefined && !quote.problem && totalUnits > 0n && (
           <span className={styles.muted}>
-            Platform fee {formatUnitsOf(token, quote.fee)}, paid by the payee out of the payments.{" "}
-            {useYield
-              ? "You pay no surcharge: while your money is in escrow it earns yield for Squirrel."
-              : fundNow
-                ? `You pay ${formatUnitsOf(token, surcharge)} on top.`
-                : `You pay a ${(Number(config?.surchargeBps ?? 0) / 100).toString()}% surcharge on top of each milestone when you fund it.`}
+            Platform fee {formatUnitsOf(token, quote.fee)}, paid by the payee out of the payments.
+            {!useYield &&
+              (fundNow
+                ? ` You pay ${formatUnitsOf(token, surcharge)} on top.`
+                : ` You pay a ${(Number(config?.surchargeBps ?? 0) / 100).toString()}% surcharge on top of each milestone when you fund it.`)}
           </span>
         )}
         {balance !== undefined && (
@@ -262,11 +299,6 @@ export function HireForm({ variant = "page", onBank, onCreated }: { variant?: "p
             </span>
           </label>
         </div>
-        {hasYield && (
-          <label className={styles.muted}>
-            <input type="checkbox" checked={yieldChoice} onChange={(e) => setYieldChoice(e.target.checked)} /> Let the escrowed money earn yield for Squirrel, and pay no surcharge. Untick to pay a {(Number(config?.surchargeBps ?? 0) / 100).toString()}% surcharge instead.
-          </label>
-        )}
         {bank && backendOnline && (
           <select className={styles.input} value={route} onChange={(e) => setRoute(e.target.value as PayoutRoute)} aria-label="Payee payout">
             <option value="sepa">Payee is paid out by SEPA bank transfer</option>
@@ -375,9 +407,10 @@ export function HireForm({ variant = "page", onBank, onCreated }: { variant?: "p
         ) : (
           <span className={styles.muted}>Attaching files needs the backend, which is offline right now.</span>
         )}
-        <button className={styles.button} disabled={!valid || busy} onClick={submit}>
+        <button className={styles.button} disabled={!valid || busy} onClick={submit} aria-describedby={valid ? undefined : "create-blocked"}>
           {working || (bank ? `Pay by bank transfer${eur > 0 ? ` (${euro(eur)})` : ""}` : fundNow ? "Create job and fund escrow" : "Create job")}
         </button>
+        {!valid && !busy && <span className={styles.hint} id="create-blocked" role="status">{missing}</span>}
         {!bank && token.address && fundNow && <span className={styles.muted}>Tokens need two confirmations: approve, then deposit.</span>}
         {bank && token.address && <span className={styles.muted}>EURC is taken from your wallet at the deposit step: approve, then deposit.</span>}
         {error && <p className={styles.error}>{error}</p>}

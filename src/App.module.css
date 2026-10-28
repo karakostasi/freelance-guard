@@ -9,6 +9,8 @@
 .error { color: #ff6b6b; }
 .badge { font-size: .75rem; padding: .1rem .5rem; border-radius: 999px; background: #2a2f3b; }
 .muted { opacity: .6; font-size: .85rem; }
+/* Says why a button is disabled. Not an error, so not red, but easy to see. */
+.hint { color: #f2c46d; font-size: .9rem; }
 
 /* status colors: --c is used by badges (fill) and cards (left accent) */
 .funded { --c: #4f7cff; }
@@ -71,6 +73,22 @@
 @media (max-width: 560px) { .optionCards { grid-template-columns: 1fr; } }
 .chipActive { border-color: #4f7cff; background: rgba(79, 124, 255, .16); color: #b4c6ff; cursor: default; }
 .optionCardDisabled { opacity: .5; cursor: not-allowed; }
+
+/* The yield choice. It changes what the payer pays, so it is a card with a switch that stands out. */
+.yieldCard { display: flex; align-items: center; gap: .9rem; padding: .9rem 1rem; border-radius: 10px; border: 1px solid #3a4a42; background: #181b22; cursor: pointer; transition: border-color .15s, background .15s; }
+.yieldCard:hover { border-color: #3ecf8e; }
+.yieldCardOn { border-color: #3ecf8e; background: rgba(62, 207, 142, .1); box-shadow: 0 0 0 1px #3ecf8e; }
+.yieldText { display: flex; flex-direction: column; gap: .25rem; flex: 1; min-width: 0; }
+.yieldTitle { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+.yieldSave { font-size: .75rem; padding: .1rem .55rem; border-radius: 999px; color: #3ecf8e; background: rgba(62, 207, 142, .16); border: 1px solid #3ecf8e; }
+.switch { position: relative; flex: none; width: 44px; height: 26px; }
+.switch input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.switchTrack { position: absolute; inset: 0; border-radius: 999px; background: #4a505e; transition: background .15s; pointer-events: none; }
+.switchTrack::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: transform .15s; }
+.switch input:checked + .switchTrack { background: #3ecf8e; }
+.switch input:checked + .switchTrack::after { transform: translateX(18px); }
+.switch input:focus-visible + .switchTrack { outline: 2px solid var(--accent-3); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .switchTrack, .switchTrack::after, .yieldCard { transition: none; } }
 .drawerForm { display: flex; flex-direction: column; }
 .headerRight { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
 .profileButton { width: 38px; height: 38px; padding: 0; border-radius: 50%; border: 2px solid #2a2f3b; cursor: pointer; transition: border-color .15s; }

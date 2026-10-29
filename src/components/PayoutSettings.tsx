@@ -42,6 +42,8 @@ export function PayoutSettings({ onClose }: { onClose: () => void }) {
     try {
       await work(await sessionToken(address));
       await queryClient.invalidateQueries({ queryKey: ["payout"] });
+      // A payment that waited for this choice goes ahead now.
+      await queryClient.invalidateQueries({ queryKey: ["run-of-job"] });
     } catch (e) {
       setError(firstLine(e));
     } finally {

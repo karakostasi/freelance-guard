@@ -275,6 +275,48 @@ async function notify(run, event) {
   return record;
 }
 
+/**
+ * Routes the payout of a released payment to where the payee wants it, and settles it. The payee is paid what is left
+ * after the platform fee, in the currency of their account (dollars and euros convert at the demo rate).
+ */
+async function settlePayout(run, pref) {
+  run.status = "released";
+  run.route = pref.route;
+  const currency = currencyOfRoute(run.route);
+  const payoutEur = run.payoutEur ?? run.amountEur;
+  const payoutAmount = currency === "USD" ? Math.round((payoutEur / providers.EUR_PER_USDC) * 100) / 100 : currency === "EUR" ? payoutEur : null;
+  const last4 = publicPayout(pref).last4;
+  run.payout = { route: run.route, currency, amount: payoutAmount, chosenBy: "payee", ...(last4 ? { last4 } : {}) };
+  save();
+  await step(run, "routing", "route", async () => ({ source: "sandbox", route: run.route, currency, chosenBy: "payee", fee: run.route === "eurc" ? "0.00" : "0.15" }));
+  await step(run, "routing", "convert", async () => {
+    ledger(run, "escrow_locked", "payout_pending", `Payout via ${run.route}`, payoutEur);
+    return { source: "sandbox", amountEur: payoutEur, ...(payoutAmount === null ? {} : { amount: payoutAmount, currency }), from: "escrow_locked", to: "payout_pending" };
+  });
+  await step(run, "settlement", "settle", () => providers.offramp.send({ route: run.route, amountEur: payoutEur, amount: payoutAmount, currency, last4 }));
+  await step(run, "settlement", "receipt", async () => {
+    ledger(run, "payout_pending", "paid_out", "Payout settled", payoutEur);
+    return { source: "backend", invoice: `INV-${run.jobId}`, status: "PAID_OUT" };
+  });
+  run.status = "paid_out";
+  emit(run, { type: "done" });
+  await notify(run, "payout.settled");
+}
+
+/** The payee has said how they want to be paid: finish the payouts that were waiting for it. */
+export async function resumePayouts(payee) {
+  const pref = db.payouts?.[payee.toLowerCase()];
+  if (!pref) return;
+  for (const run of Object.values(db.runs)) {
+    if (run.status !== "awaiting_payout" || run.payee.toLowerCase() !== payee.toLowerCase()) continue;
+    try {
+      await settlePayout(run, pref);
+    } catch (e) {
+      fail(run, e);
+    }
+  }
+}
+
 /** Called for every escrow event the chain watcher sees. */
 export async function onChainEvent(log) {
   const { eventName, args } = log;
@@ -349,7 +391,7 @@ export async function onChainEvent(log) {
   }
 
   const paid = eventName === "Approved" || (eventName === "Resolved" && args.paidPayee);
-  if (paid && run.status !== "released" && run.status !== "paid_out") {
+  if (paid && !["released", "awaiting_payout", "paid_out"].includes(run.status)) {
     run.status = "released";
     const tx = await info();
     const decidedBy = eventName === "Resolved" ? "arbiter" : "payer approval or review timeout";
@@ -357,31 +399,18 @@ export async function onChainEvent(log) {
     emit(run, { type: "step_done", stage: "release", step: "approval", payload: { source: "chain", jobId: run.jobId, event: eventName, paidTo: run.payee, decidedBy } });
     await step(run, "release", "release", async () => ({ ...tx, function: eventName === "Resolved" ? "resolve" : "approve / claimAfterTimeout", jobId: run.jobId }));
 
-    // Payout routing runs by itself once the escrow has released the funds. The payee decides where the money goes, and
-    // the choice is read now, so they can change it until the release. Without one, the run's own default applies.
+    // The payee decides where the money goes, and the choice is read now, so they can change it until the release. Without
+    // one nothing is sent anywhere: the escrow has already paid the stablecoin into their wallet, and the payout goes on
+    // when they choose.
     const pref = db.payouts?.[run.payee.toLowerCase()];
-    run.route = pref?.route ?? run.route;
-    const currency = currencyOfRoute(run.route);
-    // The payee is paid what is left after the platform fee, in the currency of their account. Dollars and euros convert
-    // at the demo rate.
-    const payoutEur = run.payoutEur ?? run.amountEur;
-    const payoutAmount = currency === "USD" ? Math.round((payoutEur / providers.EUR_PER_USDC) * 100) / 100 : currency === "EUR" ? payoutEur : null;
-    const last4 = publicPayout(pref).last4;
-    run.payout = { route: run.route, currency, amount: payoutAmount, chosenBy: pref ? "payee" : "default", ...(last4 ? { last4 } : {}) };
-    save();
-    await step(run, "routing", "route", async () => ({ source: "sandbox", route: run.route, currency, chosenBy: run.payout.chosenBy, fee: run.route === "eurc" ? "0.00" : "0.15" }));
-    await step(run, "routing", "convert", async () => {
-      ledger(run, "escrow_locked", "payout_pending", `Payout via ${run.route}`, payoutEur);
-      return { source: "sandbox", amountEur: payoutEur, ...(payoutAmount === null ? {} : { amount: payoutAmount, currency }), from: "escrow_locked", to: "payout_pending" };
-    });
-    await step(run, "settlement", "settle", () => providers.offramp.send({ route: run.route, amountEur: payoutEur, amount: payoutAmount, currency, last4 }));
-    await step(run, "settlement", "receipt", async () => {
-      ledger(run, "payout_pending", "paid_out", "Payout settled", payoutEur);
-      return { source: "backend", invoice: `INV-${run.jobId}`, status: "PAID_OUT" };
-    });
-    run.status = "paid_out";
-    emit(run, { type: "done" });
-    await notify(run, "payout.settled");
+    if (!pref) {
+      run.status = "awaiting_payout";
+      run.payout = { route: null };
+      save();
+      await notify(run, "payout.awaiting");
+      return;
+    }
+    await settlePayout(run, pref);
     return;
   }
 

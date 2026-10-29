@@ -154,6 +154,15 @@ async function run({ escrow, eurc, usdc, vault }) {
   }
   const stepDone = (events, stage, step) => events.find((e) => e.type === "step_done" && e.stage === stage && e.step === step);
   const base = { payer: payer.address, payee: payee.address, description: "flow test" };
+  // The payee signs in and says how they want to be paid. A payment waits for that when the escrow releases the money.
+  const signIn = async (account) => {
+    const issuedAt = new Date().toISOString();
+    const signature = await account.signMessage({ message: signInMessage(account.address, issuedAt) });
+    const res = await fetch(`${API}/api/auth`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ address: account.address, issuedAt, signature }) });
+    return (await res.json()).token;
+  };
+  const payeeToken = await signIn(payee);
+  const putPayout = (token, body) => fetch(`${API}/api/payout`, { method: "PUT", headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(body) });
 
   console.log("\nRequest checks");
   const badHook = await fetch(`${API}/webhooks/bank`, { method: "POST", headers: { "content-type": "application/json", "x-signature": "00" }, body: "{}" });
@@ -232,9 +241,14 @@ async function run({ escrow, eurc, usdc, vault }) {
     await until(() => stepDone(stream.events, "activated", "dashboard"), "the job to be funded");
     await mined(await asPayee.writeContract({ address: escrow, abi, functionName: "submitWork", args: [1n, 0n, "https://example.com/work"] }));
     await mined(await asPayer.writeContract({ address: escrow, abi, functionName: "approve", args: [1n, 0n] }));
+    // The payee hasn't said how they want to be paid, so the payout waits for them instead of picking a route.
+    await until(async () => (await (await fetch(`${API}/api/payments/${body.run.id}`)).json()).status === "awaiting_payout", "the payout to wait for the payee");
+    const waiting = await (await fetch(`${API}/api/payments/${body.run.id}`)).json();
+    check(waiting.payout?.route === null && !stream.events.some((e) => e.type === "done" || e.stage === "settlement"), "without a choice from the payee nothing is sent anywhere: the payout waits");
+    check((await putPayout(payeeToken, { route: "sepa", holder: "Ana Ferreira", iban: "DE89 3704 0044 0532 0130 00" })).status === 200, "the payee chooses a bank account in euros");
     await until(() => stream.events.find((e) => e.type === "done"), "the payout to finish");
     const finalRun = await (await fetch(`${API}/api/payments/${body.run.id}`)).json();
-    check(finalRun.status === "paid_out", "the payment ends as paid out");
+    check(finalRun.status === "paid_out" && finalRun.payout.route === "sepa" && finalRun.payout.chosenBy === "payee", "the payout goes ahead when they choose, and ends as paid out");
     // The fee is 0.0004 ETH (1 EUR, more than 0.25% of this small job), so the payee gets 24 of the 25 EUR.
     check(finalRun.payoutEur === 24 && finalRun.feeEur === 1, "the payout is the job amount less the platform fee");
     check(stream.events.filter((e) => e.type === "step_done").length === 20, "all 20 steps ran");
@@ -283,6 +297,8 @@ async function run({ escrow, eurc, usdc, vault }) {
     await until(async () => BigInt((await (await fetch(`${API}/api/health`)).json()).processedBlock ?? 0) >= approvedAt, "the backend to process the approval");
     check(!stream.events.some((e) => e.stage === "work"), "events of other milestones don't move the first milestone's steps");
 
+    // This payee keeps the stablecoin, and says so before the release.
+    check((await putPayout(payeeToken, { route: "eurc" })).status === 200, "the payee chooses to keep the stablecoin");
     await mined(await asPayee.writeContract({ address: escrow, abi, functionName: "submitWork", args: [2n, 0n, "ipfs://upfront"] }));
     await mined(await asPayer.writeContract({ address: escrow, abi, functionName: "approve", args: [2n, 0n] }));
     await until(() => stream.events.find((e) => e.type === "done"), "the first milestone's payout");
@@ -294,31 +310,23 @@ async function run({ escrow, eurc, usdc, vault }) {
     await stream.stop();
   }
 
-  // The payee decides where the money goes, and a choice made before the release wins over the one in the payment.
+  // The payee decides where the money goes: a choice made before the release is used at once.
   console.log("\nThe payee chooses how to be paid");
   {
-    const auth = async (account) => {
-      const issuedAt = new Date().toISOString();
-      const signature = await account.signMessage({ message: signInMessage(account.address, issuedAt) });
-      const res = await fetch(`${API}/api/auth`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ address: account.address, issuedAt, signature }) });
-      return (await res.json()).token;
-    };
-    const payeeToken = await auth(payee);
-    const put = (token, body) => fetch(`${API}/api/payout`, { method: "PUT", headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(body) });
     const us = { route: "ach", holder: "Ana Ferreira", routing: "021000021", account: "12345678" };
     // A browser asks first, and a PUT the server doesn't list is refused before it is sent.
     const preflight = await fetch(`${API}/api/payout`, { method: "OPTIONS", headers: { origin: "http://localhost:5173", "access-control-request-method": "PUT", "access-control-request-headers": "authorization,content-type" } });
     check(preflight.headers.get("access-control-allow-methods")?.includes("PUT"), "a browser is allowed to save the choice (the CORS preflight lists PUT)");
-    check((await put(undefined, us)).status === 401, "choosing how to be paid needs a sign-in");
-    check((await put(payeeToken, { route: "sepa", holder: "Ana", iban: "DE00 3704 0044 0532 0130 00" })).status === 400, "an IBAN with a wrong check number is refused");
-    check((await put(payeeToken, { ...us, routing: "021000022" })).status === 400, "a routing number that fails the check is refused");
-    check((await put(payeeToken, us)).status === 200, "a valid US account is saved");
+    check((await putPayout(undefined, us)).status === 401, "choosing how to be paid needs a sign-in");
+    check((await putPayout(payeeToken, { route: "sepa", holder: "Ana", iban: "DE00 3704 0044 0532 0130 00" })).status === 400, "an IBAN with a wrong check number is refused");
+    check((await putPayout(payeeToken, { ...us, routing: "021000022" })).status === 400, "a routing number that fails the check is refused");
+    check((await putPayout(payeeToken, us)).status === 200, "a valid US account is saved");
     const shown = await (await fetch(`${API}/api/payout/${payee.address}`)).json();
     check(shown.route === "ach" && shown.currency === "USD" && shown.last4 === "5678" && !JSON.stringify(shown).includes("12345678"), "anyone can see how the payee is paid, but only the last four digits of the account");
     check((await (await fetch(`${API}/api/payout`, { headers: { authorization: `Bearer ${payeeToken}` } })).json()).account === "12345678", "only the payee can read the account in full");
 
-    // The payer says euros by SEPA. The payee's dollars win.
-    const { body } = await post("/api/payments", { ...base, amount: "0.01", token: "eth", route: "sepa", milestones: [{ title: "Whole job", amount: "0.01", days: 7 }] });
+    // The choice is made before the release, so the payment needs no waiting.
+    const { body } = await post("/api/payments", { ...base, amount: "0.01", token: "eth", milestones: [{ title: "Whole job", amount: "0.01", days: 7 }] });
     const stream = follow(body.run.id);
     await post("/api/sandbox/bank-transfer", { reference: body.run.ref });
     const action = await until(() => stream.events.find((e) => e.type === "action_required"), "the call to sign");
@@ -329,7 +337,7 @@ async function run({ escrow, eurc, usdc, vault }) {
     await mined(await asPayer.writeContract({ address: escrow, abi, functionName: "approve", args: [id, 0n] }));
     await until(() => stream.events.find((e) => e.type === "done"), "the payout to finish");
     const settled = stepDone(stream.events, "settlement", "settle")?.payload;
-    check(settled?.rail === "ach" && settled.currency === "USD" && settled.amount === 26.09 && settled.account === "…5678", "the payout follows the payee: 26.09 dollars to their US account, not the euros the payer chose");
+    check(settled?.rail === "ach" && settled.currency === "USD" && settled.amount === 26.09 && settled.account === "…5678", "the payout follows the payee: 26.09 dollars to their US account, not euros");
     const finished = await (await fetch(`${API}/api/payments/${body.run.id}`)).json();
     check(finished.payout?.route === "ach" && finished.payout.chosenBy === "payee", "the payment records that the payee chose");
     await stream.stop();

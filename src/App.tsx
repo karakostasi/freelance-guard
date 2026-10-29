@@ -5,7 +5,7 @@ import { JobsPage } from "./components/JobsPage";
 import { NewJobPage } from "./components/NewJobPage";
 import { Landing } from "./components/Landing";
 import { ProfileMenu } from "./components/ProfileMenu";
-import { SignInButtons } from "./components/SignInButtons";
+import { SignInGate } from "./components/SignInGate";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { ReceiptPage } from "./components/ReceiptPage";
 import { navigate, useHashRoute } from "./hooks/useHashRoute";
@@ -15,6 +15,8 @@ import styles from "./App.module.css";
 export default function App() {
   const { isConnected } = useAccount();
   const route = useHashRoute();
+  // The pages that need an account show the sign-in page until there is one.
+  const gated = !isConnected && route.page !== "home" && route.page !== "receipt";
 
   return (
     <main className={styles.page}>
@@ -24,32 +26,29 @@ export default function App() {
           <h1>Squirrel</h1>
         </a>
         <div className={styles.headerRight}>
-          <nav className={styles.nav}>
-            <button className={`${styles.navLink} ${route.page === "new" ? styles.navActive : ""}`} onClick={() => navigate("/new")} aria-current={route.page === "new" ? "page" : undefined}>
-              <Plus size={16} /> Create a job
-            </button>
-            <button className={`${styles.navLink} ${route.page === "jobs" ? styles.navActive : ""}`} onClick={() => navigate("/jobs")}>
-              <Briefcase size={16} /> Jobs
-            </button>
-            <button className={`${styles.navLink} ${route.page === "flow" ? styles.navActive : ""}`} onClick={() => navigate("/flow")}>
-              <Workflow size={16} /> Payment flow
-            </button>
-          </nav>
+          {/* Every page needs a sign-in, so until then there is nowhere else to go. */}
+          {isConnected && (
+            <nav className={styles.nav}>
+              <button className={`${styles.navLink} ${route.page === "new" ? styles.navActive : ""}`} onClick={() => navigate("/new")} aria-current={route.page === "new" ? "page" : undefined}>
+                <Plus size={16} /> Create a job
+              </button>
+              <button className={`${styles.navLink} ${route.page === "jobs" ? styles.navActive : ""}`} onClick={() => navigate("/jobs")}>
+                <Briefcase size={16} /> Jobs
+              </button>
+              <button className={`${styles.navLink} ${route.page === "flow" ? styles.navActive : ""}`} onClick={() => navigate("/flow")}>
+                <Workflow size={16} /> Payment flow
+              </button>
+            </nav>
+          )}
           <div className={styles.account}>
             <ThemeToggle />
-            <ProfileMenu />
+            <ProfileMenu hideSignIn={gated} />
           </div>
         </div>
       </header>
       {route.page === "home" && <Landing />}
       {route.page === "receipt" && <ReceiptPage jobId={route.jobId} milestone={route.milestone} />}
-      {!isConnected && route.page !== "home" && route.page !== "receipt" && (
-        <div className={styles.connectPrompt}>
-          <p>Sign in to continue.</p>
-          <SignInButtons />
-          <p className={styles.muted}>Sign in with your email and we send you a code. No wallet app, no seed phrase.</p>
-        </div>
-      )}
+      {gated && <SignInGate page={route.page as "new" | "jobs" | "flow"} />}
       {isConnected && route.page === "flow" && <FlowPage jobId={route.jobId} />}
       {isConnected && route.page === "new" && <NewJobPage />}
       {isConnected && route.page === "jobs" && <JobsPage jobId={route.jobId} />}

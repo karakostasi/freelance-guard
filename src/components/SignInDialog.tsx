@@ -1,17 +1,23 @@
 import { useState, type FormEvent } from "react";
-import { Mail, X } from "lucide-react";
+import { createPortal } from "react-dom";
+import { LogIn, Wallet, X } from "lucide-react";
 import { useSignInWithEmail, useVerifyEmailOTP } from "@coinbase/cdp-hooks";
+import { useSignIn } from "../hooks/useSignIn";
 import styles from "../App.module.css";
+import d from "./SignInDialog.module.css";
 
 const firstLine = (e: unknown) => (e instanceof Error ? e.message : String(e)).split("\n")[0];
 
 /**
- * Sign in with an email: we send a code, and the person types it in. The first time, a wallet is made for them. Once the
- * code is right the wallet connects by itself, so there is nothing else to do here.
+ * The one place to sign in. With an email: we send a code, and the person types it in. The first time, a wallet is made
+ * for them, and once the code is right it connects by itself. People who already have a wallet use it from the link under
+ * the email. It is drawn on the page itself, not where it is used: the header clips and stacks what is inside it, so from
+ * there it would open behind the page.
  */
 export function SignInDialog({ onClose, onDone }: { onClose: () => void; onDone?: () => void }) {
   const { signInWithEmail } = useSignInWithEmail();
   const { verifyEmailOTP } = useVerifyEmailOTP();
+  const { isPending, error: walletError, withBrowserWallet } = useSignIn();
   const [email, setEmail] = useState("");
   const [flowId, setFlowId] = useState<string | null>(null);
   const [code, setCode] = useState("");
@@ -43,14 +49,14 @@ export function SignInDialog({ onClose, onDone }: { onClose: () => void; onDone?
     });
   };
 
-  return (
+  return createPortal(
     <div className={styles.overlay} onClick={onClose}>
       <section className={styles.modal} style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Sign in">
         <button className={styles.close} onClick={onClose} aria-label="Close">
           <X size={18} />
         </button>
         <h2 className={styles.modalTitle}>
-          <Mail size={18} style={{ verticalAlign: "-3px" }} /> Sign in with your email
+          <LogIn size={18} style={{ verticalAlign: "-3px" }} /> Sign in
         </h2>
         {flowId === null ? (
           <form onSubmit={sendCode} style={{ display: "flex", flexDirection: "column", gap: ".75rem" }}>
@@ -58,6 +64,20 @@ export function SignInDialog({ onClose, onDone }: { onClose: () => void; onDone?
             <input className={styles.input} type="email" placeholder="you@company.com" value={email} onChange={(e) => setEmail(e.target.value)} aria-label="Email" autoComplete="email" autoFocus required />
             <button className={styles.button} disabled={working || !email.includes("@")}>
               {working ? "Sending…" : "Email me a code"}
+            </button>
+            <div className={d.or}>or</div>
+            <button
+              type="button"
+              className={`${styles.ghostButton} ${d.wallet}`}
+              disabled={isPending}
+              onClick={() =>
+                withBrowserWallet(() => {
+                  onDone?.();
+                  onClose();
+                })
+              }
+            >
+              <Wallet size={16} /> Use MetaMask or another wallet
             </button>
           </form>
         ) : (
@@ -72,8 +92,9 @@ export function SignInDialog({ onClose, onDone }: { onClose: () => void; onDone?
             </button>
           </form>
         )}
-        {error && <p className={styles.error}>{error}</p>}
+        {(error ?? walletError) && <p className={styles.error}>{error ?? walletError}</p>}
       </section>
-    </div>
+    </div>,
+    document.body,
   );
 }

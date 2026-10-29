@@ -92,7 +92,7 @@ The bank, AML, FX and off-ramp providers are **sandboxes** (`server/providers.mj
 
 ### Signing in without a wallet (Coinbase embedded wallet)
 
-People can sign in with an **email**: we send a code, and a wallet is made for them (a smart account on Base Sepolia, from the [CDP Embedded Wallets](https://docs.cdp.coinbase.com/embedded-wallets)). There is nothing to install and no seed phrase. MetaMask still works ("I have MetaMask").
+People can sign in with an **email**: we send a code, and a wallet is made for them (a smart account on Base Sepolia, from the [CDP Embedded Wallets](https://docs.cdp.coinbase.com/embedded-wallets)). There is nothing to install and no seed phrase. Every sign-in button opens the same dialog, which also has "Use MetaMask or another wallet" for people who already have one.
 
 - **Set up:** create a project in the [CDP Portal](https://portal.cdp.coinbase.com), copy its Project ID into `VITE_CDP_PROJECT_ID`, and add `http://localhost:5173` and your Vercel URL to the allowed origins of its Embedded Wallets settings. Without the id the app only offers MetaMask.
 - **Sending:** the smart account sends the token approval and the deposit as one batch (`wallet_sendCalls`, one confirmation). Every action in the app goes through `src/lib/tx.ts`, which does that for the embedded wallet and signs one by one for other wallets.

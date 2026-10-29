@@ -1,0 +1,40 @@
+/* A job card with two chips floating around it. Everything here is for show. */
+.stage { position: relative; width: min(400px, 100%); margin: 0 auto; padding: 1.5rem 0 2rem; }
+.stage::before { content: ""; position: absolute; z-index: -1; inset: -10% -15%; background: radial-gradient(circle at 50% 45%, color-mix(in srgb, var(--accent) 30%, transparent), transparent 62%); }
+
+.card { position: relative; display: flex; flex-direction: column; gap: .85rem; padding: 1.25rem; border-radius: 18px; border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--line)); background: radial-gradient(circle at 100% 0, color-mix(in srgb, var(--accent) 14%, transparent), transparent 55%), var(--panel-2); box-shadow: var(--shadow-modal); }
+.head { display: flex; align-items: center; gap: .65rem; }
+.avatar { width: 34px; height: 34px; flex: none; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent-2)); }
+.name { display: flex; flex-direction: column; min-width: 0; font-size: .8rem; color: var(--muted); }
+.name strong { font-size: .95rem; color: var(--text); }
+.escrow { margin-left: auto; display: inline-flex; align-items: center; gap: .3rem; padding: .22rem .6rem; border-radius: 999px; font-size: .72rem; font-weight: 600; color: var(--link); background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.total { font-size: 2.1rem; font-weight: 700; letter-spacing: -.02em; line-height: 1; }
+
+.rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .45rem; }
+.row { display: grid; grid-template-columns: 22px 1fr auto auto; align-items: center; gap: .6rem; padding: .55rem .7rem; border-radius: 10px; border: 1px solid var(--line-2); background: var(--card-2); font-size: .88rem; }
+.mark { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; color: #fff; background: var(--c); }
+.rowTitle { font-weight: 600; }
+.amount { color: var(--muted); font-variant-numeric: tabular-nums; }
+.badge { padding: .12rem .55rem; border-radius: 999px; font-size: .7rem; font-weight: 600; color: var(--c); background: color-mix(in srgb, var(--c) 16%, transparent); }
+.paid { --c: var(--st-paid); }
+.review { --c: var(--st-submitted); border-color: color-mix(in srgb, var(--st-submitted) 45%, var(--line-2)); }
+.locked { --c: var(--st-funded); }
+.pulse { width: 8px; height: 8px; border-radius: 50%; background: #fff; animation: pulse 1.6s ease-in-out infinite; }
+
+.bar { height: 6px; border-radius: 3px; overflow: hidden; background: var(--line-3); }
+.fill { display: block; width: 36%; height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--st-paid), var(--accent)); background-size: 200% 100%; animation: shimmer 3s linear infinite; }
+
+.chip { position: absolute; display: inline-flex; align-items: center; gap: .4rem; padding: .45rem .8rem; border-radius: 999px; font-size: .8rem; font-weight: 600; white-space: nowrap; color: var(--text); border: 1px solid var(--line-4); background: var(--raised); box-shadow: var(--shadow-menu); }
+.chip svg { color: var(--accent); }
+.chipA { top: 0; left: -1.5rem; animation: bob 5s ease-in-out infinite; }
+.chipB { bottom: 0; right: -1.25rem; animation: bob 5s ease-in-out -2.5s infinite; }
+
+@keyframes pulse { 0%, 100% { transform: scale(.7); opacity: .6; } 50% { transform: scale(1.1); opacity: 1; } }
+@keyframes shimmer { to { background-position: -200% 0; } }
+@keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
+@media (prefers-reduced-motion: reduce) { .pulse, .fill, .chip { animation: none; } }
+/* The glow is wider than the card, which on a narrow screen would make the page scroll sideways. */
+@media (max-width: 900px) { .stage::before { inset: -10% 0; } }
+@media (max-width: 480px) { .chipA { left: -.25rem; } .chipB { right: -.25rem; } .card { padding: 1rem; } }
+
+:global(:root[data-theme="light"]) .chip svg, :global(:root[data-theme="light"]) .escrow { color: color-mix(in srgb, var(--accent) 62%, #000); }

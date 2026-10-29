@@ -1,0 +1,2 @@
+/* The icon and the words on one line, centred on each other, and both buttons the same height and size of text. */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; box-sizing: border-box; min-height: 2.4rem; font-family: inherit; font-size: 1rem; white-space: nowrap; }

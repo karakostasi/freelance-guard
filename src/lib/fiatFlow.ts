@@ -8,7 +8,8 @@ import { escrowAddress } from "../wagmi";
 export const EUR_PER_ETH = 2500;
 
 export type FlowKind = "funding" | "payout";
-export type PayoutRoute = "eurc" | "sepa";
+/** How a payee is paid: euros to a bank account (SEPA), dollars to a US bank account (ACH), or the stablecoin kept in their wallet. */
+export type PayoutRoute = "eurc" | "sepa" | "ach";
 
 export type SubStep = {
   id: string;
@@ -53,7 +54,7 @@ export const FUNDING_STAGES: Stage[] = [
       {
         id: "webhook",
         label: "Bank webhook verified",
-        simple: "Bank confirmed your SEPA Instant transfer",
+        simple: "Bank confirmed your payment",
         durationMs: 900,
         payload: (c) => ({ event: "sepa_instant.credited", amount: eur(c.amountEur), currency: "EUR", signature: hex(32), receivedAt: iso() }),
       },
@@ -78,7 +79,7 @@ export const FUNDING_STAGES: Stage[] = [
     group: "Fund",
     title: "Tokenization",
     icon: "coins",
-    assurance: "Euros are backed 1:1 by reserves.",
+    assurance: "Each digital euro or dollar is backed 1:1 by reserves.",
     steps: [
       {
         id: "fx",
@@ -96,8 +97,8 @@ export const FUNDING_STAGES: Stage[] = [
       },
       {
         id: "mint",
-        label: "EURC mint",
-        simple: "Digital euros created for this payment",
+        label: "Stablecoin delivered to your wallet",
+        simple: "Digital euros or dollars sent to your wallet",
         durationMs: 1100,
         payload: (c) => ({ token: "EURC", amount: eur(c.amountEur), mintTx: hex(32), network: "base-sepolia" }),
       },
@@ -225,19 +226,19 @@ export const payoutStages = (route: PayoutRoute): Stage[] => [
     group: "Payout",
     title: "Payout Routing",
     icon: "route",
-    assurance: route === "eurc" ? "You keep the digital euros." : "Converted to euros automatically.",
+    assurance: route === "eurc" ? "You keep the stablecoin." : route === "ach" ? "Converted to dollars automatically." : "Converted to euros automatically.",
     steps: [
       {
         id: "route",
-        label: route === "eurc" ? "Route: keep EURC" : "Route: off-ramp to SEPA",
-        simple: route === "eurc" ? "Payment stays as digital euros" : "Payment will be sent to the bank account",
+        label: route === "eurc" ? "Route: keep the stablecoin" : route === "ach" ? "Route: off-ramp to a US account (ACH)" : "Route: off-ramp to SEPA",
+        simple: route === "eurc" ? "Payment stays as a stablecoin" : "Payment will be sent to the bank account",
         durationMs: 800,
         payload: (c) => ({ route: c.route, fee: route === "eurc" ? "0.00" : "0.15" }),
       },
       {
         id: "convert",
-        label: route === "eurc" ? "Wallet credited" : "EURC redeemed to EUR",
-        simple: route === "eurc" ? "Digital euros added to your wallet" : "Digital euros converted to euros",
+        label: route === "eurc" ? "Wallet credited" : route === "ach" ? "Stablecoin redeemed to USD" : "EURC redeemed to EUR",
+        simple: route === "eurc" ? "The stablecoin is added to your wallet" : route === "ach" ? "Digital money converted to dollars" : "Digital euros converted to euros",
         durationMs: 1100,
         payload: (c) => ({ amount: eur(c.amountEur), token: "EURC", burnOrTransferTx: hex(32) }),
       },
@@ -252,10 +253,10 @@ export const payoutStages = (route: PayoutRoute): Stage[] => [
     steps: [
       {
         id: "settle",
-        label: route === "eurc" ? "EURC available" : "SEPA Instant sent",
-        simple: route === "eurc" ? "Funds available in your wallet" : "Transfer sent, arrives within seconds",
+        label: route === "eurc" ? "Stablecoin available" : route === "ach" ? "ACH transfer sent" : "SEPA Instant sent",
+        simple: route === "eurc" ? "Funds available in your wallet" : route === "ach" ? "Transfer sent, arrives in 1 to 2 business days" : "Transfer sent, arrives within seconds",
         durationMs: 1000,
-        payload: (c) => ({ rail: route === "eurc" ? "base-sepolia" : "sepa_instant", amount: eur(c.amountEur), reference: `SQ-${c.jobId}-${hex(3).slice(2)}` }),
+        payload: (c) => ({ rail: route === "eurc" ? "base-sepolia" : route === "ach" ? "ach" : "sepa_instant", amount: eur(c.amountEur), reference: `SQ-${c.jobId}-${hex(3).slice(2)}` }),
       },
       {
         id: "receipt",

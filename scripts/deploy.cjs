@@ -31,11 +31,12 @@ async function main() {
   const tokens = { ETH: ethers.ZeroAddress, USDC: process.env.USDC_ADDRESS || CIRCLE.USDC, EURC: process.env.EURC_ADDRESS || CIRCLE.EURC };
   // The vault that earns yield on USDC. Only USDC has one, and ETH and EURC never do.
   const vaults = { USDC: process.env.USDC_VAULT_ADDRESS || ethers.ZeroAddress };
-  // Local chains have no real stablecoins, so deploy mock ones to test token jobs with. On a testnet, MOCK_USDC=1 does
-  // the same for USDC only, because Circle's test USDC can't be minted and a mock vault needs a token it can mint yield in.
+  // Local chains have no real stablecoins, so deploy mock ones to test token jobs with. On a testnet, MOCK_USDC=1 and
+  // MOCK_EURC=1 do the same for one token each, because Circle's test tokens can't be minted: a mock vault needs a token it
+  // can mint yield in, and the paying-in-euros-or-dollars flow needs one it can create for the payer.
   const local = ["hardhat", "localhost"].includes(hre.network.name);
   for (const symbol of ["EURC", "USDC"]) {
-    if (!(local || (symbol === "USDC" && process.env.MOCK_USDC === "1"))) continue;
+    if (!(local || process.env[`MOCK_${symbol}`] === "1")) continue;
     const mock = await ethers.deployContract("MockERC20", [`Mock ${symbol}`, symbol, 6]);
     await mock.waitForDeployment();
     tokens[symbol] = await mock.getAddress();

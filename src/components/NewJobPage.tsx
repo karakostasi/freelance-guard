@@ -14,7 +14,6 @@ import { uploadDoc, uploadFile } from "../lib/files";
 import { setPendingPayment } from "../lib/pendingPayment";
 import { euro } from "../lib/jobs";
 import { ETH, TOKENS, formatBalance, formatUnitsOf, toEur } from "../lib/tokens";
-import type { PayoutRoute } from "../lib/fiatFlow";
 import { FileDrop } from "./FileDrop";
 import { ReputationBadge } from "./ReputationBadge";
 import { WalletCard } from "./WalletCard";
@@ -22,7 +21,9 @@ import styles from "../App.module.css";
 import n from "./NewJob.module.css";
 
 type Row = { title: string; percent: string; days: string };
-type PayWith = "wallet" | "bank";
+// EUR and USD are real money, paid by card or bank transfer: it becomes EURC or USDC in escrow. The rest are paid from the wallet.
+type Choice = "EUR" | "USD" | "ETH" | "EURC" | "USDC";
+const BANK_ASSET: Partial<Record<Choice, string>> = { EUR: "EURC", USD: "USDC" };
 
 const PRESETS: { label: string; rows: Row[] }[] = [
   { label: "1 payment", rows: [{ title: "Delivery", percent: "100", days: "7" }] },
@@ -53,9 +54,10 @@ const DAY = 86400;
 const sameRows = (a: Row[], b: Row[]) => a.length === b.length && a.every((r, i) => r.title === b[i].title && r.percent === b[i].percent && r.days === b[i].days);
 
 /**
- * The page for creating a job, in three steps: who and how much, the payment stages, and a review. The payer pays
- * either from their wallet (an on-chain transaction right here) or by bank transfer in euros, which hands over to the
- * live payment flow. Whatever stops a step from going on is said in words under its button.
+ * The page for creating a job, in three steps: who and how much, the payment stages, and a review. The currency next to
+ * the amount says how the payer pays: euros or dollars by card or bank transfer, which becomes a stablecoin in their
+ * wallet and hands over to the live payment flow, or ETH or a token from the wallet (an on-chain transaction right here).
+ * Whatever stops a step from going on is said in words under its button.
  */
 export function NewJobPage() {
   const { address } = useAccount();
@@ -65,9 +67,7 @@ export function NewJobPage() {
   const [txHash, setTxHash] = useState<`0x${string}` | undefined>();
   const [working, setWorking] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [payWith, setPayWith] = useState<PayWith>("wallet");
-  const [route, setRoute] = useState<PayoutRoute>("sepa");
-  const [symbol, setSymbol] = useState("EURC");
+  const [choice, setChoice] = useState<Choice>("EUR");
   const [payee, setPayee] = useState("");
   const [total, setTotal] = useState("");
   const [rows, setRows] = useState<Row[]>(PRESETS[0].rows);
@@ -80,16 +80,13 @@ export function NewJobPage() {
   const [verifier, setVerifier] = useState("");
   const [priceOpen, setPriceOpen] = useState(false);
 
-  const bank = payWith === "bank";
-  // A bank transfer is one payment for the total, so it always funds everything. Offline only ETH works.
+  // Real money runs through the backend. Without it, the wallet tokens still work.
+  const picked: Choice = BANK_ASSET[choice] && !backendOnline ? "EURC" : choice;
+  const bank = !!BANK_ASSET[picked];
+  // A bank transfer is one payment for the total, so it always funds everything.
   const fundNow = bank || fundNowChoice;
-  const assets = bank ? (backendOnline ? TOKENS.filter((t) => t.symbol !== "USDC") : [ETH]) : TOKENS;
-  const token = TOKENS.find((t) => t.symbol === symbol) ?? ETH;
-
-  const choosePayWith = (value: PayWith) => {
-    setPayWith(value);
-    if (value === "bank" && (symbol === "USDC" || (!backendOnline && symbol !== "ETH"))) setSymbol(backendOnline ? "EURC" : "ETH");
-  };
+  // The asset is also the currency of a bank payment: euros become EURC, dollars become USDC.
+  const token = TOKENS.find((t) => t.symbol === (BANK_ASSET[picked] ?? picked)) ?? ETH;
 
   const reset = () => {
     setStep(1);
@@ -132,10 +129,10 @@ export function NewJobPage() {
   if (rows.length > 0) amounts[rows.length - 1] = totalUnits - amounts.slice(0, -1).reduce((a, b) => a + b, 0n);
   const rowsValid = rows.length > 0 && percentSum === 100n && percents.every((p) => p > 0n) && rows.every((r) => Number(r.days) > 0 && r.title.trim());
 
-  // A token with a vault can earn yield while the money is in escrow. The payer then pays no service fee. Only wallet
-  // payments can take it: a bank transfer is always paid in EURC or ETH, which have none.
+  // A token with a vault can earn yield while the money is in escrow. The payer then pays no service fee. That is USDC
+  // for now, whether it is paid from the wallet or bought with dollars.
   const config = useTokenConfig(token);
-  const hasYield = !bank && !!config && config.vault !== zeroAddress;
+  const hasYield = !!config && config.vault !== zeroAddress;
   const useYield = hasYield && yieldChoice;
   // The escrow prices the job: the fee the payee pays out of the payments, and the service fee the payer pays on top.
   const quote = useQuote(token, amounts, useYield, totalUnits > 0n && rowsValid && amounts.every((a) => a > 0n));
@@ -143,11 +140,17 @@ export function NewJobPage() {
   const surcharge = fundNow ? (quote.surcharge ?? 0n) : 0n;
   const due = totalUnits + surcharge;
   const verifierValid = verifier === "" || (isAddress(verifier) && verifier.toLowerCase() !== payee.toLowerCase());
-  const short = fundNow && balance !== undefined && due > balance;
+  // A bank payment doesn't need the money in the wallet: it is what the payment puts there.
+  const short = fundNow && !bank && balance !== undefined && due > balance;
   // What taking the yield saves on the service fee.
   const saved = hasYield ? amounts.reduce((sum, a) => sum + surchargeOn(a, config?.surchargeBps ?? 0), 0n) : 0n;
   const feePercent = (Number(config?.surchargeBps ?? 0) / 100).toString();
   const eur = token.eurPer > 0 ? toEur(token, due) : 0;
+  // What the payer pays the bank: dollars for USDC, euros for EURC.
+  const fiatCurrency = token.symbol === "USDC" ? "USD" : "EUR";
+  const fiatText = (units: bigint) => new Intl.NumberFormat(fiatCurrency === "USD" ? "en-US" : "en-IE", { style: "currency", currency: fiatCurrency }).format(Number(formatUnits(units, token.decimals)));
+  // An amount the way the payer thinks of it: money for a bank payment, the token otherwise.
+  const show = (units: bigint) => (bank ? fiatText(units) : formatUnitsOf(token, units));
   const activePreset = PRESETS.find((p) => sameRows(p.rows, rows))?.label ?? null;
 
   /** What stops the job from going past this step, in words. Empty when nothing does. */
@@ -157,7 +160,7 @@ export function NewJobPage() {
       if (title.trim().length === 0) return "Add a job title: what is this for?";
       if (totalUnits <= 0n) return "Enter the amount.";
       if (config && !config.enabled) return `${token.symbol} isn't accepted here.`;
-      if (config && totalUnits < config.minJob) return `The smallest job is ${formatUnitsOf(token, config.minJob)}.`;
+      if (config && totalUnits < config.minJob) return `The smallest job is ${show(config.minJob)}.`;
     }
     if (upTo >= 2) {
       if (percentSum !== 100n) return `The shares must add up to 100% (now ${percentSum}%).`;
@@ -198,9 +201,9 @@ export function NewJobPage() {
         setPendingPayment({
           payee,
           amount: formatUnits(totalUnits, token.decimals),
-          token: token.symbol === "EURC" ? "eurc" : "eth",
+          token: token.symbol === "EURC" ? "eurc" : token.symbol === "USDC" ? "usdc" : "eth",
+          useYield,
           description,
-          route,
           milestones: rows.map((r, i) => ({ title: r.title.trim(), amount: formatUnits(amounts[i], token.decimals), days: r.days })),
         });
         reset();
@@ -326,18 +329,35 @@ export function NewJobPage() {
           <label htmlFor="amount">Amount</label>
           <div className={styles.amountRow}>
             <input id="amount" className={`${styles.input} ${n.amount}`} inputMode="decimal" placeholder="0.00" value={total} onChange={(e) => setTotal(e.target.value)} />
-            <select className={styles.input} value={symbol} onChange={(e) => setSymbol(e.target.value)} aria-label="Pay with">
-              {assets.map((t) => (
-                <option key={t.symbol} value={t.symbol}>
-                  {t.symbol}
+            <select className={styles.input} value={picked} onChange={(e) => setChoice(e.target.value as Choice)} aria-label="Pay with">
+              <optgroup label="Card or bank transfer">
+                <option value="EUR" disabled={!backendOnline}>
+                  EUR
                 </option>
-              ))}
+                <option value="USD" disabled={!backendOnline}>
+                  USD
+                </option>
+              </optgroup>
+              <optgroup label="From your wallet">
+                {TOKENS.map((t) => (
+                  <option key={t.symbol} value={t.symbol}>
+                    {t.symbol}
+                  </option>
+                ))}
+              </optgroup>
             </select>
           </div>
           <span className={styles.muted}>
-            {totalUnits > 0n && eur > 0 && `${token.symbol === "ETH" ? "≈" : "="} ${euro(toEur(token, totalUnits))}${token.symbol === "ETH" ? " (demo rate)" : ""} · `}
-            {balance !== undefined && `Your balance: ${formatBalance(balance, token.decimals)} ${token.symbol}`}
-            {balance === 0n && (token.address ? " · get free test tokens at faucet.circle.com" : " · you need some Base Sepolia ETH, from any Base Sepolia faucet")}
+            {bank ? (
+              `You pay by card or bank transfer. It is converted to ${token.symbol} and held in escrow.`
+            ) : (
+              <>
+                {totalUnits > 0n && eur > 0 && `${token.symbol === "ETH" ? "≈" : "="} ${euro(toEur(token, totalUnits))}${token.symbol === "ETH" ? " (demo rate)" : ""} · `}
+                {balance !== undefined && `Your balance: ${formatBalance(balance, token.decimals)} ${token.symbol}`}
+                {balance === 0n && (token.address ? " · get free test tokens at faucet.circle.com" : " · you need some Base Sepolia ETH, from any Base Sepolia faucet")}
+              </>
+            )}
+            {!backendOnline && " EUR and USD need the backend, which is offline right now."}
           </span>
         </div>
         {hasYield && (
@@ -347,7 +367,7 @@ export function NewJobPage() {
                 <strong>Earn yield, pay no service fee</strong>
                 {saved > 0n && (
                   <span className={styles.yieldSave}>
-                    {useYield ? "Saves" : "Save"} {formatUnitsOf(token, saved)}
+                    {useYield ? "Saves" : "Save"} {show(saved)}
                   </span>
                 )}
               </span>
@@ -402,7 +422,7 @@ export function NewJobPage() {
             <button type="button" className={styles.iconButton} disabled={rows.length === 1} onClick={() => setRows((rs) => rs.filter((_, j) => j !== i))} aria-label={`Remove stage ${i + 1}`}>
               <X size={16} />
             </button>
-            {totalUnits > 0n && <span className={`${styles.muted} ${styles.milestoneAmount}`}>{formatUnitsOf(token, amounts[i])}</span>}
+            {totalUnits > 0n && <span className={`${styles.muted} ${styles.milestoneAmount}`}>{show(amounts[i])}</span>}
           </div>
         ))}
         <div className={styles.presets}>
@@ -415,28 +435,6 @@ export function NewJobPage() {
         <details className={n.more}>
           <summary>More options</summary>
           <div className={n.moreInner}>
-            <fieldset className={n.fieldset}>
-              <legend>How do you pay?</legend>
-              <label className={n.radio}>
-                <input type="radio" name="paywith" checked={!bank} onChange={() => choosePayWith("wallet")} />
-                <span>
-                  <b>From my wallet</b> <span className={styles.muted}>ETH or a token. You confirm in your wallet.</span>
-                </span>
-              </label>
-              <label className={n.radio}>
-                <input type="radio" name="paywith" checked={bank} onChange={() => choosePayWith("bank")} />
-                <span>
-                  <b>Bank transfer in euros</b>{" "}
-                  <span className={styles.muted}>Pay by SEPA. The bank steps are a sandbox demo.{!backendOnline && " The backend is offline, so it runs as a local demo with ETH."}</span>
-                </span>
-              </label>
-              {bank && backendOnline && (
-                <select className={styles.input} value={route} onChange={(e) => setRoute(e.target.value as PayoutRoute)} aria-label="Payee payout">
-                  <option value="sepa">The payee is paid out by SEPA bank transfer</option>
-                  <option value="eurc">The payee keeps EURC in their wallet</option>
-                </select>
-              )}
-            </fieldset>
             <fieldset className={n.fieldset}>
               <legend>When do you pay?</legend>
               <label className={n.radio}>
@@ -507,7 +505,7 @@ export function NewJobPage() {
           </div>
           <div>
             <dt>Paid with</dt>
-            <dd>{bank ? "Bank transfer in euros" : token.symbol}</dd>
+            <dd>{bank ? `Card or bank transfer in ${fiatCurrency === "USD" ? "US dollars" : "euros"}` : token.symbol}</dd>
           </div>
         </dl>
         <table className={n.sched}>
@@ -523,14 +521,14 @@ export function NewJobPage() {
               <tr key={i}>
                 <td>{r.title}</td>
                 <td className={styles.muted}>{nothingNow ? `${r.days} days after you fund it` : `within ${r.days} days`}</td>
-                <td>{formatUnitsOf(token, amounts[i])}</td>
+                <td>{show(amounts[i])}</td>
               </tr>
             ))}
           </tbody>
         </table>
         <div className={n.total}>
           <span className={n.totalLabel}>{nothingNow ? "You pay now" : "You pay"}</span>
-          <span className={n.totalValue}>{formatUnitsOf(token, nothingNow ? 0n : due)}</span>
+          <span className={n.totalValue}>{show(nothingNow ? 0n : due)}</span>
           <span className={styles.muted}>
             {nothingNow
               ? useYield
@@ -538,10 +536,11 @@ export function NewJobPage() {
                 : `Nothing is locked yet. You fund each stage when it starts, and pay a ${feePercent}% service fee on top of each one.`
               : useYield
                 ? "No service fee. While your money is in escrow it earns yield for Squirrel, and you get all of it back."
-                : `${formatUnitsOf(token, totalUnits)} for the job + ${formatUnitsOf(token, surcharge)} service fee`}
-            {!nothingNow && eur > 0 && ` · ${token.symbol === "ETH" ? "≈ " : ""}${euro(eur)}`}
+                : `${show(totalUnits)} for the job + ${show(surcharge)} service fee`}
+            {!nothingNow && !bank && eur > 0 && ` · ${token.symbol === "ETH" ? "≈ " : ""}${euro(eur)}`}
           </span>
-          {!nothingNow && balance !== undefined && (
+          {bank && <span className={styles.muted}>You pay by card or bank transfer. It arrives in your wallet as {formatUnitsOf(token, due)}, and you deposit that into escrow.</span>}
+          {!nothingNow && !bank && balance !== undefined && (
             <span className={styles.muted}>
               Your balance: {formatBalance(balance, token.decimals)} {token.symbol}
               {balance >= due && ` → ${formatBalance(balance - due, token.decimals)} ${token.symbol} after paying`}
@@ -563,14 +562,14 @@ export function NewJobPage() {
         </div>
         {priceOpen && (
           <p className={styles.muted}>
-            The payee pays Squirrel a fee{quote.fee !== undefined ? ` of ${formatUnitsOf(token, quote.fee)}` : ""} (the larger of a minimum and 0.25% of the job) out of what they receive, shared between the stages.{" "}
+            The payee pays Squirrel a fee{quote.fee !== undefined ? ` of ${show(quote.fee)}` : ""} (the larger of a minimum and 0.25% of the job) out of what they receive, shared between the stages.{" "}
             {useYield ? "You pay nothing extra because your money earns yield while it waits." : `You pay ${feePercent}% on top of each stage.${hasYield ? " Choose to earn yield on the first step to avoid it." : ""}`}
           </p>
         )}
       </section>
       <div className={n.payBlock}>
         <button type="button" className={`${styles.button} ${n.payButton}`} disabled={!!problem(3) || busy} onClick={submit} aria-describedby={problem(3) ? "create-blocked" : undefined}>
-          {working || (bank ? `Pay by bank transfer${eur > 0 ? ` (${euro(eur)})` : ""}` : nothingNow ? "Create the job" : `Pay ${formatUnitsOf(token, due)}`)}
+          {working || (bank ? `Pay ${fiatText(due)} by card or bank transfer` : nothingNow ? "Create the job" : `Pay ${formatUnitsOf(token, due)}`)}
         </button>
         {problem(3) && !busy && (
           <span className={styles.hint} id="create-blocked" role="status">
@@ -580,7 +579,7 @@ export function NewJobPage() {
         <span className={styles.muted}>
           {bank
             ? token.address
-              ? "Your EURC is taken from your wallet at the deposit step: approve, then deposit."
+              ? `The ${token.symbol} arrives in your wallet first. Then you confirm twice: allow the token, then deposit.`
               : "You confirm the deposit once in your wallet."
             : nothingNow || !token.address
               ? "You confirm once in your wallet."

@@ -55,10 +55,11 @@ A job has 1 to 20 milestones, each with a title, an amount and the number of day
 - `token` is `address(0)` for ETH, or an ERC-20 address. A job uses one token. The payer approves the escrow first, and payouts and refunds are in the same token. Fee-on-transfer tokens are rejected.
 - All actions take the job id and the milestone index: `submitWork`, `approve` (the payer or the verifier), `claimAfterTimeout`, `dispute`, `resolve`, `refundExpired`. The payer can change or remove the verifier at any time with `setVerifier(id, address)`. Once a verifier approves a milestone the payer can no longer dispute it.
 
-"Create a job" is a page of its own, in three steps: who you pay, for what and how much; the payment stages (1 payment, 50 / 50, 30 / 40 / 30, or custom shares); and a review that shows the one number you pay. A button that is off always says why under it. The options most people leave alone sit under "More options" on the second step:
-- **From my wallet:** an on-chain transaction, with ETH, EURC or USDC, funding everything now or milestone by milestone.
-- **Bank transfer in euros:** the backend runs the live payment flow (sandbox bank steps, then a real deposit signed in the wallet). It pays everything at once, with ETH or EURC, and the live steps follow the first milestone. Other milestones show the real on-chain data.
-- The verifier, the description and files, and the business details are there too.
+"Create a job" is a page of its own, in three steps: who you pay, for what and how much; the payment stages (1 payment, 50 / 50, 30 / 40 / 30, or custom shares); and a review that shows the one number you pay. A button that is off always says why under it. The currency next to the amount says how you pay:
+- **ETH, EURC or USDC:** from your wallet, an on-chain transaction, funding everything now or milestone by milestone.
+- **EUR or USD:** by card or bank transfer. The backend runs the live payment flow (sandbox bank steps, then a real deposit signed in the wallet). Euros become EURC and dollars become USDC, in the payer's own wallet, and USDC can take the yield. It pays everything at once, and the live steps follow the first milestone. Other milestones show the real on-chain data. Without the backend these two are greyed out.
+
+The options most people leave alone sit under "More options" on the second step: when to fund, a verifier, the description and files, and the business details.
 
 On the Jobs page a job opens with what it is worth to you (the payer sees what they pay, the payee what they earn after the fee), the one thing to do next with its main button, and its stages. Reporting a problem, the transactions and the details are one click away. The Payment flow page shows the same next step on top, and below it the journey as a row of boxes, with a Simple and a Detailed view.
 
@@ -69,6 +70,14 @@ On Base Sepolia the app uses Circle's test EURC and USDC. Get free test tokens a
 2. The deployer is the owner and sets up ETH, USDC and EURC (the smallest fee and job come from `MIN_FEE_EUR` and `MIN_JOB_EUR`, the launch values are 40 and 2000). Set `ARBITER_ADDRESS`, `TREASURY_ADDRESS` and `OWNER_ADDRESS` to addresses you control before a real deployment.
 3. Set the new address in Vercel (`VITE_ESCROW_ADDRESS`, `VITE_ESCROW_DEPLOY_BLOCK`), Render (`ESCROW_ADDRESS`) and your local `.env`.
 4. Merge and redeploy. Jobs on the old contract no longer show, and the backend ignores their payment runs.
+
+## Paying in euros or dollars
+
+The payer pays in euros or US dollars and gets the matching stablecoin (EURC or USDC) in their own wallet, then deposits it into escrow with the same wallet. The bank, AML and FX steps are sandboxes, and the conversion works like this:
+
+- **Test networks (what runs today).** The sandbox stands in for an on-ramp that delivers the token: the backend mints the payer a test token of the exact amount (the job plus the surcharge) before asking them to sign. That only works with the mock tokens, which anyone can mint, so deploy with `MOCK_USDC=1` (and a mock EURC) and set `MINT_PRIVATE_KEY` for the backend. Circle's test tokens can't be minted, so with those the payer has to hold the token already, and the step says so. The key is only used on Hardhat, Base Sepolia and Sepolia (`server/minter.mjs`), never set it on a real network.
+- **How the payee is paid.** The payee decides, not the payer: a bank account in euros (SEPA), a US bank account in dollars (ACH), or the stablecoin kept in their wallet. They choose it from the next-step card of a job or from "How I get paid" in the account menu, and can change it until the payment is released, which is when the backend reads it (`server/payout.mjs`). Anyone can see how an address is paid and the last four digits of the account, only the payee can read the account. IBANs and US routing numbers are checked, and in the sandbox no money moves.
+- **Real money.** The conversion moves to a licensed on-ramp (a widget the payer pays in, which sends the stablecoin to their wallet). The place to change is the `mint` step of the pipeline in `server/pipeline.mjs` and `server/providers.mjs`. Nothing there runs against a real provider yet. The sandboxes of the providers I checked (Transak, MoonPay) don't deliver USDC or EURC on Base Sepolia, only their own test tokens.
 
 ## Payment flow backend (optional)
 

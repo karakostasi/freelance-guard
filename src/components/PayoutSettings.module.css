@@ -1,0 +1,8 @@
+.ways { display: flex; flex-direction: column; gap: .5rem; }
+.way { display: flex; align-items: flex-start; gap: .6rem; padding: .75rem .9rem; border-radius: 10px; border: 1px solid var(--line-3); background: var(--card-2); cursor: pointer; transition: border-color .15s; }
+.way:hover { border-color: var(--line-6); }
+.way > span { display: flex; flex-direction: column; gap: .15rem; }
+.way input { margin-top: .25rem; accent-color: #4f7cff; }
+.wayOn { border-color: #4f7cff; box-shadow: 0 0 0 1px #4f7cff; background: rgba(79, 124, 255, .08); }
+.mono { font-family: ui-monospace, monospace; }
+.ok { color: var(--good-text); font-size: .9rem; }

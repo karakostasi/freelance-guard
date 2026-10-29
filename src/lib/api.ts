@@ -8,7 +8,13 @@ export type PaymentRun = {
   payer: string;
   payee: string;
   amount: string;
-  token: "eth" | "eurc";
+  token: "eth" | "eurc" | "usdc";
+  /** What the payer pays the bank in: dollars for USDC, euros for the rest. */
+  currency: "EUR" | "USD";
+  /** The bank transfer in that currency: the job plus the surcharge. */
+  transferFiat: number;
+  /** The job takes the yield, so there is no surcharge. */
+  useYield: boolean;
   /** The job amount in euros. What the payee is owed, before the platform fee. */
   amountEur: number;
   /** What the payer pays on top of the amount, in the job's token, and the payee's fee. */
@@ -47,8 +53,8 @@ const post = <T>(path: string, body: unknown) => request<T>(path, { method: "POS
 
 export const api = {
   health: () => request<{ ok: boolean; eurPerEth: number }>("/api/health"),
-  createPayment: (body: { payer: string; payee: string; amount: string; token: "eth" | "eurc"; milestones: { title: string; amount: string; days: string }[]; description: string; route: PayoutRoute }) =>
-    post<{ run: PaymentRun; bank: { reference: string; amountEur: number } }>("/api/payments", body),
+  createPayment: (body: { payer: string; payee: string; amount: string; token: "eth" | "eurc" | "usdc"; useYield?: boolean; milestones: { title: string; amount: string; days: string }[]; description: string }) =>
+    post<{ run: PaymentRun; bank: { reference: string; amountEur: number; amount: number; currency: "EUR" | "USD" } }>("/api/payments", body),
   bankTransfer: (reference: string) => post<{ ok: boolean }>("/api/sandbox/bank-transfer", { reference }),
   markSigned: (id: string, gasMode: "sponsored" | "wallet") => post(`/api/payments/${id}/signed`, { gasMode }),
   cancel: (id: string, reason: string) => post(`/api/payments/${id}/cancel`, { reason }),
@@ -65,4 +71,20 @@ export const emailApi = {
   get: (token: string) => request<EmailStatus>("/api/email", { headers: { authorization: `Bearer ${token}` } }),
   set: (token: string, email: string) => request<EmailStatus>("/api/email", { method: "POST", headers: { authorization: `Bearer ${token}` }, body: JSON.stringify({ email }) }),
   remove: (token: string) => request<EmailStatus>("/api/email", { method: "DELETE", headers: { authorization: `Bearer ${token}` } }),
+};
+
+/** What anyone may see of how a payee is paid: the way, and the last digits of the account. */
+export type PayoutPublic = { route: "sepa" | "ach" | "eurc" | null; currency?: "EUR" | "USD"; last4?: string };
+
+/** What the payee saved, in full. Only they can read it. */
+export type PayoutChoice = { route: "sepa" | "ach" | "eurc" | null; holder?: string; iban?: string; routing?: string; account?: string };
+
+const authed = (token: string, init?: RequestInit) => ({ ...init, headers: { authorization: `Bearer ${token}`, ...init?.headers } });
+
+export const payoutApi = {
+  /** How this address is paid. No sign-in needed, the account is not in it. */
+  of: (address: string) => request<PayoutPublic>(`/api/payout/${address}`),
+  get: (token: string) => request<PayoutChoice>("/api/payout", authed(token)),
+  set: (token: string, choice: PayoutChoice) => request<PayoutChoice>("/api/payout", authed(token, { method: "PUT", body: JSON.stringify(choice) })),
+  clear: (token: string) => request<PayoutChoice>("/api/payout", authed(token, { method: "DELETE" })),
 };

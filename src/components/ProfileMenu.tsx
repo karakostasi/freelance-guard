@@ -2,10 +2,11 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAccount, useBalance, useConnect, useDisconnect } from "wagmi";
 import { formatEther } from "viem";
-import { Check, Copy, LogOut, Mail, Repeat } from "lucide-react";
+import { Check, Copy, Landmark, LogOut, Mail, Repeat } from "lucide-react";
 import { avatarGradient } from "../lib/avatar";
 import { short } from "../lib/jobs";
 import { NotificationSettings } from "./NotificationSettings";
+import { PayoutSettings } from "./PayoutSettings";
 import styles from "../App.module.css";
 
 /** The account in the header: a "Connect wallet" button, or the account avatar with a menu. */
@@ -18,6 +19,7 @@ export function ProfileMenu() {
   const [anchor, setAnchor] = useState<{ top: number; right: number } | null>(null);
   const [copied, setCopied] = useState(false);
   const [notifying, setNotifying] = useState(false);
+  const [payout, setPayout] = useState(false);
 
   useEffect(() => {
     if (!anchor) return;
@@ -95,6 +97,16 @@ export function ProfileMenu() {
               >
                 <Mail size={15} /> Email notifications
               </button>
+              <button
+                className={styles.menuItem}
+                onClick={() => {
+                  setAnchor(null);
+                  setPayout(true);
+                }}
+                role="menuitem"
+              >
+                <Landmark size={15} /> How I get paid
+              </button>
               <button className={styles.menuItem} onClick={switchAccount} role="menuitem">
                 <Repeat size={15} /> Switch account
               </button>
@@ -113,6 +125,7 @@ export function ProfileMenu() {
           document.body,
         )}
       {notifying && createPortal(<NotificationSettings onClose={() => setNotifying(false)} />, document.body)}
+      {payout && createPortal(<PayoutSettings onClose={() => setPayout(false)} />, document.body)}
     </>
   );
 }

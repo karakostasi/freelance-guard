@@ -16,6 +16,7 @@ import { useFiatFunding, type FundingForm } from "../hooks/useFiatFunding";
 import { useFlowRun } from "../hooks/useFlowRun";
 import { useJobTrace } from "../hooks/useJobTrace";
 import { useMyJobs } from "../hooks/useMyJobs";
+import { usePayoutOf } from "../hooks/usePayoutOf";
 import { deriveJourney, simulatedPayloads } from "../lib/chainFlow";
 import { FUNDING_STAGES, ROUTING_STAGE, journeyStages, type FlowState, type PayoutRoute } from "../lib/fiatFlow";
 import { STATUS_CLASS, STATUS_LABEL, currentMilestone, type Job } from "../lib/jobs";
@@ -140,11 +141,13 @@ function JobJourney({ id, job, mode, onModeChange }: { id: number; job: Job; mod
   const sim = useMemo(() => simulatedPayloads(FUNDING_STAGES, { jobId: String(id), amountEur }), [id, amountEur]);
 
   const [localRoute, setRoute] = useState<PayoutRoute>("sepa");
+  // The payee decides how they are paid. Until they have, the demo falls back to the run's route or a local choice.
+  const chosen = usePayoutOf(job.payee).data?.route ?? null;
   const localPayout = useFlowRun(`journey-payout:${id}:${index}`);
   // Backend payment runs only cover the first (and only) milestone of the job they created.
   const backendRun = useBackendRun(id);
   const backend = index === 0 ? backendRun : null;
-  const route = backend?.run.route ?? localRoute;
+  const route = chosen ?? backend?.run.route ?? localRoute;
   const stages = journeyStages(route);
 
   // With a backend run, bank/ledger payloads and the whole payout come from the backend's real events.
@@ -211,6 +214,7 @@ function JobJourney({ id, job, mode, onModeChange }: { id: number; job: Job; mod
             reset: localPayout.reset,
             amountEur,
             auto: !!backend,
+            fixed: !!chosen,
           }}
         />
 

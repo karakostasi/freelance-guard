@@ -1,6 +1,9 @@
+import { useState } from "react";
 import { useAccount } from "wagmi";
 import { RotateCcw } from "lucide-react";
 import { JobActions } from "./JobActions";
+import { PayoutSettings } from "./PayoutSettings";
+import { describePayout, usePayoutOf } from "../hooks/usePayoutOf";
 import { DeliverableView } from "./DocView";
 import { useDoc } from "../hooks/useDoc";
 import { useEscrowConfig } from "../hooks/useEscrowConfig";
@@ -21,6 +24,8 @@ export type PayoutControls = {
   amountEur: number;
   /** Payout is run by the backend, so there is nothing to click. */
   auto?: boolean;
+  /** The payee has chosen how they are paid, so the route is not for anyone to pick here. */
+  fixed?: boolean;
 };
 
 type Tone = "action" | "wait" | "done";
@@ -36,6 +41,8 @@ export function NextStep({ id, index, job, payout }: { id: number; index: number
   const now = useNow();
   const { ref } = parseDescription(job.description);
   const { data: doc } = useDoc(ref);
+  const payoutPref = usePayoutOf(job.payee);
+  const [choosing, setChoosing] = useState(false);
 
   const me = address?.toLowerCase();
   const ms = job.milestones[index];
@@ -109,7 +116,7 @@ export function NextStep({ id, index, job, payout }: { id: number; index: number
     title = isPayee ? `You received ${net}` : payout ? (routing === "done" ? "All done" : routing === "running" ? "Routing the payout…" : "Payment released") : `${name ? `The ${name}` : "The payment"} is paid`;
     detail =
       payout && routing === "done"
-        ? `${euro(payout.amountEur)} ${payout.route === "eurc" ? "kept as EURC in the wallet" : "sent to the bank account via SEPA Instant"}.`
+        ? `${euro(payout.amountEur)} ${payout.route === "eurc" ? "kept as a stablecoin in the wallet" : payout.route === "ach" ? "sent to the US bank account by ACH" : "sent to the bank account via SEPA Instant"}.`
         : `The escrow released ${gross} to the payee.${nextText}`;
   } else if (status === "Refunded") {
     tone = "wait";
@@ -121,13 +128,18 @@ export function NextStep({ id, index, job, payout }: { id: number; index: number
   const paidActions = status === "Paid" && (
     <div className={s.actions}>
       {payout?.auto ? (
-        <span className={styles.muted}>Route: {payout.route === "eurc" ? "keep EURC" : "SEPA bank transfer"}</span>
+        <span className={styles.muted}>Route: {payout.route === "eurc" ? "keep the stablecoin" : payout.route === "ach" ? "ACH bank transfer in dollars" : "SEPA bank transfer"}</span>
       ) : payout ? (
         <>
-          <select className={styles.input} value={payout.route} disabled={payout.state.status === "running"} onChange={(e) => payout.setRoute(e.target.value as PayoutRoute)} aria-label="Where the payout goes">
-            <option value="sepa">Off-ramp to SEPA</option>
-            <option value="eurc">Keep EURC</option>
-          </select>
+          {payout.fixed ? (
+            <span className={styles.muted}>Route chosen by the payee: {payout.route === "eurc" ? "keep the stablecoin" : payout.route === "ach" ? "ACH bank transfer in dollars" : "SEPA bank transfer"}</span>
+          ) : (
+            <select className={styles.input} value={payout.route} disabled={payout.state.status === "running"} onChange={(e) => payout.setRoute(e.target.value as PayoutRoute)} aria-label="Where the payout goes">
+              <option value="sepa">Off-ramp to SEPA</option>
+              <option value="ach">Off-ramp to a US account (ACH)</option>
+              <option value="eurc">Keep the stablecoin</option>
+            </select>
+          )}
           <button className={styles.button} disabled={payout.state.status === "running"} onClick={payout.start}>
             {payout.state.status === "done" ? "Run again" : "Route payout"}
           </button>
@@ -155,6 +167,26 @@ export function NextStep({ id, index, job, payout }: { id: number; index: number
       )}
       {detail && <p className={s.detail}>{detail}</p>}
       {status === "Paid" || status === "Refunded" ? paidActions : <JobActions id={String(id)} index={index} job={job} />}
+      {/* The payee decides where the money goes, and can change it until the payment is released. */}
+      {(status === "Unfunded" || status === "Funded" || status === "Submitted" || status === "Disputed") && (isPayee || isPayer) && (
+        <p className={s.payout}>
+          {payoutPref.data?.route ? (
+            <>
+              {isPayee ? "You get paid in" : "The payee gets paid in"} {describePayout(payoutPref.data)}.
+            </>
+          ) : isPayee ? (
+            "Choose how you want to be paid: a bank account, or the stablecoin in your wallet."
+          ) : (
+            "The payee hasn't chosen yet how they get paid."
+          )}{" "}
+          {isPayee && (
+            <button type="button" className={styles.textButton} onClick={() => setChoosing(true)}>
+              {payoutPref.data?.route ? "Change" : "Choose"}
+            </button>
+          )}
+        </p>
+      )}
+      {choosing && <PayoutSettings onClose={() => setChoosing(false)} />}
     </section>
   );
 }

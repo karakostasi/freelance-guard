@@ -13,3 +13,4 @@
 .card > input { width: 100%; max-width: 480px; }
 .actions { display: flex; align-items: flex-start; flex-wrap: wrap; gap: .5rem; }
 .actions input, .actions select, .actions button { box-sizing: border-box; min-height: 2.4rem; }
+.payout { margin: 0; font-size: .88rem; color: var(--muted); }

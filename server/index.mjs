@@ -7,6 +7,7 @@ import { db, flush, save } from "./db.mjs";
 import { watchEscrow, ESCROW_ADDRESS, RPC_URL, abi, client } from "./chain.mjs";
 import { cleanEmail, confirmToken, notifyParties, readEmailToken, unsubscribeToken } from "./emails.mjs";
 import { sendMail } from "./mail.mjs";
+import { ROUTES, cleanPayout, publicPayout } from "./payout.mjs";
 import { bankReceived, createRun, fail, milestonePlan, onChainEvent, onThisContract, publicRun, subscribe } from "./pipeline.mjs";
 import { EUR_PER_ETH } from "./providers.mjs";
 
@@ -35,7 +36,7 @@ const corsFor = (req) => {
     "access-control-allow-origin": allowedOrigins.length === 0 ? "*" : allowedOrigins.includes(origin) ? origin : allowedOrigins[0],
     vary: "Origin",
     "access-control-allow-headers": "content-type, x-signature, last-event-id, authorization, x-file-name",
-    "access-control-allow-methods": "GET, POST, DELETE, OPTIONS",
+    "access-control-allow-methods": "GET, POST, PUT, DELETE, OPTIONS",
   };
 };
 
@@ -141,7 +142,8 @@ function validatePayment(b) {
   if (!ADDRESS.test(b.payee ?? "")) throw fieldError("payee must be an address");
   if (b.payer.toLowerCase() === b.payee.toLowerCase()) throw fieldError("payee must differ from payer");
   if (!(Number(b.amount) > 0)) throw fieldError("amount must be greater than 0");
-  if (b.token !== undefined && !["eth", "eurc"].includes(b.token)) throw fieldError("token must be eth or eurc");
+  if (b.token !== undefined && !["eth", "eurc", "usdc"].includes(b.token)) throw fieldError("token must be eth, eurc or usdc");
+  if (b.useYield !== undefined && typeof b.useYield !== "boolean") throw fieldError("useYield must be true or false");
   milestonePlan(b);
 }
 
@@ -218,6 +220,27 @@ const server = createServer(async (req, res) => {
       return page(res, 200, confirming ? "Email confirmed. You will get a message when a job is funded or work is submitted." : "Done. You won't get any more emails.");
     }
 
+    // ---- how a payee wants to be paid ----
+    // Anyone can see how an address is paid (not the account). Only that address can read the account or change the choice.
+    const payoutOf = path.match(/^\/api\/payout\/(0x[0-9a-fA-F]{40})$/);
+    if (req.method === "GET" && payoutOf) return send(res, 200, publicPayout(db.payouts[payoutOf[1].toLowerCase()]));
+    if (path === "/api/payout") {
+      const owner = bearer(req)?.toLowerCase();
+      if (!owner) throw Object.assign(new Error("Sign in with your wallet to choose how you get paid"), { status: 401 });
+      if (req.method === "GET") return send(res, 200, db.payouts[owner] ?? { route: null });
+      if (req.method === "PUT") {
+        const { body } = await json(req);
+        db.payouts[owner] = cleanPayout(body);
+        save();
+        return send(res, 200, db.payouts[owner]);
+      }
+      if (req.method === "DELETE") {
+        delete db.payouts[owner];
+        save();
+        return send(res, 200, { route: null });
+      }
+    }
+
     if (req.method === "POST" && path === "/api/files") {
       const owner = bearer(req);
       if (!owner) throw Object.assign(new Error("Sign in with your wallet to upload files"), { status: 401 });
@@ -257,7 +280,7 @@ const server = createServer(async (req, res) => {
       const { body } = await json(req);
       validatePayment(body);
       const run = await createRun(body);
-      return send(res, 201, { run: publicRun(run), bank: { iban: "DE89 3704 0044 0532 0130 00", name: "Squirrel (sandbox)", reference: run.ref, amountEur: run.transferEur } });
+      return send(res, 201, { run: publicRun(run), bank: { iban: "DE89 3704 0044 0532 0130 00", name: "Squirrel (sandbox)", reference: run.ref, amountEur: run.transferEur, amount: run.transferFiat, currency: run.currency } });
     }
 
     // Stand-in for the user's banking app: it triggers the same signed webhook a real bank would send.
@@ -265,7 +288,7 @@ const server = createServer(async (req, res) => {
       const { body } = await json(req);
       const run = Object.values(db.runs).find((r) => r.ref === body.reference);
       if (!run) throw Object.assign(new Error("Unknown reference"), { status: 404 });
-      const payload = JSON.stringify({ reference: run.ref, amountEur: run.transferEur ?? run.amountEur, iban: "DE89 3704 0044 0532 0130 00" });
+      const payload = JSON.stringify({ reference: run.ref, amount: run.transferFiat ?? run.transferEur ?? run.amountEur, currency: run.currency ?? "EUR", iban: "DE89 3704 0044 0532 0130 00" });
       const r = await fetch(`http://127.0.0.1:${PORT}/webhooks/bank`, { method: "POST", headers: { "content-type": "application/json", "x-signature": sign(payload) }, body: payload });
       return send(res, r.status, await r.json());
     }
@@ -305,7 +328,7 @@ const server = createServer(async (req, res) => {
       }
       if (req.method === "POST" && action === "route") {
         const { body } = await json(req);
-        if (!["sepa", "eurc"].includes(body.route)) throw fieldError("route must be sepa or eurc");
+        if (!ROUTES.includes(body.route)) throw fieldError("route must be sepa, ach or eurc");
         if (["released", "paid_out", "refunded", "failed"].includes(run.status)) throw Object.assign(new Error("Payout already started"), { status: 409 });
         run.route = body.route;
         save();

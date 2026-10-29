@@ -81,6 +81,9 @@ async function main() {
       RPC_URL: RPC,
       ESCROW_ADDRESS: escrow,
       EURC_ADDRESS: eurc,
+      USDC_ADDRESS: usdc,
+      // The first Hardhat account may create the mock tokens, which stands in for an on-ramp that delivers them.
+      MINT_PRIVATE_KEY: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
       DB_FILE: join(dir, "db.json"),
       FILES_DIR: join(dir, "files"),
       UPLOADS_PER_DAY: "8", // small, so the quota can be tested
@@ -241,7 +244,7 @@ async function run({ escrow, eurc, usdc, vault }) {
 
   console.log("\nEURC payment, three milestones (30 / 40 / 30)");
   {
-    await mined(await asPayer.writeContract({ address: eurc, abi: erc20, functionName: "mint", args: [payer.address, parseUnits("5000", 6)] }));
+    const eurcBefore = await pub.readContract({ address: eurc, abi: erc20, functionName: "balanceOf", args: [payer.address] });
     const { body } = await post("/api/payments", {
       ...base,
       amount: "1000",
@@ -259,6 +262,9 @@ async function run({ escrow, eurc, usdc, vault }) {
     await post("/api/sandbox/bank-transfer", { reference: body.run.ref });
     const action = await until(() => stream.events.find((e) => e.type === "action_required"), "the calls to sign");
     check(action.approval?.to.toLowerCase() === eurc.toLowerCase() && action.tx.value === "0", "the token is approved first, and no ETH is sent");
+    const minted = stepDone(stream.events, "tokenization", "mint")?.payload;
+    check(minted?.delivered === true && minted.asset === "EURC" && minted.txHash, "the euros arrive in the payer's wallet as EURC, with the transaction that created them");
+    check((await pub.readContract({ address: eurc, abi: erc20, functionName: "balanceOf", args: [payer.address] })) - eurcBefore === parseUnits("1002.5", 6), "the payer got exactly the EURC they have to deposit (the job plus the surcharge)");
     await mined(await asPayer.sendTransaction({ to: action.approval.to, data: action.approval.data }));
     await mined(await asPayer.sendTransaction({ to: action.tx.to, data: action.tx.data }));
     await until(() => stepDone(stream.events, "activated", "dashboard"), "the job to be funded");
@@ -285,6 +291,79 @@ async function run({ escrow, eurc, usdc, vault }) {
     const done = await (await fetch(`${API}/api/payments/${body.run.id}`)).json();
     check(done.payoutEur === 299.25, "the payout of the first milestone is 300 less its 0.75 fee");
     check(stepDone(stream.events, "settlement", "settle")?.payload.rail === "base", "the payout was routed as EURC");
+    await stream.stop();
+  }
+
+  // The payee decides where the money goes, and a choice made before the release wins over the one in the payment.
+  console.log("\nThe payee chooses how to be paid");
+  {
+    const auth = async (account) => {
+      const issuedAt = new Date().toISOString();
+      const signature = await account.signMessage({ message: signInMessage(account.address, issuedAt) });
+      const res = await fetch(`${API}/api/auth`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ address: account.address, issuedAt, signature }) });
+      return (await res.json()).token;
+    };
+    const payeeToken = await auth(payee);
+    const put = (token, body) => fetch(`${API}/api/payout`, { method: "PUT", headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(body) });
+    const us = { route: "ach", holder: "Ana Ferreira", routing: "021000021", account: "12345678" };
+    // A browser asks first, and a PUT the server doesn't list is refused before it is sent.
+    const preflight = await fetch(`${API}/api/payout`, { method: "OPTIONS", headers: { origin: "http://localhost:5173", "access-control-request-method": "PUT", "access-control-request-headers": "authorization,content-type" } });
+    check(preflight.headers.get("access-control-allow-methods")?.includes("PUT"), "a browser is allowed to save the choice (the CORS preflight lists PUT)");
+    check((await put(undefined, us)).status === 401, "choosing how to be paid needs a sign-in");
+    check((await put(payeeToken, { route: "sepa", holder: "Ana", iban: "DE00 3704 0044 0532 0130 00" })).status === 400, "an IBAN with a wrong check number is refused");
+    check((await put(payeeToken, { ...us, routing: "021000022" })).status === 400, "a routing number that fails the check is refused");
+    check((await put(payeeToken, us)).status === 200, "a valid US account is saved");
+    const shown = await (await fetch(`${API}/api/payout/${payee.address}`)).json();
+    check(shown.route === "ach" && shown.currency === "USD" && shown.last4 === "5678" && !JSON.stringify(shown).includes("12345678"), "anyone can see how the payee is paid, but only the last four digits of the account");
+    check((await (await fetch(`${API}/api/payout`, { headers: { authorization: `Bearer ${payeeToken}` } })).json()).account === "12345678", "only the payee can read the account in full");
+
+    // The payer says euros by SEPA. The payee's dollars win.
+    const { body } = await post("/api/payments", { ...base, amount: "0.01", token: "eth", route: "sepa", milestones: [{ title: "Whole job", amount: "0.01", days: 7 }] });
+    const stream = follow(body.run.id);
+    await post("/api/sandbox/bank-transfer", { reference: body.run.ref });
+    const action = await until(() => stream.events.find((e) => e.type === "action_required"), "the call to sign");
+    await mined(await asPayer.sendTransaction({ to: action.tx.to, data: action.tx.data, value: BigInt(action.tx.value) }));
+    await until(() => stepDone(stream.events, "activated", "dashboard"), "the job to be funded");
+    const id = await pub.readContract({ address: escrow, abi, functionName: "jobCount" });
+    await mined(await asPayee.writeContract({ address: escrow, abi, functionName: "submitWork", args: [id, 0n, "https://example.com/work"] }));
+    await mined(await asPayer.writeContract({ address: escrow, abi, functionName: "approve", args: [id, 0n] }));
+    await until(() => stream.events.find((e) => e.type === "done"), "the payout to finish");
+    const settled = stepDone(stream.events, "settlement", "settle")?.payload;
+    check(settled?.rail === "ach" && settled.currency === "USD" && settled.amount === 26.09 && settled.account === "…5678", "the payout follows the payee: 26.09 dollars to their US account, not the euros the payer chose");
+    const finished = await (await fetch(`${API}/api/payments/${body.run.id}`)).json();
+    check(finished.payout?.route === "ach" && finished.payout.chosenBy === "payee", "the payment records that the payee chose");
+    await stream.stop();
+    check((await fetch(`${API}/api/payout`, { method: "DELETE", headers: { authorization: `Bearer ${payeeToken}` } })).status === 200 && (await (await fetch(`${API}/api/payout/${payee.address}`)).json()).route === null, "the payee can take the choice back");
+  }
+
+  // Paying in dollars: the dollars become USDC in the payer's wallet, and the job can take the yield.
+  console.log("\nUSDC payment in dollars");
+  {
+    const usdcBalance = (who) => pub.readContract({ address: usdc, abi: erc20, functionName: "balanceOf", args: [who] });
+    const one = { title: "Whole job", amount: "500", days: 7 };
+    check((await post("/api/payments", { ...base, amount: "500", token: "eurc", useYield: true, milestones: [one] })).status === 400, "yield is refused for euros");
+    check((await post("/api/payments", { ...base, amount: "500", token: "usdc", useYield: "yes", milestones: [one] })).status === 400, "yield has to be true or false");
+
+    // Without the yield the payer pays a 0.25% surcharge, in dollars.
+    const plain = await post("/api/payments", { ...base, amount: "500", token: "usdc", route: "eurc", useYield: false, milestones: [one] });
+    check(plain.body.bank?.currency === "USD" && plain.body.bank.amount === 501.25 && plain.body.run.surcharge === "1.25", "without the yield the bank transfer is $501.25: the job and a 1.25 surcharge");
+
+    // With it, there is no surcharge and the money goes to the vault.
+    const { body } = await post("/api/payments", { ...base, amount: "500", token: "usdc", route: "eurc", useYield: true, milestones: [one] });
+    check(body.bank.currency === "USD" && body.bank.amount === 500 && body.run.surcharge === "0" && body.run.useYield === true, "with the yield the bank transfer is $500 and has no surcharge");
+    const before = { payer: await usdcBalance(payer.address), vault: await usdcBalance(vault) };
+    const stream = follow(body.run.id);
+    await post("/api/sandbox/bank-transfer", { reference: body.run.ref });
+    const action = await until(() => stream.events.find((e) => e.type === "action_required"), "the calls to sign");
+    const minted = stepDone(stream.events, "tokenization", "mint")?.payload;
+    check(minted?.delivered === true && minted.asset === "USDC" && (await usdcBalance(payer.address)) - before.payer === parseUnits("500", 6), "the dollars arrive in the payer's wallet as 500 USDC");
+    check(stepDone(stream.events, "inbound", "webhook")?.payload.currency === "USD", "the bank step records dollars");
+    await mined(await asPayer.sendTransaction({ to: action.approval.to, data: action.approval.data }));
+    await mined(await asPayer.sendTransaction({ to: action.tx.to, data: action.tx.data }));
+    await until(() => stepDone(stream.events, "activated", "dashboard"), "the job to be funded");
+    const id = await pub.readContract({ address: escrow, abi, functionName: "jobCount" });
+    const [head] = await pub.readContract({ address: escrow, abi, functionName: "getJob", args: [id] });
+    check(head.yield === true && head.surchargeBps === 0 && (await usdcBalance(vault)) - before.vault === parseUnits("500", 6), "the job took the yield, and its 500 USDC are in the vault");
     await stream.stop();
   }
 

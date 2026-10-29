@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { getBlock, readContract, waitForTransactionReceipt } from "wagmi/actions";
 import { parseEther, parseEventLogs, zeroAddress, type Abi } from "viem";
 import { config, escrowAbi, escrowAddress } from "../wagmi";
-import { EUR_PER_ETH, FUNDING_STAGES, stepKey, type FlowContext, type PayoutRoute } from "../lib/fiatFlow";
+import { EUR_PER_ETH, FUNDING_STAGES, stepKey, type FlowContext } from "../lib/fiatFlow";
 import { useFlowRun } from "./useFlowRun";
 
 export type FundingMilestone = { title: string; amount: string; days: string };
@@ -14,8 +14,9 @@ export type FundingForm = {
   amount: string;
   description: string;
   milestones: FundingMilestone[];
-  route?: PayoutRoute;
-  token?: "eth" | "eurc";
+  token?: "eth" | "eurc" | "usdc";
+  /** Take the yield on the money while it is in escrow (US dollars only), instead of paying the surcharge. */
+  useYield?: boolean;
 };
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));

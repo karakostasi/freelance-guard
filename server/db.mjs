@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { createPgStore } from "./pgstore.mjs";
 import { explainConnectionFailure, getPool } from "./pool.mjs";
 
-const empty = () => ({ cursor: null, runs: {}, ledger: [], notifications: [], files: {}, emails: {} });
+const empty = () => ({ cursor: null, runs: {}, ledger: [], notifications: [], files: {}, emails: {}, payouts: {} });
 
 // DATABASE_URL (Postgres, e.g. Supabase) makes the state durable across restarts and redeploys.
 // Without it the state lives in a local JSON file, which is fine for development.

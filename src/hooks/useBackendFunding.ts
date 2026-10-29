@@ -95,7 +95,7 @@ export function useBackendFunding(onFunded: (jobId: number) => void) {
     if (!address) return;
     setStartError(null);
     try {
-      const { run, bank } = await api.createPayment({ payer: address, ...form, route: form.route ?? "sepa", token: form.token ?? "eth" });
+      const { run, bank } = await api.createPayment({ payer: address, ...form, token: form.token ?? "eth" });
       setRunId(run.id);
       await api.bankTransfer(bank.reference);
     } catch (e) {

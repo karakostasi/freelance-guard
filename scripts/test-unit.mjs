@@ -9,6 +9,7 @@ import { computeReputation, jobKey } from "../src/lib/reputation.ts";
 import { reminderFor } from "../src/lib/reminders.ts";
 import { formatBalance } from "../src/lib/format.ts";
 import { milestoneFeeShare, surchargeOn } from "../src/lib/fees.ts";
+import { cleanPayout, currencyOfRoute, isValidIban, isValidRouting, publicPayout } from "../server/payout.mjs";
 import { ETH_GAS_BUFFER, checkSend, maxSendable, parseAmount } from "../src/lib/send.ts";
 import { cleanEmail, confirmToken, messagesFor, notifyParties, readEmailToken, unsubscribeToken } from "../server/emails.mjs";
 import { sendMail } from "../server/mail.mjs";
@@ -273,6 +274,22 @@ console.log("\nFees (the same numbers as the contract tests, in 6-decimal units)
   check(surchargeOn(U(12000), 25) === U(30) && surchargeOn(U(8000), 25) === U(20), "the surcharge is 0.25% of each milestone");
   check(surchargeOn(U(12000), 0) === 0n, "a job that takes the yield pays no surcharge");
   check(surchargeOn(399n, 25) === 0n && surchargeOn(400n, 25) === 1n, "the surcharge rounds down");
+}
+
+console.log("\nHow a payee is paid");
+{
+  check(isValidIban("DE89 3704 0044 0532 0130 00") && isValidIban("gb82west12345698765432"), "real IBANs pass, with spaces or in lower case");
+  check(!isValidIban("DE00 3704 0044 0532 0130 00") && !isValidIban("DE89") && !isValidIban(""), "a wrong check number, a short one and an empty one fail");
+  check(isValidRouting("021000021") && !isValidRouting("021000022") && !isValidRouting("12345"), "a routing number needs nine digits that pass the ABA check");
+  const sepa = cleanPayout({ route: "sepa", holder: "  Ana   Ferreira ", iban: "de89 3704 0044 0532 0130 00" });
+  check(sepa.route === "sepa" && sepa.holder === "Ana Ferreira" && sepa.iban === "DE89370400440532013000", "a bank choice is tidied up before it is saved");
+  check(cleanPayout({ route: "eurc" }).route === "eurc", "keeping the stablecoin needs no account");
+  const bad = (body) => { try { cleanPayout(body); return null; } catch (e) { return e.status; } };
+  check(bad({ route: "paypal" }) === 400 && bad({ route: "sepa", holder: "Ana", iban: "nope" }) === 400 && bad({ route: "sepa", iban: "DE89370400440532013000" }) === 400, "an unknown route, a bad IBAN and a missing name are refused");
+  check(bad({ route: "ach", holder: "Ana", routing: "021000021", account: "12" }) === 400 && bad({ route: "ach", holder: "Ana", routing: "021000021", account: "12345678" }) === null, "a US account needs 4 to 17 digits");
+  const shown = publicPayout(cleanPayout({ route: "sepa", holder: "Ana", iban: "DE89370400440532013000" }));
+  check(shown.route === "sepa" && shown.currency === "EUR" && shown.last4 === "3000" && !JSON.stringify(shown).includes("DE89"), "what anyone sees is the route, the currency and the last four digits");
+  check(publicPayout(undefined).route === null && currencyOfRoute("eurc") === null && currencyOfRoute("ach") === "USD", "no choice, and the currency of each route");
 }
 
 console.log(failures ? `\n${failures} check(s) failed` : "\nAll checks passed");

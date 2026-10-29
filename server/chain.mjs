@@ -3,6 +3,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createPublicClient, http, parseEventLogs } from "viem";
 import { db, save } from "./db.mjs";
+import { START_RANGE, logsFrom } from "./logs.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 export const abi = JSON.parse(readFileSync(join(root, "abi/FreelanceEscrow.json"), "utf8")).abi;
@@ -11,8 +12,6 @@ export const RPC_URL = process.env.RPC_URL ?? "https://sepolia.base.org";
 export const ESCROW_ADDRESS = process.env.ESCROW_ADDRESS ?? process.env.VITE_ESCROW_ADDRESS;
 
 export const client = createPublicClient({ transport: http(RPC_URL) });
-
-const MAX_RANGE = 2000n;
 
 export async function txInfo(hash, blockNumber) {
   try {
@@ -37,6 +36,9 @@ export async function txInfo(hash, blockNumber) {
  */
 export function watchEscrow(onEvent, intervalMs = 2000) {
   let busy = false;
+  // How many blocks one request may cover. The RPC decides, and the answer is kept between polls.
+  const reach = { range: START_RANGE };
+  let catchingUp = false;
   const tick = async () => {
     if (busy) return;
     busy = true;
@@ -52,13 +54,21 @@ export function watchEscrow(onEvent, intervalMs = 2000) {
         save();
       }
       let from = BigInt(db.cursor) + 1n;
+      // After a long stop there is a lot to read, and a public RPC only allows a little at a time. New jobs are only seen once it is done.
+      if (latest - from > 5000n && !catchingUp) {
+        catchingUp = true;
+        console.log(`[chain] ${latest - from} blocks behind, catching up. This can take a few minutes on a public RPC.`);
+      }
       while (from <= latest) {
-        const to = from + MAX_RANGE - 1n < latest ? from + MAX_RANGE - 1n : latest;
-        const logs = await client.getLogs({ address: ESCROW_ADDRESS, fromBlock: from, toBlock: to });
+        const { logs, to } = await logsFrom((fromBlock, toBlock) => client.getLogs({ address: ESCROW_ADDRESS, fromBlock, toBlock }), from, latest, reach);
         for (const log of parseEventLogs({ abi, logs })) await onEvent(log);
         db.cursor = String(to);
         save();
         from = to + 1n;
+      }
+      if (catchingUp) {
+        catchingUp = false;
+        console.log("[chain] caught up");
       }
     } catch (e) {
       console.error("[chain] poll failed:", e.shortMessage ?? e.message);

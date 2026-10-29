@@ -1,4 +1,3 @@
-import { useAccount } from "wagmi";
 import { Briefcase, Plus, Workflow } from "lucide-react";
 import { FlowPage } from "./components/FlowPage";
 import { JobsPage } from "./components/JobsPage";
@@ -9,11 +8,12 @@ import { SignInGate } from "./components/SignInGate";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { ReceiptPage } from "./components/ReceiptPage";
 import { navigate, useHashRoute } from "./hooks/useHashRoute";
+import { useSession } from "./hooks/useSession";
 import logo from "./assets/logo.svg";
 import styles from "./App.module.css";
 
 export default function App() {
-  const { isConnected } = useAccount();
+  const { isConnected, restoring } = useSession();
   const route = useHashRoute();
   // The pages that need an account show the sign-in page until there is one.
   const gated = !isConnected && route.page !== "home" && route.page !== "receipt";
@@ -26,8 +26,8 @@ export default function App() {
           <h1>Squirrel</h1>
         </a>
         <div className={styles.headerRight}>
-          {/* Every page needs a sign-in, so until then there is nowhere else to go. */}
-          {isConnected && (
+          {/* Every page needs a sign-in, so until then there is nowhere else to go. Someone coming back keeps the links while the wallet starts. */}
+          {(isConnected || restoring) && (
             <nav className={styles.nav}>
               <button className={`${styles.navLink} ${route.page === "new" ? styles.navActive : ""}`} onClick={() => navigate("/new")} aria-current={route.page === "new" ? "page" : undefined}>
                 <Plus size={16} /> Create a job
@@ -48,7 +48,7 @@ export default function App() {
       </header>
       {route.page === "home" && <Landing />}
       {route.page === "receipt" && <ReceiptPage jobId={route.jobId} milestone={route.milestone} />}
-      {gated && <SignInGate page={route.page as "new" | "jobs" | "flow"} />}
+      {gated && <SignInGate page={route.page as "new" | "jobs" | "flow"} checking={restoring} />}
       {isConnected && route.page === "flow" && <FlowPage jobId={route.jobId} />}
       {isConnected && route.page === "new" && <NewJobPage />}
       {isConnected && route.page === "jobs" && <JobsPage jobId={route.jobId} />}

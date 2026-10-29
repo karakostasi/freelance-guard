@@ -1,4 +1,4 @@
-import { ArrowRight, Banknote, FileCheck, Lock, Send, ShieldCheck, Wallet } from "lucide-react";
+import { ArrowRight, Banknote, FileCheck, LoaderCircle, Lock, Send, ShieldCheck, Wallet } from "lucide-react";
 import logo from "../assets/logo.svg";
 import { SignInButton } from "./SignInButton";
 import styles from "../App.module.css";
@@ -26,8 +26,12 @@ const FACTS = [
   { icon: Banknote, text: "Pay in euros or dollars" },
 ];
 
-/** The page for someone who isn't signed in, with the one way in. The header's own sign-in button hides while it shows. */
-export function SignInGate({ page }: { page: GatedPage }) {
+/**
+ * The page for someone who isn't signed in, with the one way in. The header's own sign-in button hides while it shows.
+ * `checking` is for someone who signed in before and whose wallet is still starting: the button waits, instead of asking
+ * a person who is already in to sign in.
+ */
+export function SignInGate({ page, checking = false }: { page: GatedPage; checking?: boolean }) {
   const { title, text, stop } = COPY[page];
   return (
     <section className={s.gate} aria-label="Sign in">
@@ -45,14 +49,20 @@ export function SignInGate({ page }: { page: GatedPage }) {
       </ol>
       <div className={s.card}>
         <span className={s.badge}>
-          <Lock size={13} /> Sign in to continue
+          <Lock size={13} /> {checking ? "Welcome back" : "Sign in to continue"}
         </span>
         <h2 className={s.title}>{title}</h2>
         <p className={s.text}>{text}</p>
-        <SignInButton className={`${styles.button} ${s.cta}`}>
-          Sign in <ArrowRight size={18} />
-        </SignInButton>
-        <p className={s.note}>We email you a code. Already have a wallet? You can use that too.</p>
+        {checking ? (
+          <button className={`${styles.button} ${s.cta}`} disabled>
+            <LoaderCircle size={18} className={s.spin} /> Checking your session…
+          </button>
+        ) : (
+          <SignInButton className={`${styles.button} ${s.cta}`}>
+            Sign in <ArrowRight size={18} />
+          </SignInButton>
+        )}
+        <p className={s.note}>{checking ? "Just a moment." : "We email you a code. Already have a wallet? You can use that too."}</p>
         <ul className={s.facts}>
           {FACTS.map(({ icon: Icon, text: fact }) => (
             <li key={fact}>

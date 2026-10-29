@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAccount, useBalance, useDisconnect } from "wagmi";
+import { useSession } from "../hooks/useSession";
 import { formatEther } from "viem";
 import { Check, Copy, Landmark, LogOut, Mail, Repeat } from "lucide-react";
 import { avatarGradient } from "../lib/avatar";
@@ -13,6 +14,7 @@ import styles from "../App.module.css";
 /** The account in the header: the sign-in button, or the account avatar with a menu. `hideSignIn` leaves it out when the page has its own. */
 export function ProfileMenu({ hideSignIn = false }: { hideSignIn?: boolean }) {
   const { address, chain, connector, isConnected } = useAccount();
+  const { restoring } = useSession();
   const { disconnect } = useDisconnect();
   const { data: balance } = useBalance({ address });
   // Where the menu opens (under the avatar); null while it is closed.
@@ -29,6 +31,7 @@ export function ProfileMenu({ hideSignIn = false }: { hideSignIn?: boolean }) {
   }, [anchor]);
 
   if (!isConnected || !address) {
+    if (restoring) return <span className={styles.profilePlaceholder} aria-hidden="true" />;
     return hideSignIn ? null : <SignInButton />;
   }
 

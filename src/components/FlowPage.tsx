@@ -41,7 +41,7 @@ function useLiveEscrowEvents() {
 export function FlowPage({ jobId: routeJobId }: { jobId?: string }) {
   const [mode, setMode] = useState<FlowMode>("simple");
   const [selectedId, setSelectedId] = useState(routeJobId ?? "");
-  const mine = useMyJobs();
+  const { jobs: mine, loading } = useMyJobs();
   useLiveEscrowEvents();
 
   // Once a new payment lands on-chain, hand over from the live run to that job's own journey.
@@ -88,8 +88,9 @@ export function FlowPage({ jobId: routeJobId }: { jobId?: string }) {
     <div className={page.page}>
       <div className={flow.header}>
         <h2 className={page.title}>Payment flow</h2>
-        <span className={backendOnline ? flow.pillLive : flow.demo}>{backendOnline ? "Live backend" : "Offline demo"}</span>
-        {!backendOnline && (
+        {/* Nothing until the first check has answered, so a backend that is up isn't called offline for a moment. */}
+        {backendChecked && <span className={backendOnline ? flow.pillLive : flow.demo}>{backendOnline ? "Live backend" : "Offline demo"}</span>}
+        {backendChecked && !backendOnline && (
           <span className={flow.muted}>
             Can&apos;t reach {backendUrl}
             {backendError ? ` (${backendError})` : ""}
@@ -99,7 +100,7 @@ export function FlowPage({ jobId: routeJobId }: { jobId?: string }) {
 
       <div className={page.layout}>
         <WalletCard className={page.wallet} />
-        <JobList jobs={mine} selectedId={id} onSelect={setSelectedId} emptyText={'No jobs for this account yet. Use "Create a job" to start one.'} />
+        <JobList jobs={mine} selectedId={id} onSelect={setSelectedId} emptyText={loading ? "Loading your jobs…" : 'No jobs for this account yet. Use "Create a job" to start one.'} />
         {showingLive ? (
           <>
             <div className={page.top}>
@@ -120,7 +121,7 @@ export function FlowPage({ jobId: routeJobId }: { jobId?: string }) {
           <JobJourney key={selected.id} id={selected.id} job={selected.job} mode={mode} onModeChange={setMode} />
         ) : (
           <div className={page.top}>
-            <p className={flow.muted}>{mine.length > 0 ? "Pick a job from the list." : "Nothing to show yet."}</p>
+            <p className={flow.muted}>{mine.length > 0 ? "Pick a job from the list." : loading ? "Loading your jobs…" : "Nothing to show yet."}</p>
           </div>
         )}
       </div>

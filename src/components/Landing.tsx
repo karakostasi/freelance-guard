@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { useAccount } from "wagmi";
+import { useSession } from "../hooks/useSession";
 import { ArrowRight, Banknote, Coins, CreditCard, FileCheck, FileText, Landmark, ListChecks, Lock, Mail, MapPin, Scale, Send, TrendingUp, UserCheck } from "lucide-react";
 import { navigate } from "../hooks/useHashRoute";
 import { JobPreview } from "./JobPreview";
@@ -28,10 +28,11 @@ const RIBBON = [
 
 /** The page you land on, and the one the logo leads to. Everything on it leads to the same place: the app once you are in, the sign-in dialog until then. */
 export function Landing() {
-  const { isConnected } = useAccount();
+  const { isConnected, restoring } = useSession();
   const how = useRef<HTMLElement>(null);
 
-  const start = isConnected ? (
+  // Someone whose session is coming back is treated as inside, so the page doesn't ask them to sign in for a moment.
+  const start = isConnected || restoring ? (
     <button className={`${styles.button} ${page.primary}`} onClick={() => navigate("/jobs")}>
       Open the app <ArrowRight size={16} />
     </button>

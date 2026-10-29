@@ -61,7 +61,9 @@ const sameRows = (a: Row[], b: Row[]) => a.length === b.length && a.every((r, i)
  */
 export function NewJobPage() {
   const { address } = useAccount();
-  const { online: backendOnline } = useBackendStatus();
+  // Until the first check has answered the backend is taken to be up, so the choice of euros isn't greyed out and switched back.
+  const { online, checked } = useBackendStatus();
+  const backendOnline = online || !checked;
   const [step, setStep] = useState(1);
   const [txHash, setTxHash] = useState<`0x${string}` | undefined>();
   const [working, setWorking] = useState("");

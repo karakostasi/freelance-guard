@@ -1,10 +1,11 @@
-import { useAccount, useConnect } from "wagmi";
+import { useAccount } from "wagmi";
 import { Briefcase, Plus, Workflow } from "lucide-react";
 import { FlowPage } from "./components/FlowPage";
 import { JobsPage } from "./components/JobsPage";
 import { NewJobPage } from "./components/NewJobPage";
 import { Landing } from "./components/Landing";
 import { ProfileMenu } from "./components/ProfileMenu";
+import { SignInButtons } from "./components/SignInButtons";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { ReceiptPage } from "./components/ReceiptPage";
 import { navigate, useHashRoute } from "./hooks/useHashRoute";
@@ -13,7 +14,6 @@ import styles from "./App.module.css";
 
 export default function App() {
   const { isConnected } = useAccount();
-  const { connect, connectors, error: connectError } = useConnect();
   const route = useHashRoute();
 
   return (
@@ -45,11 +45,9 @@ export default function App() {
       {route.page === "receipt" && <ReceiptPage jobId={route.jobId} milestone={route.milestone} />}
       {!isConnected && route.page !== "home" && route.page !== "receipt" && (
         <div className={styles.connectPrompt}>
-          <p>Connect your wallet to continue.</p>
-          <button className={styles.button} onClick={() => connect({ connector: connectors[0] })}>
-            Connect wallet
-          </button>
-          {connectError && <p className={styles.error}>{connectError.message.split("\n")[0]}</p>}
+          <p>Sign in to continue.</p>
+          <SignInButtons />
+          <p className={styles.muted}>Sign in with your email and we send you a code. No wallet app, no seed phrase.</p>
         </div>
       )}
       {isConnected && route.page === "flow" && <FlowPage jobId={route.jobId} />}

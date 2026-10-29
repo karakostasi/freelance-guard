@@ -1,12 +1,11 @@
 import { useState } from "react";
 import { useAccount } from "wagmi";
-import { writeContract } from "wagmi/actions";
-import { config, escrowAbi, escrowAddress } from "../wagmi";
+import { escrowAbi, escrowAddress } from "../wagmi";
 import { useEscrowConfig } from "../hooks/useEscrowConfig";
 import { useNow } from "../hooks/useNow";
 import { useRefreshOnConfirm } from "../hooks/useRefreshOnConfirm";
 import { useBackendStatus } from "../hooks/useBackend";
-import { ensureAllowance } from "../lib/erc20";
+import { approvalCall, contractCall, sendWalletCalls, type Call } from "../lib/tx";
 import { uploadDoc, uploadFile } from "../lib/files";
 import { FileDrop } from "./FileDrop";
 import { STATUS, formatDuration, hasVerifier, milestoneName, milestoneSurcharge, type Job } from "../lib/jobs";
@@ -53,13 +52,14 @@ export function JobActions({ id, index, job }: { id: string; index: number; job:
     return `fg:${await uploadDoc({ version: 1, text, files: uploaded }, address!)}`;
   };
 
-  const send = async (functionName: string, args: unknown[] | (() => Promise<unknown[]>), value?: bigint, prepare?: () => Promise<void>) => {
+  // `before` may return a call to send first (a token approval), which a smart wallet sends in the same batch.
+  const send = async (functionName: string, args: unknown[] | (() => Promise<unknown[]>), value?: bigint, before?: () => Promise<Call | null>) => {
     setError(null);
     try {
-      await prepare?.();
+      const first = await before?.();
       const resolved = typeof args === "function" ? await args() : args;
-      setWorking("Confirm in your wallet…");
-      setTxHash(await writeContract(config, { address: escrowAddress, abi: escrowAbi, functionName, args: resolved, value }));
+      const calls = [...(first ? [first] : []), contractCall({ address: escrowAddress, abi: escrowAbi, functionName, args: resolved, value })];
+      setTxHash(await sendWalletCalls(calls, { labels: first ? ["Approve the token in your wallet…", "Confirm in your wallet…"] : ["Confirm in your wallet…"], onStep: setWorking }));
       setFiles([]);
       setDeliverable("");
     } catch (e) {
@@ -75,7 +75,7 @@ export function JobActions({ id, index, job }: { id: string; index: number; job:
     const due = ms.amount + milestoneSurcharge(job, ms);
     if (!token.address) return send("fundMilestone", [n, m], due);
     // Tokens need the escrow to be allowed to pull them first.
-    return send("fundMilestone", [n, m], undefined, () => ensureAllowance(token.address!, address!, due, () => setWorking("Approve the token in your wallet…")));
+    return send("fundMilestone", [n, m], undefined, () => approvalCall(token.address!, address!, due));
   };
 
   // Each action is disabled (with a hint) when the contract would revert.

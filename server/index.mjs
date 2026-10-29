@@ -174,7 +174,7 @@ const server = createServer(async (req, res) => {
 
     if (req.method === "POST" && path === "/api/auth") {
       const { body } = await json(req);
-      return send(res, 200, await createSession(body));
+      return send(res, 200, await createSession(body, Date.now(), (check) => client.verifyMessage(check)));
     }
 
     // ---- email notifications ----

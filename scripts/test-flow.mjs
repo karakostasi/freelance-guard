@@ -228,6 +228,22 @@ async function run({ escrow, eurc, usdc, vault }) {
     check((await put(other.token, Buffer.from("someone else's file"), "theirs")).status === 201, "another wallet has its own quota");
   }
 
+  // A smart wallet (Base Account, a Safe) has no key of its own. It proves a signature through its contract (ERC-1271).
+  console.log("\nA smart wallet signs in");
+  {
+    const artifact = JSON.parse(readFileSync(new URL("../artifacts/contracts/mocks/MockSmartWallet.sol/MockSmartWallet.json", import.meta.url), "utf8"));
+    const wallet = (await mined(await asPayer.deployContract({ abi: artifact.abi, bytecode: artifact.bytecode, args: [verifier.address] }))).contractAddress;
+    const issuedAt = new Date().toISOString();
+    const login = async (signer) =>
+      fetch(`${API}/api/auth`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ address: wallet, issuedAt, signature: await signer.signMessage({ message: signInMessage(wallet, issuedAt) }) }) });
+    const accepted = await login(verifier);
+    check(accepted.status === 200, "a smart wallet signs in with a signature its contract accepts (ERC-1271)");
+    check((await login(payee)).status === 401, "a signature from a key the wallet doesn't recognise is refused");
+    const { token } = await accepted.json();
+    check((await putPayout(token, { route: "eurc" })).status === 200 && (await (await fetch(`${API}/api/payout/${wallet}`)).json()).route === "eurc", "the smart wallet can then choose how it is paid");
+    await fetch(`${API}/api/payout`, { method: "DELETE", headers: { authorization: `Bearer ${token}` } });
+  }
+
   console.log("\nETH payment, one milestone");
   {
     const { body } = await post("/api/payments", { ...base, amount: "0.01", token: "eth", route: "sepa", milestones: [{ title: "Whole job", amount: "0.01", days: 7 }] });

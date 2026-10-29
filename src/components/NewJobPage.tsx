@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { useAccount, useBalance, useReadContract, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
+import { useAccount, useBalance, useReadContract, useWaitForTransactionReceipt } from "wagmi";
 import { erc20Abi, formatUnits, isAddress, parseEventLogs, parseUnits, zeroAddress, type Abi } from "viem";
 import { Check, Lock, Plus, X } from "lucide-react";
 import { escrowAbi, escrowAddress } from "../wagmi";
@@ -8,7 +8,7 @@ import { useQuote, useTokenConfig } from "../hooks/useQuote";
 import { useRefreshOnConfirm } from "../hooks/useRefreshOnConfirm";
 import { navigate } from "../hooks/useHashRoute";
 import { BILLING_MAX, buildDescription, cleanBilling, type Billing } from "../lib/documents";
-import { ensureAllowance } from "../lib/erc20";
+import { approvalCall, contractCall, sendWalletCalls } from "../lib/tx";
 import { surchargeOn } from "../lib/fees";
 import { uploadDoc, uploadFile } from "../lib/files";
 import { setPendingPayment } from "../lib/pendingPayment";
@@ -62,7 +62,6 @@ const sameRows = (a: Row[], b: Row[]) => a.length === b.length && a.every((r, i)
 export function NewJobPage() {
   const { address } = useAccount();
   const { online: backendOnline } = useBackendStatus();
-  const { writeContractAsync } = useWriteContract();
   const [step, setStep] = useState(1);
   const [txHash, setTxHash] = useState<`0x${string}` | undefined>();
   const [working, setWorking] = useState("");
@@ -210,20 +209,17 @@ export function NewJobPage() {
         navigate("/flow");
         return;
       }
-      if (fundNow && token.address) {
-        await ensureAllowance(token.address, address!, due, () => setWorking("Approve the token in your wallet…"));
-      }
-      setWorking("Confirm in your wallet…");
       const items = rows.map((r, i) => ({ title: r.title.trim(), amount: amounts[i], duration: Math.round(Number(r.days) * DAY) }));
-      setTxHash(
-        await writeContractAsync({
-          address: escrowAddress,
-          abi: escrowAbi,
-          functionName: "createJob",
-          args: [payee, token.address ?? zeroAddress, description, items, { verifier: verifier || zeroAddress, useYield, fundNow }],
-          value: fundNow && !token.address ? due : 0n,
-        }),
-      );
+      // The token approval, if the escrow needs one, goes first. A smart wallet sends both in one batch.
+      const approval = fundNow && token.address ? await approvalCall(token.address, address!, due) : null;
+      const create = contractCall({
+        address: escrowAddress,
+        abi: escrowAbi,
+        functionName: "createJob",
+        args: [payee, token.address ?? zeroAddress, description, items, { verifier: verifier || zeroAddress, useYield, fundNow }],
+        value: fundNow && !token.address ? due : 0n,
+      });
+      setTxHash(await sendWalletCalls(approval ? [approval, create] : [create], { labels: approval ? ["Approve the token in your wallet…", "Confirm in your wallet…"] : ["Confirm in your wallet…"], onStep: setWorking }));
     } catch (e) {
       setError((e as Error).message.split("\n")[0]);
     } finally {

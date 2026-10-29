@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAccount } from "wagmi";
-import { sendTransaction, waitForTransactionReceipt, writeContract } from "wagmi/actions";
+import { waitForTransactionReceipt } from "wagmi/actions";
 import { erc20Abi } from "viem";
 import { ArrowDownLeft, ArrowLeft, ArrowUpRight, Check, Copy, ExternalLink, LoaderCircle } from "lucide-react";
 import { config } from "../wagmi";
+import { contractCall, sendWalletCalls } from "../lib/tx";
 import { useWalletAssets, type Asset } from "../hooks/useWalletAssets";
 import { avatarGradient } from "../lib/avatar";
 import { euro, short, txUrl } from "../lib/jobs";
@@ -62,9 +63,7 @@ function Send({ assets, from }: { assets: Asset[]; from: string }) {
     let submitted = false;
     try {
       const target = to.trim() as `0x${string}`;
-      const sent = token.address
-        ? await writeContract(config, { address: token.address, abi: erc20Abi, functionName: "transfer", args: [target, check.units] })
-        : await sendTransaction(config, { to: target, value: check.units });
+      const sent = await sendWalletCalls([token.address ? contractCall({ address: token.address, abi: erc20Abi, functionName: "transfer", args: [target, check.units] }) : { to: target, value: check.units }]);
       submitted = true;
       setHash(sent);
       setStage("pending");

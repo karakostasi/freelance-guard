@@ -151,6 +151,17 @@ check((await rejects(createSession({ address: account.address, issuedAt, signatu
 check((await rejects(createSession({ address: account.address, issuedAt: new Date(now + 60_000).toISOString(), signature }, now)))?.status === 401, "a signature for a different time than claimed is refused");
 check((await rejects(createSession({ address: account.address, issuedAt, signature: "0x1234" }, now)))?.status === 401, "a garbage signature is refused");
 check((await rejects(createSession({ address: "nope", issuedAt, signature }, now)))?.status === 401, "a bad address is refused");
+// A smart wallet has no key: its contract is asked, and the answer decides.
+const contractWallet = "0x00000000000000000000000000000000000000c1";
+const asked = [];
+const viaContract = async (check) => (asked.push(check), check.signature === "0xabcd");
+const smart = await createSession({ address: contractWallet, issuedAt, signature: "0xabcd" }, now, viaContract);
+check(smart.address === contractWallet && verifyToken(smart.token, now) === contractWallet && asked[0].message === signInMessage(contractWallet, issuedAt), "a smart wallet gets a session when its contract accepts the signature, and is asked for the exact sign-in message");
+check((await rejects(createSession({ address: contractWallet, issuedAt, signature: "0x1234" }, now, viaContract)))?.status === 401, "a smart wallet whose contract refuses is refused");
+check((await rejects(createSession({ address: contractWallet, issuedAt, signature: "0xabcd" }, now, async () => { throw new Error("rpc down"); })))?.status === 401, "a contract check that fails is a refusal");
+const before = asked.length;
+await createSession({ address: account.address, issuedAt, signature }, now, viaContract);
+check(asked.length === before, "a normal wallet is never sent to the contract check");
 
 console.log("\nFile stores");
 const dir = mkdtempSync(join(tmpdir(), "fg-blobs-"));

@@ -1,7 +1,6 @@
-import { signMessage } from "wagmi/actions";
-import { config } from "../wagmi";
 import { API_URL } from "./api";
 import { parseDoc, serializeDoc, signInMessage, type Doc, type DocFile } from "./documents";
+import { signForBackend } from "./signature";
 
 export const MAX_FILE_BYTES = 10 * 1024 * 1024;
 export const MAX_FILES = 5;
@@ -17,7 +16,7 @@ let session: { token: string; address: string; expiresAt: number } | null = null
 export async function sessionToken(address: string) {
   if (session && session.address === address.toLowerCase() && session.expiresAt - Date.now() > 60_000) return session.token;
   const issuedAt = new Date().toISOString();
-  const signature = await signMessage(config, { message: signInMessage(address, issuedAt) });
+  const signature = await signForBackend(address as `0x${string}`, signInMessage(address, issuedAt));
   const res = await fetch(`${API_URL}/api/auth`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ address, issuedAt, signature }) });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error((body as { error?: string }).error ?? "Sign-in failed");

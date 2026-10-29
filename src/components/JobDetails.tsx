@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { Check, Copy, ExternalLink } from "lucide-react";
 import { useAccount, useReadContract } from "wagmi";
-import { writeContract } from "wagmi/actions";
 import { zeroAddress } from "viem";
-import { config, escrowAbi, escrowAddress } from "../wagmi";
+import { escrowAbi, escrowAddress } from "../wagmi";
+import { contractCall, sendWalletCalls } from "../lib/tx";
 import { useRefreshOnConfirm } from "../hooks/useRefreshOnConfirm";
 import { formatAmount } from "../lib/tokens";
 import { avatarGradient } from "../lib/avatar";
@@ -60,7 +60,7 @@ function VerifierLine({ id, job, isPayer }: { id: string; job: Job; isPayer: boo
   const remove = async () => {
     setError(null);
     try {
-      setTxHash(await writeContract(config, { address: escrowAddress, abi: escrowAbi, functionName: "setVerifier", args: [BigInt(id), zeroAddress] }));
+      setTxHash(await sendWalletCalls([contractCall({ address: escrowAddress, abi: escrowAbi, functionName: "setVerifier", args: [BigInt(id), zeroAddress] })]));
     } catch (e) {
       setError((e as Error).message.split("\n")[0]);
     }

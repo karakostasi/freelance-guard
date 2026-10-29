@@ -3,6 +3,7 @@ import { useAccount } from "wagmi";
 import { Mail, X } from "lucide-react";
 import { emailApi, type EmailStatus } from "../lib/api";
 import { sessionToken } from "../lib/files";
+import { useEmailWallet } from "../hooks/useEmailWallet";
 import styles from "../App.module.css";
 
 const firstLine = (e: unknown) => (e instanceof Error ? e.message : String(e)).split("\n")[0];
@@ -30,6 +31,13 @@ export function NotificationSettings({ onClose }: { onClose: () => void }) {
     }
   };
 
+  const load = () => {
+    setAsked(true);
+    void run("Loading…", emailApi.get);
+  };
+  // An email login signs by itself, so it just loads. A browser wallet asks first.
+  const emailWallet = useEmailWallet(load);
+
   const busy = !!working;
   return (
     <div className={styles.overlay} onClick={onClose}>
@@ -42,16 +50,10 @@ export function NotificationSettings({ onClose }: { onClose: () => void }) {
         </h2>
         <p className={styles.muted}>Get an email when a job where you are the payee is funded, and when work on a job where you are the payer is submitted. We only email confirmed addresses, and every email has an unsubscribe link.</p>
 
-        {!status && !asked && (
-          <button
-            className={styles.button}
-            disabled={busy}
-            onClick={() => {
-              setAsked(true);
-              void run("Check your wallet…", emailApi.get);
-            }}
-          >
-            {working || "Sign in with my wallet to continue"}
+        {!status && emailWallet && !error && <p className={styles.muted}>Loading…</p>}
+        {!status && !(emailWallet && !error) && (!asked || error !== null) && (
+          <button className={styles.button} disabled={busy} onClick={load}>
+            {working || (error ? "Try again" : "Confirm in your wallet to continue")}
           </button>
         )}
 

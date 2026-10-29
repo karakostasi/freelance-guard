@@ -1,7 +1,9 @@
-import { useRef } from "react";
-import { useAccount, useConnect } from "wagmi";
+import { useRef, useState } from "react";
+import { useAccount } from "wagmi";
+import { useSignIn } from "../hooks/useSignIn";
 import { ArrowRight, Banknote, Eye, FileCheck, Lock, Scale, Send, ShieldCheck, Wallet } from "lucide-react";
 import { navigate } from "../hooks/useHashRoute";
+import { SignInDialog } from "./SignInDialog";
 import styles from "../App.module.css";
 import page from "./Landing.module.css";
 
@@ -21,12 +23,14 @@ const BENEFITS = [
 
 export function Landing() {
   const { isConnected } = useAccount();
-  const { connect, connectors, isPending, error } = useConnect();
+  const { emailAvailable, isPending, error, withBrowserWallet } = useSignIn();
+  const [signingIn, setSigningIn] = useState(false);
   const how = useRef<HTMLElement>(null);
 
   const start = () => {
     if (isConnected) navigate("/jobs");
-    else connect({ connector: connectors[0] }, { onSuccess: () => navigate("/jobs") });
+    else if (emailAvailable) setSigningIn(true);
+    else withBrowserWallet(() => navigate("/jobs"));
   };
 
   return (
@@ -37,13 +41,18 @@ export function Landing() {
         <p className={page.lead}>Squirrel holds the payment in escrow until the work is approved.</p>
         <div className={page.cta}>
           <button className={`${styles.button} ${page.primary}`} onClick={start} disabled={isPending}>
-            {isConnected ? "Open the app" : "Connect wallet to start"} <ArrowRight size={16} />
+            {isConnected ? "Open the app" : emailAvailable ? "Sign in with your email" : "Connect MetaMask"} <ArrowRight size={16} />
           </button>
           <button className={styles.ghostButton} onClick={() => how.current?.scrollIntoView({ behavior: "smooth" })}>
             See how it works
           </button>
+          {!isConnected && emailAvailable && (
+            <button className={styles.ghostButton} onClick={() => withBrowserWallet(() => navigate("/jobs"))} disabled={isPending}>
+              I have MetaMask
+            </button>
+          )}
         </div>
-        {error && <p className={styles.error}>{error.message.split("\n")[0]}</p>}
+        {error && <p className={styles.error}>{error}</p>}
         <p className={page.note}>Testnet demo. No real money.</p>
       </section>
 
@@ -92,9 +101,10 @@ export function Landing() {
       <section className={page.final}>
         <h3 className={page.title}>Ready to try it?</h3>
         <button className={`${styles.button} ${page.primary}`} onClick={start} disabled={isPending}>
-          {isConnected ? "Open the app" : "Connect wallet to start"} <ArrowRight size={16} />
+          {isConnected ? "Open the app" : emailAvailable ? "Sign in with your email" : "Connect MetaMask"} <ArrowRight size={16} />
         </button>
       </section>
+      {signingIn && <SignInDialog onClose={() => setSigningIn(false)} onDone={() => navigate("/jobs")} />}
     </div>
   );
 }

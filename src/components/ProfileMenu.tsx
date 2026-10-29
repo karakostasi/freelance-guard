@@ -1,18 +1,18 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { useAccount, useBalance, useConnect, useDisconnect } from "wagmi";
+import { useAccount, useBalance, useDisconnect } from "wagmi";
 import { formatEther } from "viem";
 import { Check, Copy, Landmark, LogOut, Mail, Repeat } from "lucide-react";
 import { avatarGradient } from "../lib/avatar";
 import { short } from "../lib/jobs";
 import { NotificationSettings } from "./NotificationSettings";
 import { PayoutSettings } from "./PayoutSettings";
+import { SignInButtons } from "./SignInButtons";
 import styles from "../App.module.css";
 
-/** The account in the header: a "Connect wallet" button, or the account avatar with a menu. */
+/** The account in the header: the sign-in buttons, or the account avatar with a menu. */
 export function ProfileMenu() {
   const { address, chain, connector, isConnected } = useAccount();
-  const { connect, connectors, isPending } = useConnect();
   const { disconnect } = useDisconnect();
   const { data: balance } = useBalance({ address });
   // Where the menu opens (under the avatar); null while it is closed.
@@ -29,11 +29,7 @@ export function ProfileMenu() {
   }, [anchor]);
 
   if (!isConnected || !address) {
-    return (
-      <button className={styles.button} disabled={isPending} onClick={() => connect({ connector: connectors[0] })}>
-        Connect wallet
-      </button>
-    );
+    return <SignInButtons compact />;
   }
 
   const copy = async () => {
@@ -107,9 +103,11 @@ export function ProfileMenu() {
               >
                 <Landmark size={15} /> How I get paid
               </button>
-              <button className={styles.menuItem} onClick={switchAccount} role="menuitem">
-                <Repeat size={15} /> Switch account
-              </button>
+              {connector?.id === "metaMask" && (
+                <button className={styles.menuItem} onClick={switchAccount} role="menuitem">
+                  <Repeat size={15} /> Switch account
+                </button>
+              )}
               <button
                 className={`${styles.menuItem} ${styles.menuDanger}`}
                 onClick={() => {

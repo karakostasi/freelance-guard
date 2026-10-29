@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Landmark, X } from "lucide-react";
 import { payoutApi, type PayoutChoice } from "../lib/api";
 import { sessionToken } from "../lib/files";
+import { useEmailWallet } from "../hooks/useEmailWallet";
 import styles from "../App.module.css";
 import p from "./PayoutSettings.module.css";
 
@@ -66,6 +67,10 @@ export function PayoutSettings({ onClose }: { onClose: () => void }) {
       setSaved(true);
     });
 
+  const load = () => run("Loading…", async (token) => show(await payoutApi.get(token)));
+  // An email login signs by itself, so it just loads. A browser wallet asks first.
+  const emailWallet = useEmailWallet(load);
+
   const busy = !!working;
   return (
     <div className={styles.overlay} onClick={onClose}>
@@ -79,9 +84,13 @@ export function PayoutSettings({ onClose }: { onClose: () => void }) {
         <p className={styles.muted}>When a payer releases a payment to you, this is where it goes. The payer doesn&apos;t choose that, you do. You can change it until the payment is released.</p>
 
         {!loaded ? (
-          <button className={styles.button} disabled={busy} onClick={() => run("Check your wallet…", async (token) => show(await payoutApi.get(token)))}>
-            {working || "Sign in with my wallet to continue"}
-          </button>
+          emailWallet && !error ? (
+            <p className={styles.muted}>Loading…</p>
+          ) : (
+            <button className={styles.button} disabled={busy} onClick={load}>
+              {working || (error ? "Try again" : "Confirm in your wallet to continue")}
+            </button>
+          )
         ) : (
           <>
             <div className={p.ways} role="radiogroup" aria-label="Where the money goes">

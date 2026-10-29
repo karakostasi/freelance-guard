@@ -44,7 +44,7 @@ cp .env.example .env    # set VITE_ESCROW_ADDRESS to that address
 npm run dev             # terminal 2: frontend
 ```
 
-Connect MetaMask to `http://127.0.0.1:8545` (chain id 31337).
+Connect MetaMask to `http://127.0.0.1:8545` (chain id 31337), and set `VITE_LOCAL_CHAIN=1` so the app offers that chain.
 
 ## Milestones and tokens
 
@@ -90,7 +90,17 @@ The payer pays in euros or US dollars and gets the matching stablecoin (EURC or 
 
 The bank, AML, FX and off-ramp providers are **sandboxes** (`server/providers.mjs`), each shaped like its real counterpart. Without the backend the page falls back to a local demo.
 
-Set `VITE_PAYMASTER_URL` to try sponsored gas. It only applies if the wallet supports sponsored calls (EIP-5792 + ERC-7677) and otherwise the wallet pays as usual.
+### Signing in without a wallet (Coinbase embedded wallet)
+
+People can sign in with an **email**: we send a code, and a wallet is made for them (a smart account on Base Sepolia, from the [CDP Embedded Wallets](https://docs.cdp.coinbase.com/embedded-wallets)). There is nothing to install and no seed phrase. MetaMask still works ("I have MetaMask").
+
+- **Set up:** create a project in the [CDP Portal](https://portal.cdp.coinbase.com), copy its Project ID into `VITE_CDP_PROJECT_ID`, and add `http://localhost:5173` and your Vercel URL to the allowed origins of its Embedded Wallets settings. Without the id the app only offers MetaMask.
+- **Sending:** the smart account sends the token approval and the deposit as one batch (`wallet_sendCalls`, one confirmation). Every action in the app goes through `src/lib/tx.ts`, which does that for the embedded wallet and signs one by one for other wallets.
+- **Gas:** on Base Sepolia the embedded wallet's gas is sponsored by default, so a new account needs no ETH. On mainnet, set up a paymaster in the CDP Portal. Its URL stays with Coinbase and never reaches the browser.
+- **Signing in to the backend:** a smart account has no key to recover, so the backend asks its contract whether the signature is valid (ERC-1271, or ERC-6492 before the wallet exists on-chain).
+- **Whose keys:** the wallet's keys are held by Coinbase's embedded wallet service, not by the person or by Squirrel. That matters for licensing (`docs/business-model.md`, decision 13).
+- **Why not Base Account (passkey):** it would keep the keys with the person, but new Base Accounts can't send transactions on Base Sepolia ([base/account-sdk #363](https://github.com/base/account-sdk/issues/363)).
+- **Not tested with the real service:** the code is checked against the connector's types and a stand-in wallet. The real email code, the smart account and the sponsored gas need a CDP project, and have to be tried by hand.
 
 ## Receipts and business details
 

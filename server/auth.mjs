@@ -13,18 +13,31 @@ export const signInMessage = (address, issuedAt) => ["Squirrel", "Sign in to upl
 
 const unauthorized = (msg) => Object.assign(new Error(msg), { status: 401 });
 
-/** Checks a signed sign-in message and returns a session token valid for an hour. */
-export async function createSession({ address, issuedAt, signature }, now = Date.now()) {
+/**
+ * Checks a signed sign-in message and returns a session token valid for an hour. A normal wallet signs with its own key.
+ * A smart wallet (Base Account, a Safe) signs through the contract at its address, which `verifyContract` asks on-chain
+ * (ERC-1271, or ERC-6492 while the wallet is not deployed yet).
+ */
+export async function createSession({ address, issuedAt, signature }, now = Date.now(), verifyContract) {
   if (!/^0x[0-9a-fA-F]{40}$/.test(address ?? "")) throw unauthorized("Invalid address");
   const issued = Date.parse(issuedAt);
   if (!Number.isFinite(issued) || Math.abs(now - issued) > MAX_CLOCK_SKEW_MS) throw unauthorized("The sign-in message is too old or too new");
-  let signer;
+  const message = signInMessage(address, issuedAt);
+  let valid = false;
+  let malformed = false;
   try {
-    signer = await recoverMessageAddress({ message: signInMessage(address, issuedAt), signature });
+    valid = (await recoverMessageAddress({ message, signature })).toLowerCase() === address.toLowerCase();
   } catch {
-    throw unauthorized("Invalid signature");
+    malformed = true;
   }
-  if (signer.toLowerCase() !== address.toLowerCase()) throw unauthorized("The signature is not from that address");
+  if (!valid && verifyContract) {
+    try {
+      valid = !!(await verifyContract({ address, message, signature }));
+    } catch {
+      valid = false;
+    }
+  }
+  if (!valid) throw unauthorized(malformed ? "Invalid signature" : "The signature is not from that address");
   const payload = b64(JSON.stringify({ a: address.toLowerCase(), e: now + SESSION_MS }));
   return { token: `${payload}.${mac(payload)}`, expiresAt: now + SESSION_MS, address: address.toLowerCase() };
 }

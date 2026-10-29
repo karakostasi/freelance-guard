@@ -19,6 +19,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@coinbase/cdp-core": "^0.0.128",
+    "@coinbase/cdp-hooks": "^0.0.128",
+    "@coinbase/cdp-wagmi": "^0.0.128",
     "@tanstack/react-query": "^5.104.2",
     "lucide-react": "^1.59.0",
     "pg": "^8.23.1",
@@ -37,5 +40,10 @@
     "oxlint": "^1.81.0",
     "typescript": "~6.0.2",
     "vite": "^8.3.0"
+  },
+  "overrides": {
+    "@coinbase/cdp-wagmi": {
+      "wagmi": "$wagmi"
+    }
   }
 }

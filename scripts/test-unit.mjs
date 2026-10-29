@@ -9,6 +9,7 @@ import { computeReputation, jobKey } from "../src/lib/reputation.ts";
 import { reminderFor } from "../src/lib/reminders.ts";
 import { formatBalance } from "../src/lib/format.ts";
 import { milestoneFeeShare, surchargeOn } from "../src/lib/fees.ts";
+import { START_RANGE, logsFrom, rangeRefused } from "../server/logs.mjs";
 import { cleanPayout, currencyOfRoute, isValidIban, isValidRouting, publicPayout } from "../server/payout.mjs";
 import { ETH_GAS_BUFFER, checkSend, maxSendable, parseAmount } from "../src/lib/send.ts";
 import { cleanEmail, confirmToken, messagesFor, notifyParties, readEmailToken, unsubscribeToken } from "../server/emails.mjs";
@@ -31,6 +32,31 @@ const rejects = async (promise) => {
   }
 };
 const SHA = "a".repeat(64);
+
+console.log("\nReading events from an RPC that limits the range");
+{
+  // A fake RPC that, like Base Sepolia's public one, refuses more than 200 blocks at a time.
+  const asked = [];
+  const limited = (max, words = (n) => `eth_getLogs is limited to a ${n} range`) => async (from, to) => {
+    asked.push([from, to]);
+    if (to - from + 1n > max) throw Object.assign(new Error("RPC Request failed."), { details: words(max) });
+    return [`logs ${from}-${to}`];
+  };
+  const state = { range: START_RANGE };
+  const first = await logsFrom(limited(200n), 1000n, 100_000n, state);
+  check(first.to === 1199n && state.range === 200n && same(first.logs, ["logs 1000-1199"]), "a refused range becomes the one the RPC names, and the call still succeeds");
+  const before = asked.length;
+  const second = await logsFrom(limited(200n), first.to + 1n, 100_000n, state);
+  check(asked.length === before + 1 && second.to === 1399n, "later calls ask for that size at once");
+  const near = await logsFrom(limited(200n), 99_990n, 100_000n, { range: 200n });
+  check(near.to === 100_000n, "the last piece stops at the latest block");
+  const halved = await logsFrom(limited(10n, () => "query exceeds the block range"), 1n, 100_000n, { range: START_RANGE });
+  check(halved.to - 1n + 1n <= 10n, "without a number in the message the range is halved until it is accepted");
+  const unrelated = await rejects(logsFrom(async () => { throw Object.assign(new Error("rate limit exceeded, too many requests"), { details: "429" }); }, 1n, 100n));
+  check(!!unrelated && !rangeRefused(unrelated), "a rate limit is an error, not a reason to ask for less");
+  const down = await rejects(logsFrom(async () => { throw new Error("fetch failed"); }, 1n, 100n));
+  check(down?.message === "fetch failed", "any other failure is passed on");
+}
 
 console.log("\nJob descriptions");
 check(same(parseDescription("Logo design"), { title: "Logo design", spec: "", ref: undefined }), "a title alone");

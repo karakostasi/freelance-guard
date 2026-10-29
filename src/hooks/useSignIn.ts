@@ -7,13 +7,23 @@ import { cdpConfig } from "../cdp";
  * install and no seed phrase. A browser wallet such as MetaMask is for people who already have one.
  */
 export function useSignIn() {
-  const { connect, connectors, isPending, error } = useConnect();
+  const { connectAsync, connectors, isPending, error } = useConnect();
   const browser = connectors.find((c) => c.id === "metaMask") ?? connectors.find((c) => c.id !== CDP_CONNECTOR_ID);
   return {
     /** Whether the email login is set up (it needs a CDP project id). */
     emailAvailable: !!cdpConfig,
     isPending,
     error: error ? error.message.split("\n")[0] : null,
-    withBrowserWallet: (onSuccess?: () => void) => browser && connect({ connector: browser }, { onSuccess }),
+    // Awaited here, not passed as a callback: the button that asked is gone once the wallet is connected, and a callback
+    // of a component that is gone never runs. A refusal shows in `error`.
+    withBrowserWallet: async (onSuccess?: () => void) => {
+      if (!browser) return;
+      try {
+        await connectAsync({ connector: browser });
+      } catch {
+        return;
+      }
+      onSuccess?.();
+    },
   };
 }

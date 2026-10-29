@@ -7,11 +7,11 @@ import { avatarGradient } from "../lib/avatar";
 import { short } from "../lib/jobs";
 import { NotificationSettings } from "./NotificationSettings";
 import { PayoutSettings } from "./PayoutSettings";
-import { SignInButtons } from "./SignInButtons";
+import { SignInButton } from "./SignInButton";
 import styles from "../App.module.css";
 
-/** The account in the header: the sign-in buttons, or the account avatar with a menu. */
-export function ProfileMenu() {
+/** The account in the header: the sign-in button, or the account avatar with a menu. `hideSignIn` leaves it out when the page has its own. */
+export function ProfileMenu({ hideSignIn = false }: { hideSignIn?: boolean }) {
   const { address, chain, connector, isConnected } = useAccount();
   const { disconnect } = useDisconnect();
   const { data: balance } = useBalance({ address });
@@ -29,7 +29,7 @@ export function ProfileMenu() {
   }, [anchor]);
 
   if (!isConnected || !address) {
-    return <SignInButtons compact />;
+    return hideSignIn ? null : <SignInButton />;
   }
 
   const copy = async () => {

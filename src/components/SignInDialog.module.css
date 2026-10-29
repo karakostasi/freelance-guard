@@ -1,0 +1,4 @@
+/* "or" between the email and the wallet, on a line. */
+.or { display: flex; align-items: center; gap: .75rem; margin: .25rem 0; color: var(--muted); font-size: .85rem; }
+.or::before, .or::after { content: ""; flex: 1; height: 1px; background: var(--line-3); }
+.wallet { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; min-height: 2.4rem; box-sizing: border-box; font-family: inherit; font-size: 1rem; }

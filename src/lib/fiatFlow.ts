@@ -19,6 +19,12 @@ export type SubStep = {
   durationMs: number;
   /** True when the step is backed by the real escrow contract rather than simulated. */
   real?: boolean;
+  /**
+   * Who does a step that is not `real`, so it can be labelled before it has run: our own server ("backend"), a partner
+   * we stand in for with a sandbox ("sandbox"), or a transaction on the chain ("chain"). What a step says about itself
+   * when it is done (its `source`) wins over this.
+   */
+  kind?: "chain" | "backend" | "sandbox";
   /** Raw data shown in the Detailed view. */
   payload: (ctx: FlowContext) => Record<string, unknown>;
 };
@@ -53,6 +59,7 @@ export const FUNDING_STAGES: Stage[] = [
     steps: [
       {
         id: "webhook",
+        kind: "sandbox",
         label: "Bank webhook verified",
         simple: "Bank confirmed your payment",
         durationMs: 900,
@@ -60,6 +67,7 @@ export const FUNDING_STAGES: Stage[] = [
       },
       {
         id: "aml",
+        kind: "sandbox",
         label: "AML & sanctions check",
         simple: "Compliance screening passed",
         durationMs: 1300,
@@ -67,6 +75,7 @@ export const FUNDING_STAGES: Stage[] = [
       },
       {
         id: "ledger",
+        kind: "backend",
         label: "Internal ledger allocation",
         simple: "Funds reserved for this job",
         durationMs: 800,
@@ -83,6 +92,7 @@ export const FUNDING_STAGES: Stage[] = [
     steps: [
       {
         id: "fx",
+        kind: "sandbox",
         label: "FX rate locked (15 min)",
         simple: "Exchange rate fixed so the amount can't move",
         durationMs: 800,
@@ -90,6 +100,7 @@ export const FUNDING_STAGES: Stage[] = [
       },
       {
         id: "por",
+        kind: "sandbox",
         label: "Proof-of-Reserves check",
         simple: "Reserves verified against issued tokens",
         durationMs: 1200,
@@ -97,6 +108,7 @@ export const FUNDING_STAGES: Stage[] = [
       },
       {
         id: "mint",
+        kind: "sandbox",
         label: "Stablecoin delivered to your wallet",
         simple: "Digital euros or dollars sent to your wallet",
         durationMs: 1100,
@@ -113,6 +125,7 @@ export const FUNDING_STAGES: Stage[] = [
     steps: [
       {
         id: "userop",
+        kind: "backend",
         label: "UserOperation built (ERC-4337)",
         simple: "Deposit instruction prepared",
         durationMs: 800,
@@ -153,6 +166,7 @@ export const FUNDING_STAGES: Stage[] = [
       },
       {
         id: "notify",
+        kind: "backend",
         label: "Payee notified (webhook)",
         simple: "Payee told they can start",
         durationMs: 700,
@@ -160,6 +174,7 @@ export const FUNDING_STAGES: Stage[] = [
       },
       {
         id: "dashboard",
+        kind: "backend",
         label: "Invoice dashboard updated",
         simple: "Your invoice now shows as funded",
         durationMs: 600,
@@ -230,6 +245,7 @@ export const payoutStages = (route: PayoutRoute): Stage[] => [
     steps: [
       {
         id: "route",
+        kind: "sandbox",
         label: route === "eurc" ? "Route: keep the stablecoin" : route === "ach" ? "Route: off-ramp to a US account (ACH)" : "Route: off-ramp to SEPA",
         simple: route === "eurc" ? "Payment stays as a stablecoin" : "Payment will be sent to the bank account",
         durationMs: 800,
@@ -237,6 +253,7 @@ export const payoutStages = (route: PayoutRoute): Stage[] => [
       },
       {
         id: "convert",
+        kind: "sandbox",
         label: route === "eurc" ? "Wallet credited" : route === "ach" ? "Stablecoin redeemed to USD" : "EURC redeemed to EUR",
         simple: route === "eurc" ? "The stablecoin is added to your wallet" : route === "ach" ? "Digital money converted to dollars" : "Digital euros converted to euros",
         durationMs: 1100,
@@ -253,6 +270,7 @@ export const payoutStages = (route: PayoutRoute): Stage[] => [
     steps: [
       {
         id: "settle",
+        kind: "sandbox",
         label: route === "eurc" ? "Stablecoin available" : route === "ach" ? "ACH transfer sent" : "SEPA Instant sent",
         simple: route === "eurc" ? "Funds available in your wallet" : route === "ach" ? "Transfer sent, arrives in 1 to 2 business days" : "Transfer sent, arrives within seconds",
         durationMs: 1000,
@@ -260,6 +278,7 @@ export const payoutStages = (route: PayoutRoute): Stage[] => [
       },
       {
         id: "receipt",
+        kind: "backend",
         label: "Receipt issued",
         simple: "Receipt saved to the invoice",
         durationMs: 600,

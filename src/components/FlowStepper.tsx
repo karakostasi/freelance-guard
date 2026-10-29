@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Check, Circle, CircleX, Clock, Code, Coins, Eye, Landmark, LoaderCircle, Route, Send, ShieldCheck, Timer, type LucideIcon } from "lucide-react";
-import { stepKey, type FlowState, type Stage } from "../lib/fiatFlow";
+import { stepKey, type FlowState, type Stage, type SubStep } from "../lib/fiatFlow";
 import styles from "./FlowStepper.module.css";
 
 export type FlowMode = "simple" | "detailed";
@@ -54,9 +54,7 @@ export function FlowStepper({ stages, state, mode, onModeChange, timer = false }
       <div className={styles.head}>
         <div className={styles.titles}>
           <h3 className={styles.viewTitle}>Payment steps</h3>
-          <p className={styles.viewHint}>
-            {mode === "simple" ? "Plain-language steps. The stage in progress is open, click any box to open another." : "Technical step names, transaction hashes and the raw data behind every step."}
-          </p>
+          {mode === "detailed" && <p className={styles.viewHint}>Technical step names, transaction hashes and the raw data behind every step.</p>}
         </div>
         <div className={styles.progress}>
           <span className={styles.progressText}>
@@ -87,12 +85,14 @@ export function FlowStepper({ stages, state, mode, onModeChange, timer = false }
           </label>
         )}
       </div>
-      <div className={styles.legend}>
-        <span className={`${styles.tag} ${styles.tagReal}`}>On-chain</span>
-        <span className={`${styles.tag} ${styles.tagBackend}`}>Backend</span>
-        <span className={`${styles.tag} ${styles.tagSandbox}`}>Sandbox</span>
-        <span className={`${styles.tag} ${styles.tagDemo}`}>Demo</span>
-      </div>
+      <ul className={styles.legend} aria-label="What the labels mean">
+        {(Object.keys(ORIGINS) as Origin[]).map((origin) => (
+          <li key={origin}>
+            <span className={`${styles.tag} ${styles[ORIGINS[origin].css]}`}>{ORIGINS[origin].label}</span>
+            <span>{ORIGINS[origin].means}</span>
+          </li>
+        ))}
+      </ul>
 
       <div className={styles.scroll}>
         <div className={styles.journey} style={{ gridTemplateColumns: `repeat(${stages.length}, minmax(116px, 1fr))`, minWidth: `${stages.length * 130}px` }}>
@@ -151,7 +151,7 @@ export function FlowStepper({ stages, state, mode, onModeChange, timer = false }
                           </span>
                           <span className={styles.stepBody}>
                             <span>{mode === "simple" ? step.simple : step.label}</span>
-                            <StepTag real={!!step.real} source={done?.payload.source as string | undefined} txHash={done?.payload.txHash as string | undefined} />
+                            <StepTag step={step} payload={done?.payload} />
                             {mode === "detailed" && done && <AuditDetails payload={done.payload} />}
                           </span>
                         </li>
@@ -175,16 +175,40 @@ export function FlowStepper({ stages, state, mode, onModeChange, timer = false }
   );
 }
 
-function StepTag({ real, source, txHash }: { real: boolean; source?: string; txHash?: string }) {
-  if (!real && source === "backend") return <span className={`${styles.tag} ${styles.tagBackend}`}>Backend</span>;
-  if (!real && source === "sandbox") return <span className={`${styles.tag} ${styles.tagSandbox}`}>Sandbox</span>;
-  if (!real) return <span className={`${styles.tag} ${styles.tagDemo}`}>Demo</span>;
-  return txHash ? (
-    <a className={`${styles.tag} ${styles.tagReal}`} href={`${EXPLORER}/tx/${txHash}`} target="_blank" rel="noreferrer">
-      On-chain ↗
-    </a>
-  ) : (
-    <span className={`${styles.tag} ${styles.tagReal}`}>On-chain</span>
+/** Who does a step. Everything but "chain" happens outside the blockchain, which is what "Off-chain" says. */
+type Origin = "chain" | "backend" | "sandbox" | "demo";
+
+const ORIGINS: Record<Origin, { label: string; css: string; means: string }> = {
+  chain: { label: "On-chain", css: "tagReal", means: "recorded on the blockchain, where anyone can check it" },
+  backend: { label: "Off-chain", css: "tagOff", means: "done by Squirrel's server, outside the blockchain" },
+  sandbox: { label: "Off-chain · sandbox", css: "tagSandbox", means: "a bank, compliance or exchange partner, simulated here" },
+  demo: { label: "Off-chain · demo", css: "tagDemo", means: "simulated in your browser, with no backend" },
+};
+
+/** A step on the chain, or off it and then by whom. What the finished step says about itself wins over what is known beforehand, so the label doesn't change under you. */
+function originOf(step: SubStep, payload?: Record<string, unknown>): Origin {
+  const source = payload?.source;
+  if (step.real || source === "chain") return "chain";
+  if (payload?.simulated) return "demo";
+  if (source === "backend" || source === "sandbox") return source;
+  return step.kind === "backend" || step.kind === "sandbox" ? step.kind : step.kind === "chain" ? "chain" : "demo";
+}
+
+function StepTag({ step, payload }: { step: SubStep; payload?: Record<string, unknown> }) {
+  const origin = originOf(step, payload);
+  const { label, css, means } = ORIGINS[origin];
+  const txHash = payload?.txHash as string | undefined;
+  if (origin === "chain" && txHash) {
+    return (
+      <a className={`${styles.tag} ${styles[css]}`} href={`${EXPLORER}/tx/${txHash}`} target="_blank" rel="noreferrer" title={`This step is ${means}`}>
+        {label} ↗
+      </a>
+    );
+  }
+  return (
+    <span className={`${styles.tag} ${styles[css]}`} title={`This step is ${means}`}>
+      {label}
+    </span>
   );
 }
 

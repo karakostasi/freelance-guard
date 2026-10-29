@@ -23,11 +23,14 @@
 .switch input:checked + .switchTrack::after { transform: translateX(18px); }
 .switch input:focus-visible + .switchTrack { outline: 2px solid var(--accent-3); outline-offset: 2px; }
 
-.legend { display: inline-flex; gap: .4rem; margin-bottom: .5rem; }
+/* One label to a line, the labels in one column and what they mean in the next. */
+.legend { list-style: none; display: grid; grid-template-columns: max-content 1fr; align-items: center; gap: .4rem .75rem; margin: 0 0 .75rem; padding: 0; font-size: .78rem; color: var(--muted); }
+.legend li { display: contents; }
+.legend .tag { justify-self: start; }
 .tag { align-self: flex-start; font-size: .65rem; font-weight: 600; letter-spacing: .03em; padding: .05rem .4rem; border-radius: 4px; text-decoration: none; }
 .tagReal { color: var(--cyan-text); background: rgba(76, 201, 240, .14); }
 .tagDemo { color: var(--muted-2); background: rgba(170, 170, 187, .14); }
-.tagBackend { color: var(--good-text); background: rgba(62, 207, 142, .14); }
+.tagOff { color: var(--violet-text); background: rgba(179, 157, 255, .14); }
 .tagSandbox { color: var(--warn-text); background: rgba(245, 185, 66, .14); }
 
 /* the row */

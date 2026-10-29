@@ -1,5 +1,5 @@
 import { useAccount } from "wagmi";
-import { Plus } from "lucide-react";
+import { LoaderCircle, Plus } from "lucide-react";
 import { JobDetails } from "./JobDetails";
 import { JobList } from "./JobList";
 import { WalletCard } from "./WalletCard";
@@ -14,7 +14,7 @@ import page from "./FlowPage.module.css";
 
 /** Your jobs as a list, with the selected one beside it: what to do next on it, its stages and its details. */
 export function JobsPage({ jobId }: { jobId?: string }) {
-  const mine = useMyJobs();
+  const { jobs: mine, loading } = useMyJobs();
   const { address } = useAccount();
   const { reviewPeriod } = useEscrowConfig();
   const now = useNow(30_000);
@@ -28,7 +28,7 @@ export function JobsPage({ jobId }: { jobId?: string }) {
 
   return (
     <div className={page.jobsLayout}>
-      <JobList jobs={mine} selectedId={open} onSelect={(id) => navigate(`/jobs/${id}`)} emptyText="No jobs yet." />
+      <JobList jobs={mine} selectedId={open} onSelect={(id) => navigate(`/jobs/${id}`)} emptyText={loading ? "Loading your jobs…" : "No jobs yet."} />
       <WalletCard className={page.wallet} />
       <div className={page.top}>
         {due.length > 0 && (
@@ -42,6 +42,12 @@ export function JobsPage({ jobId }: { jobId?: string }) {
         )}
         {open ? (
           <JobDetails key={open} id={open} />
+        ) : loading ? (
+          <section className={page.empty} role="status">
+            <p className={`${styles.muted} ${page.loading}`}>
+              <LoaderCircle size={16} /> Loading your jobs…
+            </p>
+          </section>
         ) : (
           <section className={page.empty}>
             <h2>No jobs yet</h2>

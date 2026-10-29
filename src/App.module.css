@@ -83,6 +83,10 @@
 .themeButton { display: inline-grid; place-items: center; width: 38px; height: 38px; padding: 0; border-radius: 50%; border: 1px solid var(--line-3); background: none; color: inherit; cursor: pointer; transition: border-color .15s, background .15s; }
 .themeButton:hover { border-color: var(--accent); background: var(--hover); }
 .profileButton { width: 38px; height: 38px; padding: 0; border-radius: 50%; border: 2px solid var(--line); cursor: pointer; transition: border-color .15s; }
+/* where the avatar will be, while a session comes back */
+.profilePlaceholder { display: inline-block; width: 38px; height: 38px; border-radius: 50%; border: 2px solid var(--line); background: var(--card-2); animation: placeholder 1.4s ease-in-out infinite; }
+@keyframes placeholder { 50% { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) { .profilePlaceholder { animation: none; } }
 .profileButton:hover, .profileButton[aria-expanded="true"] { border-color: #4f7cff; }
 .menuBackdrop { position: fixed; inset: 0; z-index: 30; }
 .menu { position: fixed; z-index: 31; min-width: 240px; display: flex; flex-direction: column; gap: .15rem; padding: .5rem; border-radius: 12px; border: 1px solid var(--line-3); background: var(--card-2); box-shadow: var(--shadow-menu); }

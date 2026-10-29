@@ -25,10 +25,12 @@
 .facts li { display: inline-flex; align-items: center; gap: .4rem; font-size: .82rem; padding: .3rem .7rem; border-radius: 999px; color: var(--muted); background: color-mix(in srgb, var(--accent) 8%, transparent); }
 .facts svg { color: var(--accent); }
 
+.spin { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
 @keyframes travel { from { transform: translateX(-100%); } to { transform: translateX(290%); } }
 @media (prefers-reduced-motion: reduce) {
-  .mascot, .rail::after { animation: none; }
+  .mascot, .rail::after, .spin { animation: none; }
   .rail::after { width: 100%; opacity: .35; }
 }
 @media (max-width: 480px) {

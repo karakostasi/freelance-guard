@@ -1,6 +1,9 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useAccount } from "wagmi";
 import { RotateCcw } from "lucide-react";
+import { api } from "../lib/api";
+import { useBackendOnline } from "../hooks/useBackend";
 import { JobActions } from "./JobActions";
 import { PayoutSettings } from "./PayoutSettings";
 import { describePayout, usePayoutOf } from "../hooks/usePayoutOf";
@@ -10,7 +13,7 @@ import { useEscrowConfig } from "../hooks/useEscrowConfig";
 import { useNow } from "../hooks/useNow";
 import { parseDescription, receiptPath } from "../lib/documents";
 import { STATUS, amountFor, euro, formatDay, formatDuration, hasVerifier, milestoneName, type Job } from "../lib/jobs";
-import { formatAmount } from "../lib/tokens";
+import { formatAmount, tokenOf } from "../lib/tokens";
 import type { FlowState, PayoutRoute } from "../lib/fiatFlow";
 import styles from "../App.module.css";
 import s from "./NextStep.module.css";
@@ -30,6 +33,9 @@ export type PayoutControls = {
 
 type Tone = "action" | "wait" | "done";
 
+/** The stablecoin or coin a job pays in. */
+const symbolOf = (job: Job) => tokenOf(job).symbol;
+
 /**
  * The one thing to do next on a job, in a sentence, with the button for whoever has to act. Everything else about the
  * milestone (dispute, refund, the facts and the transactions) is below it. On the payment flow page `payout` adds the
@@ -42,6 +48,7 @@ export function NextStep({ id, index, job, payout }: { id: number; index: number
   const { ref } = parseDescription(job.description);
   const { data: doc } = useDoc(ref);
   const payoutPref = usePayoutOf(job.payee);
+  const online = useBackendOnline();
   const [choosing, setChoosing] = useState(false);
 
   const me = address?.toLowerCase();
@@ -51,6 +58,17 @@ export function NextStep({ id, index, job, payout }: { id: number; index: number
   const isVerifier = !!me && hasVerifier(job) && me === job.verifier.toLowerCase();
   const isArbiter = !!me && arbiter?.toLowerCase() === me;
   const status = STATUS[ms.status];
+  // The escrow has paid the payee, but they haven't said where they want the money, so the payout waits for them. Only a
+  // payment made by card or bank transfer has a payout of its own, and only the backend knows where it stands.
+  const run = useQuery({
+    queryKey: ["run-of-job", id],
+    queryFn: () => api.runForJob(id),
+    enabled: online && index === 0 && status === "Paid",
+    retry: false,
+    // While the payout waits for the payee, look again soon: it goes ahead as soon as they choose.
+    refetchInterval: (q) => (q.state.data?.status === "awaiting_payout" ? 4000 : false),
+  });
+  const waitingForPayee = status === "Paid" && run.data?.status === "awaiting_payout";
   const name = milestoneName(job, index);
   const the = name ? `the ${name}` : "";
   // The business names the payer typed in, when there are any. Otherwise just the role.
@@ -114,8 +132,16 @@ export function NextStep({ id, index, job, payout }: { id: number; index: number
     const routing = payout?.state.status;
     eyebrow = routing === "done" ? "All done" : "Paid";
     title = isPayee ? `You received ${net}` : payout ? (routing === "done" ? "All done" : routing === "running" ? "Routing the payout…" : "Payment released") : `${name ? `The ${name}` : "The payment"} is paid`;
-    detail =
-      payout && routing === "done"
+    if (waitingForPayee) {
+      tone = isPayee ? "action" : "wait";
+      eyebrow = isPayee ? "Your turn" : "Paid";
+      title = isPayee ? `${net} arrived in your wallet` : payout ? "Payment released" : `${name ? `The ${name}` : "The payment"} is paid`;
+    }
+    detail = waitingForPayee
+      ? isPayee
+        ? `You haven't chosen how you want to be paid, so nothing else happens yet. Choose a bank account in euros or dollars, or keep the ${symbolOf(job)}.`
+        : `The escrow released ${gross} to the payee. They haven't chosen yet how they receive it, so the payout waits for them.${nextText}`
+      : payout && routing === "done"
         ? `${euro(payout.amountEur)} ${payout.route === "eurc" ? "kept as a stablecoin in the wallet" : payout.route === "ach" ? "sent to the US bank account by ACH" : "sent to the bank account via SEPA Instant"}.`
         : `The escrow released ${gross} to the payee.${nextText}`;
   } else if (status === "Refunded") {
@@ -127,7 +153,14 @@ export function NextStep({ id, index, job, payout }: { id: number; index: number
 
   const paidActions = status === "Paid" && (
     <div className={s.actions}>
-      {payout?.auto ? (
+      {waitingForPayee && isPayee && (
+        <button className={styles.button} onClick={() => setChoosing(true)}>
+          Choose how to get paid
+        </button>
+      )}
+      {waitingForPayee && payout?.auto ? (
+        isPayee ? null : <span className={styles.muted}>Waiting for the payee to choose how they get paid.</span>
+      ) : payout?.auto ? (
         <span className={styles.muted}>Route: {payout.route === "eurc" ? "keep the stablecoin" : payout.route === "ach" ? "ACH bank transfer in dollars" : "SEPA bank transfer"}</span>
       ) : payout ? (
         <>
@@ -175,7 +208,7 @@ export function NextStep({ id, index, job, payout }: { id: number; index: number
               {isPayee ? "You get paid in" : "The payee gets paid in"} {describePayout(payoutPref.data)}.
             </>
           ) : isPayee ? (
-            "Choose how you want to be paid: a bank account, or the stablecoin in your wallet."
+            `Choose how you want to be paid: a bank account in euros or dollars, or keep the ${symbolOf(job)}. Until you do, the ${symbolOf(job)} lands in your wallet when the payer approves, and the payout waits for you.`
           ) : (
             "The payee hasn't chosen yet how they get paid."
           )}{" "}

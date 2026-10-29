@@ -8,7 +8,7 @@ import { watchEscrow, ESCROW_ADDRESS, RPC_URL, abi, client } from "./chain.mjs";
 import { cleanEmail, confirmToken, notifyParties, readEmailToken, unsubscribeToken } from "./emails.mjs";
 import { sendMail } from "./mail.mjs";
 import { ROUTES, cleanPayout, publicPayout } from "./payout.mjs";
-import { bankReceived, createRun, fail, milestonePlan, onChainEvent, onThisContract, publicRun, subscribe } from "./pipeline.mjs";
+import { bankReceived, createRun, fail, milestonePlan, onChainEvent, onThisContract, publicRun, resumePayouts, subscribe } from "./pipeline.mjs";
 import { EUR_PER_ETH } from "./providers.mjs";
 
 const PORT = Number(process.env.PORT ?? 8787);
@@ -232,6 +232,8 @@ const server = createServer(async (req, res) => {
         const { body } = await json(req);
         db.payouts[owner] = cleanPayout(body);
         save();
+        // Payments that were waiting for this choice go on in the background.
+        resumePayouts(owner).catch((e) => console.error("[payout] could not continue:", e.message));
         return send(res, 200, db.payouts[owner]);
       }
       if (req.method === "DELETE") {

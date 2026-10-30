@@ -83,6 +83,9 @@
 .themeButton { display: inline-grid; place-items: center; width: 38px; height: 38px; padding: 0; border-radius: 50%; border: 1px solid var(--line-3); background: none; color: inherit; cursor: pointer; transition: border-color .15s, background .15s; }
 .themeButton:hover { border-color: var(--accent); background: var(--hover); }
 .profileButton { width: 38px; height: 38px; padding: 0; border-radius: 50%; border: 2px solid var(--line); cursor: pointer; transition: border-color .15s; }
+.brandGroup { display: flex; align-items: center; gap: .75rem; min-width: 0; }
+.networkPill { padding: .15rem .6rem; border-radius: 999px; font-size: .72rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--warn-text); background: color-mix(in srgb, var(--warn-text) 14%, transparent); }
+.mismatch { margin: 0 0 1rem; padding: .75rem 1rem; border-radius: 10px; font-weight: 600; color: var(--bad-text); border: 1px solid color-mix(in srgb, var(--bad-text) 55%, transparent); background: color-mix(in srgb, var(--bad-text) 12%, transparent); }
 /* where the avatar will be, while a session comes back */
 .profilePlaceholder { display: inline-block; width: 38px; height: 38px; border-radius: 50%; border: 2px solid var(--line); background: var(--card-2); animation: placeholder 1.4s ease-in-out infinite; }
 @keyframes placeholder { 50% { opacity: .45; } }

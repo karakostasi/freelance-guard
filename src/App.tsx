@@ -8,12 +8,19 @@ import { SignInGate } from "./components/SignInGate";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { ReceiptPage } from "./components/ReceiptPage";
 import { navigate, useHashRoute } from "./hooks/useHashRoute";
+import { useConfig } from "wagmi";
+import { useBackendStatus } from "./hooks/useBackend";
 import { useSession } from "./hooks/useSession";
+import { chain, isMainnet } from "./chain";
 import logo from "./assets/logo.svg";
 import styles from "./App.module.css";
 
 export default function App() {
   const { isConnected, restoring } = useSession();
+  // The site and its server must be on the same network. If they aren't, say so loudly: money sent from here would go to the wrong place.
+  const { chainId: serverChain } = useBackendStatus();
+  const chains = useConfig().chains;
+  const mismatch = serverChain !== undefined && !chains.some((c) => c.id === serverChain);
   const route = useHashRoute();
   // The pages that need an account show the sign-in page until there is one.
   const gated = !isConnected && route.page !== "home" && route.page !== "receipt";
@@ -21,10 +28,13 @@ export default function App() {
   return (
     <main className={styles.page}>
       <header className={`${styles.header} ${styles.noPrint}`}>
-        <a className={`${styles.brand} ${styles.brandLink}`} href="#/" aria-label="Home">
-          <img src={logo} alt="" className={styles.logo} />
-          <h1>Squirrel</h1>
-        </a>
+        <div className={styles.brandGroup}>
+          <a className={`${styles.brand} ${styles.brandLink}`} href="#/" aria-label="Home">
+            <img src={logo} alt="" className={styles.logo} />
+            <h1>Squirrel</h1>
+          </a>
+          {!isMainnet && <span className={styles.networkPill} title={`${chain.name}: the money here is not real`}>Test network</span>}
+        </div>
         <div className={styles.headerRight}>
           {/* Every page needs a sign-in, so until then there is nowhere else to go. Someone coming back keeps the links while the wallet starts. */}
           {(isConnected || restoring) && (
@@ -46,6 +56,11 @@ export default function App() {
           </div>
         </div>
       </header>
+      {mismatch && (
+        <p className={styles.mismatch} role="alert">
+          This site is on {chain.name}, but its server is on chain {serverChain}. Don&apos;t send money until that is fixed.
+        </p>
+      )}
       {route.page === "home" && <Landing />}
       {route.page === "receipt" && <ReceiptPage jobId={route.jobId} milestone={route.milestone} />}
       {gated && <SignInGate page={route.page as "new" | "jobs" | "flow"} checking={restoring} />}

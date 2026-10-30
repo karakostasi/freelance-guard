@@ -10,6 +10,7 @@ import { sendMail } from "./mail.mjs";
 import { ROUTES, cleanPayout, publicPayout } from "./payout.mjs";
 import { bankReceived, createRun, fail, milestonePlan, onChainEvent, onThisContract, publicRun, resumePayouts, subscribe } from "./pipeline.mjs";
 import { EUR_PER_ETH } from "./providers.mjs";
+import { isStrict, startupProblems } from "./safety.mjs";
 
 const PORT = Number(process.env.PORT ?? 8787);
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET ?? "dev-webhook-secret";
@@ -22,6 +23,19 @@ if (!process.env.ESCROW_ADDRESS && !process.env.VITE_ESCROW_ADDRESS) {
 if (!process.env.WEBHOOK_SECRET) console.warn("[warn] WEBHOOK_SECRET not set, using an insecure development secret.");
 
 const sign = (body) => createHmac("sha256", WEBHOOK_SECRET).update(body).digest("hex");
+
+// Which network this is, and with it whether the money is real. On a real network (or with STRICT=1) the server refuses to
+// start unless its settings are safe, and the sandbox parts stay shut (see server/safety.mjs).
+const chainId = await client.getChainId().catch(() => null);
+const problems = startupProblems({ env: process.env, chainId });
+if (problems.length > 0) {
+  console.error(`\nNot starting: ${problems.length} thing${problems.length === 1 ? " is" : "s are"} unsafe for real money.\n`);
+  for (const p of problems) console.error(` - ${p}`);
+  process.exit(1);
+}
+const realMoney = isStrict({ env: process.env, chainId });
+if (realMoney) console.log(`[mode] real money, chain ${chainId}: the sandbox bank, the mint and bank payouts are off.`);
+const closed = () => Object.assign(new Error("Card and bank payments aren't open yet."), { status: 503 });
 
 // CORS_ORIGIN: comma-separated list of allowed site origins. Empty means any origin.
 // Trailing slashes are ignored, so "https://site.vercel.app/" works too.
@@ -170,7 +184,7 @@ const server = createServer(async (req, res) => {
       return res.end();
     }
 
-    if (req.method === "GET" && path === "/api/health") return send(res, 200, { ok: true, escrow: ESCROW_ADDRESS, rpc: RPC_URL, eurPerEth: EUR_PER_ETH, processedBlock: db.cursor });
+    if (req.method === "GET" && path === "/api/health") return send(res, 200, { ok: true, escrow: ESCROW_ADDRESS, rpc: RPC_URL, eurPerEth: EUR_PER_ETH, processedBlock: db.cursor, chainId, realMoney, bankRails: !realMoney });
 
     if (req.method === "POST" && path === "/api/auth") {
       const { body } = await json(req);
@@ -230,6 +244,8 @@ const server = createServer(async (req, res) => {
       if (req.method === "GET") return send(res, 200, db.payouts[owner] ?? { route: null });
       if (req.method === "PUT") {
         const { body } = await json(req);
+        // Bank details are only kept once something can pay them out. Until then, keeping the stablecoin is the only choice.
+        if (realMoney && body?.route !== "eurc") throw Object.assign(new Error("Bank payouts aren't open yet."), { status: 503 });
         db.payouts[owner] = cleanPayout(body);
         save();
         // Payments that were waiting for this choice go on in the background.
@@ -279,6 +295,7 @@ const server = createServer(async (req, res) => {
     }
 
     if (req.method === "POST" && path === "/api/payments") {
+      if (realMoney) throw closed();
       const { body } = await json(req);
       validatePayment(body);
       const run = await createRun(body);
@@ -287,6 +304,7 @@ const server = createServer(async (req, res) => {
 
     // Stand-in for the user's banking app: it triggers the same signed webhook a real bank would send.
     if (req.method === "POST" && path === "/api/sandbox/bank-transfer") {
+      if (realMoney) throw closed();
       const { body } = await json(req);
       const run = Object.values(db.runs).find((r) => r.ref === body.reference);
       if (!run) throw Object.assign(new Error("Unknown reference"), { status: 404 });
@@ -296,6 +314,7 @@ const server = createServer(async (req, res) => {
     }
 
     if (req.method === "POST" && path === "/webhooks/bank") {
+      if (realMoney) throw closed();
       const { raw, body } = await json(req);
       const given = Buffer.from(String(req.headers["x-signature"] ?? ""), "hex");
       const expected = Buffer.from(sign(raw), "hex");

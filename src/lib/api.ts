@@ -52,7 +52,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 const post = <T>(path: string, body: unknown) => request<T>(path, { method: "POST", body: JSON.stringify(body) });
 
 export const api = {
-  health: () => request<{ ok: boolean; eurPerEth: number }>("/api/health"),
+  health: () => request<{ ok: boolean; eurPerEth: number; chainId?: number; realMoney?: boolean; bankRails?: boolean }>("/api/health"),
   createPayment: (body: { payer: string; payee: string; amount: string; token: "eth" | "eurc" | "usdc"; useYield?: boolean; milestones: { title: string; amount: string; days: string }[]; description: string }) =>
     post<{ run: PaymentRun; bank: { reference: string; amountEur: number; amount: number; currency: "EUR" | "USD" } }>("/api/payments", body),
   bankTransfer: (reference: string) => post<{ ok: boolean }>("/api/sandbox/bank-transfer", { reference }),

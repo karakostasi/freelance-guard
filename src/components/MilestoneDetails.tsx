@@ -60,7 +60,7 @@ export function MilestoneDetails({ job, index, trace, onRetry, loading, compact,
           {multi && <strong>{ms.title || "Untitled"}</strong>}
           <span>
             <span className={page.factLabel}>{multi ? "This milestone" : "Amount"}</span> <strong>{formatUnitsOf(token, ms.amount)}</strong>{" "}
-            <span className={page.factLabel}>({approxEuro(eur)})</span>
+            {token.eurPer > 0 && <span className={page.factLabel}>({approxEuro(eur)})</span>}
           </span>
           {multi && (
             <span className={page.factLabel}>

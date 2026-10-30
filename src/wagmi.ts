@@ -1,8 +1,9 @@
 import { createConfig, http } from "wagmi";
-import { baseSepolia, hardhat } from "wagmi/chains";
+import { base, baseSepolia, hardhat } from "wagmi/chains";
 import { injected } from "wagmi/connectors";
 import { createCDPEmbeddedWalletConnector } from "@coinbase/cdp-wagmi";
 import { cdpConfig } from "./cdp";
+import { chain, isMainnet } from "./chain";
 import artifact from "../abi/FreelanceEscrow.json";
 
 export const escrowAbi = artifact.abi;
@@ -13,21 +14,24 @@ export const escrowDeployBlock = import.meta.env.VITE_ESCROW_DEPLOY_BLOCK
   ? BigInt(import.meta.env.VITE_ESCROW_DEPLOY_BLOCK as string)
   : undefined;
 
-// A local Hardhat chain is only offered when asked for (VITE_LOCAL_CHAIN=1). The embedded wallet only knows real networks.
-const local = import.meta.env.VITE_LOCAL_CHAIN === "1";
+// A local Hardhat chain is only offered when asked for (VITE_LOCAL_CHAIN=1), and never in a build for real money. The
+// embedded wallet only knows real networks.
+const local = import.meta.env.VITE_LOCAL_CHAIN === "1" && !isMainnet;
 
-const rpc = (import.meta.env.VITE_BASE_SEPOLIA_RPC_URL as string | undefined) || undefined;
+const rpc = ((import.meta.env.VITE_RPC_URL ?? import.meta.env.VITE_BASE_SEPOLIA_RPC_URL) as string | undefined) || undefined;
 
 export const config = createConfig({
-  chains: local ? ([baseSepolia, hardhat] as const) : ([baseSepolia] as const),
+  chains: local ? ([chain, hardhat] as const) : ([chain] as const),
   connectors: [
     // An email login and a wallet made for the person, for people with no crypto wallet. MetaMask is for those who have one.
-    ...(cdpConfig ? [createCDPEmbeddedWalletConnector({ cdpConfig, providerConfig: { chains: [baseSepolia], transports: { [baseSepolia.id]: http(rpc) } } })] : []),
+    ...(cdpConfig ? [createCDPEmbeddedWalletConnector({ cdpConfig, providerConfig: { chains: [chain], transports: { [chain.id]: http(rpc) } } })] : []),
     injected({ target: "metaMask" }),
   ],
+  // A transport for every chain there could be, so the types hold whichever network this build is for. Only the chains
+  // above are used. The public RPC is shared and rate-limited: set VITE_RPC_URL to your own (Alchemy, Infura, QuickNode...).
   transports: {
-    // The public RPC is shared and rate-limited. Set VITE_BASE_SEPOLIA_RPC_URL to your own (Alchemy, Infura, QuickNode...).
     [baseSepolia.id]: http(rpc),
+    [base.id]: http(rpc),
     [hardhat.id]: http(),
   },
 });

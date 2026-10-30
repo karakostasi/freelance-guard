@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Check, Circle, CircleX, Clock, Code, Coins, Eye, Landmark, LoaderCircle, Route, Send, ShieldCheck, Timer, type LucideIcon } from "lucide-react";
 import { stepKey, type FlowState, type Stage, type SubStep } from "../lib/fiatFlow";
+import { explorerHost } from "../chain";
 import styles from "./FlowStepper.module.css";
 
 export type FlowMode = "simple" | "detailed";
@@ -14,7 +15,7 @@ const ICONS: Record<Stage["icon"], LucideIcon> = {
   send: Send,
 };
 
-const EXPLORER = "https://sepolia.basescan.org";
+const EXPLORER = explorerHost;
 
 const seconds = (ms: number) => `${(ms / 1000).toFixed(1)}s`;
 

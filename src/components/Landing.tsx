@@ -1,5 +1,6 @@
 import { useRef } from "react";
 import { useSession } from "../hooks/useSession";
+import { isMainnet } from "../chain";
 import { ArrowRight, Banknote, Coins, CreditCard, FileCheck, FileText, Landmark, ListChecks, Lock, Mail, MapPin, Scale, Send, TrendingUp, UserCheck } from "lucide-react";
 import { navigate } from "../hooks/useHashRoute";
 import { JobPreview } from "./JobPreview";
@@ -57,7 +58,7 @@ export function Landing() {
               See how it works
             </button>
           </div>
-          <p className={page.note}>No wallet needed. Testnet demo, no real money.</p>
+          <p className={page.note}>{isMainnet ? "No wallet needed." : "No wallet needed. Testnet demo, no real money."}</p>
         </div>
         <JobPreview />
       </section>

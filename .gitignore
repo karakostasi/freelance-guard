@@ -20,3 +20,6 @@ typechain-types/
 
 # Backend state
 server/data/
+
+# The settings file for real money is private. Its template is not.
+!.env.mainnet.example

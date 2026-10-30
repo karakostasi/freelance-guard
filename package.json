@@ -16,7 +16,12 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy:mainnet": "hardhat run scripts/deploy-mainnet.cjs --network base",
+    "deploy:rehearsal": "hardhat run scripts/deploy-mainnet.cjs --network baseSepolia",
+    "check:deployment": "hardhat run scripts/check-deployment.cjs --network base",
+    "check:deployment:rehearsal": "hardhat run scripts/check-deployment.cjs --network baseSepolia",
+    "test:deploy": "node scripts/test-deploy.mjs"
   },
   "dependencies": {
     "@coinbase/cdp-core": "^0.0.128",

@@ -1,6 +1,7 @@
 import { formatUnits, zeroAddress } from "viem";
 import type { Job } from "./jobs";
 import { EUR_PER_ETH } from "./fiatFlow";
+import { TOKEN_ADDRESSES, isMainnet } from "../chain";
 
 export type Token = {
   symbol: string;
@@ -11,24 +12,17 @@ export type Token = {
   eurPer: number;
 };
 
-export const ETH: Token = { symbol: "ETH", decimals: 18, eurPer: EUR_PER_ETH };
+// A euro value is only shown where there is a rate. The rates here are invented (for the test network), so on the real one only
+// EURC, which is a euro, has one.
+export const ETH: Token = { symbol: "ETH", decimals: 18, eurPer: isMainnet ? 0 : EUR_PER_ETH };
 
-// Base Sepolia test tokens from Circle. Override with env vars (e.g. a local mock token).
-export const EURC: Token = {
-  symbol: "EURC",
-  decimals: 6,
-  address: ((import.meta.env.VITE_EURC_ADDRESS as string | undefined) || "0x808456652fdb597867f38412077A9182bf77359F") as `0x${string}`,
-  eurPer: 1,
-};
+// Circle's tokens on the network of this build (src/chain.ts says which, and which address).
+export const EURC: Token = { symbol: "EURC", decimals: 6, address: TOKEN_ADDRESSES.EURC, eurPer: 1 };
 
-export const USDC: Token = {
-  symbol: "USDC",
-  decimals: 6,
-  address: ((import.meta.env.VITE_USDC_ADDRESS as string | undefined) || "0x036CbD53842c5426634e7929541eC2318f3dCF7e") as `0x${string}`,
-  eurPer: 0.92,
-};
+export const USDC: Token = { symbol: "USDC", decimals: 6, address: TOKEN_ADDRESSES.USDC, eurPer: isMainnet ? 0 : 0.92 };
 
-export const TOKENS: Token[] = [ETH, EURC, USDC];
+/** What a job can be paid in. ETH only on the test network: its euro value is invented, and the escrow's limits for it are set in euros. */
+export const TOKENS: Token[] = isMainnet ? [EURC, USDC] : [ETH, EURC, USDC];
 
 /** Which token a job is paid in. */
 export function tokenOf(job: Job): Token {

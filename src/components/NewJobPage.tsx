@@ -14,6 +14,7 @@ import { uploadDoc, uploadFile } from "../lib/files";
 import { setPendingPayment } from "../lib/pendingPayment";
 import { euro } from "../lib/jobs";
 import { ETH, TOKENS, formatBalance, formatUnitsOf, toEur } from "../lib/tokens";
+import { isMainnet } from "../chain";
 import { FileDrop } from "./FileDrop";
 import { ReputationBadge } from "./ReputationBadge";
 import { WalletCard } from "./WalletCard";
@@ -62,8 +63,10 @@ const sameRows = (a: Row[], b: Row[]) => a.length === b.length && a.every((r, i)
 export function NewJobPage() {
   const { address } = useAccount();
   // Until the first check has answered the backend is taken to be up, so the choice of euros isn't greyed out and switched back.
-  const { online, checked } = useBackendStatus();
+  const { online, checked, bankRails } = useBackendStatus();
   const backendOnline = online || !checked;
+  // Card and bank payments need the backend, and the backend has them shut on a real network until a real bank is behind them.
+  const cardsOpen = backendOnline && bankRails;
   const [step, setStep] = useState(1);
   const [txHash, setTxHash] = useState<`0x${string}` | undefined>();
   const [working, setWorking] = useState("");
@@ -82,7 +85,7 @@ export function NewJobPage() {
   const [priceOpen, setPriceOpen] = useState(false);
 
   // Real money runs through the backend. Without it, the wallet tokens still work.
-  const picked: Choice = BANK_ASSET[choice] && !backendOnline ? "EURC" : choice;
+  const picked: Choice = BANK_ASSET[choice] && !cardsOpen ? "EURC" : choice;
   const bank = !!BANK_ASSET[picked];
   // A bank transfer is one payment for the total, so it always funds everything.
   const fundNow = bank || fundNowChoice;
@@ -329,10 +332,10 @@ export function NewJobPage() {
             <input id="amount" className={`${styles.input} ${n.amount}`} inputMode="decimal" placeholder="0.00" value={total} onChange={(e) => setTotal(e.target.value)} />
             <select className={styles.input} value={picked} onChange={(e) => setChoice(e.target.value as Choice)} aria-label="Pay with">
               <optgroup label="Card or bank transfer">
-                <option value="EUR" disabled={!backendOnline}>
+                <option value="EUR" disabled={!cardsOpen}>
                   EUR
                 </option>
-                <option value="USD" disabled={!backendOnline}>
+                <option value="USD" disabled={!cardsOpen}>
                   USD
                 </option>
               </optgroup>
@@ -352,10 +355,10 @@ export function NewJobPage() {
               <>
                 {totalUnits > 0n && eur > 0 && `${token.symbol === "ETH" ? "≈" : "="} ${euro(toEur(token, totalUnits))}${token.symbol === "ETH" ? " (demo rate)" : ""} · `}
                 {balance !== undefined && `Your balance: ${formatBalance(balance, token.decimals)} ${token.symbol}`}
-                {balance === 0n && (token.address ? " · get free test tokens at faucet.circle.com" : " · you need some Base Sepolia ETH, from any Base Sepolia faucet")}
+                {balance === 0n && !isMainnet && (token.address ? " · get free test tokens at faucet.circle.com" : " · you need some Base Sepolia ETH, from any Base Sepolia faucet")}
               </>
             )}
-            {!backendOnline && " EUR and USD need the backend, which is offline right now."}
+            {!backendOnline ? " EUR and USD need the backend, which is offline right now." : !bankRails ? " Paying by card or bank transfer isn't open yet." : ""}
           </span>
         </div>
         {hasYield && (

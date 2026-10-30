@@ -31,6 +31,8 @@ jobs:
           path: ~/.cache/hardhat-nodejs
           key: hardhat-compilers-${{ hashFiles('hardhat.config.cjs') }}
       - run: npx hardhat test
+      - name: The deploy script for real money, on a local chain
+        run: npm run test:deploy
       - name: The committed ABI matches the contract
         run: |
           node scripts/export-abi.cjs

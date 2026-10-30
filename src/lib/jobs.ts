@@ -1,4 +1,5 @@
 import styles from "../App.module.css";
+import { explorerAddress, explorerTx, networkLabel } from "../chain";
 import { formatDuration } from "./format";
 import { milestoneFeeShare, surchargeOn } from "./fees";
 
@@ -156,10 +157,10 @@ export function timeInfo(m: Milestone, reviewPeriod: bigint | undefined, now: bi
 
 export { deliverableUrl } from "./documents";
 
-/** The network the escrow runs on, as printed on receipts. Keep in step with the explorer links below. */
-export const NETWORK_LABEL = "Base Sepolia (test network)";
+/** The network the escrow runs on, as printed on receipts, and the links to it. Both come from src/chain.ts. */
+export const NETWORK_LABEL = networkLabel;
 
-export const txUrl = (hash: string) => `https://sepolia.basescan.org/tx/${hash}`;
-export const addressUrl = (address: string) => `https://sepolia.basescan.org/address/${address}`;
+export const txUrl = explorerTx;
+export const addressUrl = explorerAddress;
 
 export const euro = (n: number) => `€${n.toLocaleString("en-IE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;

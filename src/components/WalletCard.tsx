@@ -11,6 +11,7 @@ import { avatarGradient } from "../lib/avatar";
 import { euro, short, txUrl } from "../lib/jobs";
 import { checkSend, maxSendable } from "../lib/send";
 import { formatBalance, toEur } from "../lib/tokens";
+import { isMainnet } from "../chain";
 import styles from "../App.module.css";
 
 type View = "assets" | "send" | "receive";
@@ -188,14 +189,18 @@ function Receive({ address, network }: { address: string; network: string }) {
       </div>
       <p className={styles.muted}>Only send assets on {network} to this address.</p>
 
-      <h3 className={styles.groupTitle}>Get test funds</h3>
-      <p className={styles.muted}>This is a test network, so funds are free from a faucet.</p>
-      <a className={styles.wpLink} href="https://portal.cdp.coinbase.com/products/faucet" target="_blank" rel="noreferrer noopener">
-        Coinbase faucet: test ETH, USDC and EURC <ExternalLink size={12} />
-      </a>
-      <a className={styles.wpLink} href="https://faucet.circle.com" target="_blank" rel="noreferrer noopener">
-        Circle faucet: test USDC and EURC <ExternalLink size={12} />
-      </a>
+      {!isMainnet && (
+        <>
+          <h3 className={styles.groupTitle}>Get test funds</h3>
+          <p className={styles.muted}>This is a test network, so funds are free from a faucet.</p>
+          <a className={styles.wpLink} href="https://portal.cdp.coinbase.com/products/faucet" target="_blank" rel="noreferrer noopener">
+            Coinbase faucet: test ETH, USDC and EURC <ExternalLink size={12} />
+          </a>
+          <a className={styles.wpLink} href="https://faucet.circle.com" target="_blank" rel="noreferrer noopener">
+            Circle faucet: test USDC and EURC <ExternalLink size={12} />
+          </a>
+        </>
+      )}
     </div>
   );
 }
@@ -221,11 +226,14 @@ export function WalletCard({ className }: { className?: string }) {
         </span>
       </div>
 
-      <div className={styles.wpTotal}>
-        <span className={styles.muted}>Total balance</span>
-        <strong className={styles.wpTotalValue}>{loaded ? euro(total) : "…"}</strong>
-        <span className={styles.muted}>at the app's demo rates</span>
-      </div>
+      {/* A total in euros needs a rate for every token. The rates here are invented, so on the real network there is no total. */}
+      {!isMainnet && (
+        <div className={styles.wpTotal}>
+          <span className={styles.muted}>Total balance</span>
+          <strong className={styles.wpTotalValue}>{loaded ? euro(total) : "…"}</strong>
+          <span className={styles.muted}>at the app's demo rates</span>
+        </div>
+      )}
 
       <div className={styles.wpActions}>
         <button className={`${styles.wpAction} ${view === "send" ? styles.wpActionOn : ""}`} onClick={() => setView(view === "send" ? "assets" : "send")} aria-pressed={view === "send"}>

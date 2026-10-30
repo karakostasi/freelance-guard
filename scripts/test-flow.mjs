@@ -93,7 +93,7 @@ async function main() {
     });
     await until(async () => (await fetch(`${API}/api/health`)).ok, "the backend");
 
-    await run({ escrow, eurc, usdc, vault });
+    await run({ escrow, eurc, usdc, vault, dir });
   } catch (e) {
     failures++;
     console.error("\nTest run aborted:", e.message);
@@ -106,7 +106,7 @@ async function main() {
   process.exit(failures ? 1 : 0);
 }
 
-async function run({ escrow, eurc, usdc, vault }) {
+async function run({ escrow, eurc, usdc, vault, dir }) {
   const erc20 = [
     { type: "function", name: "mint", stateMutability: "nonpayable", inputs: [{ type: "address" }, { type: "uint256" }], outputs: [] },
     { type: "function", name: "balanceOf", stateMutability: "view", inputs: [{ type: "address" }], outputs: [{ type: "uint256" }] },
@@ -427,6 +427,59 @@ async function run({ escrow, eurc, usdc, vault }) {
     await mined(await asPayer.writeContract({ address: escrow, abi, functionName: "setVerifier", args: [id, zero] }));
     const gone = await asVerifier.writeContract({ address: escrow, abi, functionName: "approve", args: [id, 1n] }).then(() => false, () => true);
     check(gone, "after the payer removes the verifier, it can no longer approve");
+  }
+
+  // The rules for real money, rehearsed on this test chain with STRICT=1: the server must refuse unsafe settings, and
+  // once it runs, the sandbox bank, the mint and bank payouts must be shut.
+  console.log("\nThe rules for real money (STRICT=1)");
+  {
+    const port = String(Number(API_PORT) + 2);
+    const safe = {
+      STRICT: "1",
+      PORT: port,
+      RPC_URL: RPC,
+      EXPECTED_CHAIN_ID: "31337",
+      ESCROW_ADDRESS: escrow,
+      WEBHOOK_SECRET: "w".repeat(40),
+      SESSION_SECRET: "s".repeat(40),
+      CORS_ORIGIN: "http://localhost:5173",
+      APP_URL: "http://localhost:5173",
+      PUBLIC_API_URL: `http://127.0.0.1:${port}`,
+      ALLOW_FILE_DB: "1",
+      DB_FILE: join(dir, "strict-db.json"),
+      FILES_DIR: join(dir, "strict-files"),
+      DATABASE_URL: "",
+      NOTIFY_WEBHOOK_URL: "",
+      MINT_PRIVATE_KEY: "",
+    };
+    const exited = (name) => logs.get(name)?.join("").match(/\[exited with code (\d+)\]/)?.[1];
+
+    // Unsafe settings: no start, with the reasons.
+    launch("strict-unsafe", "node", ["server/index.mjs"], { ...safe, WEBHOOK_SECRET: "change-me", MINT_PRIVATE_KEY: "0x" + "1".repeat(64), CORS_ORIGIN: "" });
+    await until(() => exited("strict-unsafe") !== undefined, "the unsafe server to stop");
+    const said = logs.get("strict-unsafe").join("");
+    check(exited("strict-unsafe") === "1" && /Not starting/.test(said) && /WEBHOOK_SECRET/.test(said) && /MINT_PRIVATE_KEY/.test(said) && /CORS_ORIGIN/.test(said), "with weak secrets, the mint key and no site address the server doesn't start, and says why");
+    launch("strict-wrong-chain", "node", ["server/index.mjs"], { ...safe, EXPECTED_CHAIN_ID: "8453" });
+    await until(() => exited("strict-wrong-chain") !== undefined, "the wrong-network server to stop");
+    check(exited("strict-wrong-chain") === "1" && /says 8453/.test(logs.get("strict-wrong-chain").join("")), "pointed at a network other than the one it was told, it doesn't start");
+
+    // Safe settings: it runs, and the play-money parts are shut.
+    launch("strict", "node", ["server/index.mjs"], safe);
+    const base = `http://127.0.0.1:${port}`;
+    await until(async () => (await fetch(`${base}/api/health`)).ok, "the strict server");
+    const health = await (await fetch(`${base}/api/health`)).json();
+    check(health.realMoney === true && health.bankRails === false && health.chainId === 31337, "the server says the money is real and the bank rails are off");
+    const base_ = () => ({ payer: payer.address, payee: payee.address, description: "strict" });
+    const attempt = (path, init) => fetch(base + path, { ...init, headers: { "content-type": "application/json", ...(init?.headers ?? {}) } });
+    check((await attempt("/api/payments", { method: "POST", body: JSON.stringify({ ...base_(), amount: "1000", token: "eurc", milestones: [{ title: "a", amount: "1000", days: 3 }] }) })).status === 503, "a card payment can't be started");
+    check((await attempt("/api/sandbox/bank-transfer", { method: "POST", body: JSON.stringify({ reference: "SQ-X" }) })).status === 503, "the sandbox bank is shut");
+    check((await attempt("/webhooks/bank", { method: "POST", body: "{}" })).status === 503, "the bank webhook is shut");
+    const issuedAt = new Date().toISOString();
+    const token = (await (await attempt("/api/auth", { method: "POST", body: JSON.stringify({ address: payee.address, issuedAt, signature: await payee.signMessage({ message: signInMessage(payee.address, issuedAt) }) }) })).json()).token;
+    const choose = (body) => attempt("/api/payout", { method: "PUT", headers: { authorization: `Bearer ${token}` }, body: JSON.stringify(body) });
+    check((await choose({ route: "sepa", holder: "Ana Ferreira", iban: "DE89 3704 0044 0532 0130 00" })).status === 503, "bank details aren't taken while nothing can pay them out");
+    check((await choose({ route: "eurc" })).status === 200, "keeping the stablecoin is still a choice");
+    await attempt("/api/payout", { method: "DELETE", headers: { authorization: `Bearer ${token}` } });
   }
 }
 

@@ -5,6 +5,7 @@ import { Landmark, X } from "lucide-react";
 import { payoutApi, type PayoutChoice } from "../lib/api";
 import { sessionToken } from "../lib/files";
 import { useEmailWallet } from "../hooks/useEmailWallet";
+import { useBackendStatus } from "../hooks/useBackend";
 import styles from "../App.module.css";
 import p from "./PayoutSettings.module.css";
 
@@ -12,7 +13,7 @@ type Way = "sepa" | "ach" | "eurc";
 
 const firstLine = (e: unknown) => (e instanceof Error ? e.message : String(e)).split("\n")[0];
 
-const WAYS: { way: Way; title: string; text: string }[] = [
+const ALL_WAYS: { way: Way; title: string; text: string }[] = [
   { way: "sepa", title: "A bank account in euros", text: "Paid by SEPA transfer to an IBAN." },
   { way: "ach", title: "A US bank account in dollars", text: "Paid by ACH to a routing and account number." },
   { way: "eurc", title: "Keep the stablecoin", text: "EURC or USDC stays in your wallet. Nothing is converted." },
@@ -24,8 +25,13 @@ const WAYS: { way: Way; title: string; text: string }[] = [
  */
 export function PayoutSettings({ onClose }: { onClose: () => void }) {
   const { address } = useAccount();
+  // Bank accounts are only taken where something can pay them out. Until then keeping the stablecoin is the only way.
+  const { bankRails } = useBackendStatus();
+  const ways = bankRails ? ALL_WAYS : ALL_WAYS.filter((w) => w.way === "eurc");
   const queryClient = useQueryClient();
-  const [way, setWay] = useState<Way>("sepa");
+  const [picked, setWay] = useState<Way>("sepa");
+  // What is shown selected: the choice, unless it isn't on offer (the bank rails closed after the page loaded).
+  const way: Way = ways.some((w) => w.way === picked) ? picked : "eurc";
   const [holder, setHolder] = useState("");
   const [iban, setIban] = useState("");
   const [routing, setRouting] = useState("");
@@ -94,7 +100,7 @@ export function PayoutSettings({ onClose }: { onClose: () => void }) {
         ) : (
           <>
             <div className={p.ways} role="radiogroup" aria-label="Where the money goes">
-              {WAYS.map((w) => (
+              {ways.map((w) => (
                 <label key={w.way} className={`${p.way} ${way === w.way ? p.wayOn : ""}`}>
                   <input type="radio" name="way" checked={way === w.way} onChange={() => setWay(w.way)} />
                   <span>

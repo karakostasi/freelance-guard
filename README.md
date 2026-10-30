@@ -102,6 +102,10 @@ People can sign in with an **email**: we send a code, and a wallet is made for t
 - **Why not Base Account (passkey):** it would keep the keys with the person, but new Base Accounts can't send transactions on Base Sepolia ([base/account-sdk #363](https://github.com/base/account-sdk/issues/363)).
 - **Not tested with the real service:** the code is checked against the connector's types and a stand-in wallet. The real email code, the smart account and the sponsored gas need a CDP project, and have to be tried by hand.
 
+## Real money (Base mainnet)
+
+The app is for play money (Base Sepolia) until it is built for the real network. `VITE_CHAIN=base` makes a build for Base mainnet, and everything that depends on the network comes from that one setting. On a real network the backend refuses to start with an unsafe setting and keeps the sandbox bank and the mint shut, and `npm run deploy:mainnet` puts the escrow there with an owner and an arbiter that are multisigs, from a key that holds no role, after a dry run that reads the chain. **Read `docs/mainnet.md`: it says what has to exist first (an audit, a legal opinion, real providers), what each step checks, and what isn't done.** The settings are in `.env.mainnet.example`.
+
 ## Receipts and business details
 
 When creating a job, the payer can add **business details**: a PO or invoice reference, and a company name and VAT ID for each side. They are stored inside the job's document, whose SHA-256 is already in the job's on-chain description, so they can't be changed afterwards without the hash showing it. No contract change was needed. Jobs without them work as before. They need the backend, and are not verified by Squirrel.

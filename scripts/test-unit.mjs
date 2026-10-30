@@ -10,6 +10,7 @@ import { reminderFor } from "../src/lib/reminders.ts";
 import { formatBalance } from "../src/lib/format.ts";
 import { milestoneFeeShare, surchargeOn } from "../src/lib/fees.ts";
 import { START_RANGE, logsFrom, rangeRefused } from "../server/logs.mjs";
+import { CANONICAL_TOKENS, isStrict, startupProblems } from "../server/safety.mjs";
 import { cleanPayout, currencyOfRoute, isValidIban, isValidRouting, publicPayout } from "../server/payout.mjs";
 import { ETH_GAS_BUFFER, checkSend, maxSendable, parseAmount } from "../src/lib/send.ts";
 import { cleanEmail, confirmToken, messagesFor, notifyParties, readEmailToken, unsubscribeToken } from "../server/emails.mjs";
@@ -56,6 +57,44 @@ console.log("\nReading events from an RPC that limits the range");
   check(!!unrelated && !rangeRefused(unrelated), "a rate limit is an error, not a reason to ask for less");
   const down = await rejects(logsFrom(async () => { throw new Error("fetch failed"); }, 1n, 100n));
   check(down?.message === "fetch failed", "any other failure is passed on");
+}
+
+console.log("\nStarting the server with real money");
+{
+  const good = {
+    EXPECTED_CHAIN_ID: "8453",
+    ESCROW_ADDRESS: "0x1111111111111111111111111111111111111111",
+    RPC_URL: "https://base-mainnet.example/rpc",
+    WEBHOOK_SECRET: "a".repeat(40),
+    SESSION_SECRET: "b".repeat(40),
+    CORS_ORIGIN: "https://squirrel.example",
+    APP_URL: "https://squirrel.example",
+    PUBLIC_API_URL: "https://api.squirrel.example",
+    DATABASE_URL: "postgres://db.example/squirrel",
+  };
+  const has = (problems, text) => problems.some((p) => p.includes(text));
+  check(startupProblems({ env: {}, chainId: 84532 }).length === 0 && startupProblems({ env: { WEBHOOK_SECRET: "x" }, chainId: 31337 }).length === 0, "on a test network nothing is checked, as before");
+  check(startupProblems({ env: good, chainId: 8453 }).length === 0, "a complete setting for Base mainnet passes");
+  check(isStrict({ env: {}, chainId: 8453 }) && isStrict({ env: {}, chainId: 1 }) && !isStrict({ env: {}, chainId: 84532 }), "any network that isn't a known test network counts as real money");
+  check(isStrict({ env: { STRICT: "1" }, chainId: 84532 }) && !isStrict({ env: { STRICT: "0" }, chainId: 84532 }), "STRICT=1 turns the rules on for a rehearsal on a test network, and nothing turns them off");
+  check(has(startupProblems({ env: { ...good, EXPECTED_CHAIN_ID: undefined }, chainId: 8453 }), "EXPECTED_CHAIN_ID"), "a real network needs EXPECTED_CHAIN_ID");
+  check(has(startupProblems({ env: good, chainId: 84532 }), "RPC_URL is on chain 84532") && isStrict({ env: good, chainId: 84532 }), "an RPC on the wrong network is caught, even when it is a test network, because the operator named a real one");
+  check(has(startupProblems({ env: { ...good, EXPECTED_CHAIN_ID: "1" }, chainId: 8453 }), "says 1"), "a different chain than the one named is refused");
+  check(has(startupProblems({ env: good, chainId: null }), "didn't answer"), "an RPC that doesn't answer is refused when the money is real");
+  check(has(startupProblems({ env: { ...good, MINT_PRIVATE_KEY: "0x" + "1".repeat(64) }, chainId: 8453 }), "MINT_PRIVATE_KEY"), "the key that creates play money must not be there");
+  for (const name of ["WEBHOOK_SECRET", "SESSION_SECRET"]) {
+    check(has(startupProblems({ env: { ...good, [name]: "change-me" }, chainId: 8453 }), name) && has(startupProblems({ env: { ...good, [name]: "short" }, chainId: 8453 }), name) && has(startupProblems({ env: { ...good, [name]: undefined }, chainId: 8453 }), name), `${name} can't be missing, a known weak value or short`);
+  }
+  check(has(startupProblems({ env: { ...good, SESSION_SECRET: good.WEBHOOK_SECRET }, chainId: 8453 }), "must be different"), "the two secrets can't be the same");
+  check(has(startupProblems({ env: { ...good, CORS_ORIGIN: "" }, chainId: 8453 }), "CORS_ORIGIN") && has(startupProblems({ env: { ...good, CORS_ORIGIN: "*" }, chainId: 8453 }), "CORS_ORIGIN") && has(startupProblems({ env: { ...good, CORS_ORIGIN: "http://squirrel.example" }, chainId: 8453 }), "https"), "the site's address is required, and it can't be * or http");
+  check(!has(startupProblems({ env: { ...good, CORS_ORIGIN: "http://localhost:5173", APP_URL: "http://localhost:5173", PUBLIC_API_URL: "http://localhost:8787", EXPECTED_CHAIN_ID: "84532", STRICT: "1" }, chainId: 84532 }), "https"), "a rehearsal on a test network may use localhost");
+  check(has(startupProblems({ env: { ...good, CORS_ORIGIN: "http://localhost:5173" }, chainId: 8453 }), "https"), "but a real network may not");
+  check(has(startupProblems({ env: { ...good, APP_URL: undefined }, chainId: 8453 }), "APP_URL") && has(startupProblems({ env: { ...good, PUBLIC_API_URL: "http://api.example" }, chainId: 8453 }), "PUBLIC_API_URL"), "the links in emails must be https");
+  check(has(startupProblems({ env: { ...good, DATABASE_URL: undefined }, chainId: 8453 }), "DATABASE_URL") && !has(startupProblems({ env: { ...good, DATABASE_URL: undefined, ALLOW_FILE_DB: "1" }, chainId: 8453 }), "DATABASE_URL"), "the database can't be a file unless that is said on purpose");
+  check(has(startupProblems({ env: { ...good, ESCROW_ADDRESS: undefined, VITE_ESCROW_ADDRESS: good.ESCROW_ADDRESS }, chainId: 8453 }), "ESCROW_ADDRESS") && has(startupProblems({ env: { ...good, RPC_URL: undefined }, chainId: 8453 }), "RPC_URL"), "the escrow and the RPC have to be named, not defaulted");
+  const usdc = CANONICAL_TOKENS[8453].USDC;
+  check(!has(startupProblems({ env: { ...good, USDC_ADDRESS: usdc.toLowerCase() }, chainId: 8453 }), "USDC_ADDRESS") && has(startupProblems({ env: { ...good, USDC_ADDRESS: "0x2222222222222222222222222222222222222222" }, chainId: 8453 }), "USDC_ADDRESS") && has(startupProblems({ env: { ...good, EURC_ADDRESS: "0x2222222222222222222222222222222222222222" }, chainId: 8453 }), "EURC_ADDRESS"), "a token address that isn't Circle's is refused, and Circle's is fine in any letter case");
+  check(has(startupProblems({ env: { ...good, EXPECTED_CHAIN_ID: "1" }, chainId: 1 }), "no known tokens"), "a real network we haven't set up is refused");
 }
 
 console.log("\nJob descriptions");

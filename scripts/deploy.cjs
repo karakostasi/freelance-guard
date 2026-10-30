@@ -17,6 +17,8 @@ const MIN_JOB_EUR = Number(process.env.MIN_JOB_EUR || 20);
 const units = (eur, symbol) => ethers.parseUnits((eur / EUR_PER[symbol]).toFixed(6), DECIMALS[symbol]);
 
 async function main() {
+  // This sets everything up from one key, with play-money rates. For real money use deploy-mainnet.cjs.
+  if (!["hardhat", "localhost", "baseSepolia"].includes(hre.network.name)) throw new Error(`deploy.cjs is for test networks. For ${hre.network.name} use scripts/deploy-mainnet.cjs (npm run deploy:mainnet).`);
   const [deployer] = await ethers.getSigners();
   const reviewPeriod = 3 * 24 * 3600; // 3 days
   // Owner, arbiter and treasury default to the deployer. Set trusted addresses for real use.

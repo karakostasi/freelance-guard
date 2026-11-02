@@ -10,6 +10,8 @@ Milestone escrow for business payments on Ethereum. A payer's payment is locked 
 4. Payer can dispute within the review period; an arbiter decides who gets the funds.
 5. If nothing is delivered by the deadline, the payer reclaims the funds.
 
+The project's current status is in `docs/thesis-context.md`. If the two disagree, that file wins.
+
 ## Terminology
 
 The two sides are the **payer** (funds the escrow) and the **payee** (delivers and gets paid). The contract uses the same names. A job can also name a **verifier**, an address that may approve delivered milestones for the payer.

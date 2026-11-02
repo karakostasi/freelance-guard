@@ -2,6 +2,8 @@
 
 This is what it takes to run Squirrel with real money, what the code now does to make that safe, and what it still can't do for you. Read it with `docs/business-model.md` (the decisions and the legal questions).
 
+The project's current status is in `docs/thesis-context.md`. If the two disagree, that file wins.
+
 **Nothing here has been audited or legally cleared.** The code makes a wrong setting hard and a right one checkable. It does not replace an audit of the contract, a legal opinion, or the people who hold the keys.
 
 ## 1. What has to exist before the first euro

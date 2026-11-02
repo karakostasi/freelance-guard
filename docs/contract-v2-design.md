@@ -1,6 +1,6 @@
 # Squirrel: τεχνικό design του contract v2 (πρόχειρο)
 
-Ημερομηνία: 2026-10-28. Κατάσταση: draft για έγκριση, χωρίς κώδικα. Βάση: οι αποφάσεις #1–#12 στο [business-model.md](business-model.md). Οι αναφορές σε γραμμές είναι στο τωρινό `contracts/FreelanceEscrow.sol`.
+Ημερομηνία: 2026-10-28. Η κατάσταση του έργου είναι στο [thesis-context.md](thesis-context.md): αν διαφωνούν, νικάει εκείνο. Αυτό το αρχείο είναι ο σχεδιασμός, και το contract έχει πια υλοποιηθεί (δες το §10). Βάση: οι αποφάσεις #1–#12 στο [business-model.md](business-model.md). Οι αναφορές σε γραμμές είναι στο τωρινό `contracts/FreelanceEscrow.sol`.
 
 ## 1. Τι αλλάζει
 
@@ -186,11 +186,11 @@ fee milestone i    = ⌊fee job × amount_i / total⌋            αφαιρεί
 ## 10. Σειρά υλοποίησης
 
 Ένα deployment, αλλά η δουλειά σε βήματα, με tests σε κάθε βήμα:
-1. `owner`, whitelist, `TokenConfig`, fee payee, επιβάρυνση, `quote`, `MilestonePaid`, μετονομασία σε `payer`/`payee`. **Έγινε** (2026-10-28, branch `contract-v2`, δεν έχει γίνει commit). Μένει εκτός το `abi/` και το frontend, δες το βήμα 4.
-2. `verifier` και `setVerifier`. **Έγινε** (2026-10-28, branch `contract-v2`, δεν έχει γίνει commit). Το `JobOptions` έχει `verifier` πριν από το `fundNow`, το `Job` έχει `verifier` στο τέλος, και υπάρχει το σφάλμα `BadVerifier`.
-3. Vault, `MockVault`, `harvest`, `exitVault`, `withdrawFees`. **Έγινε** (2026-10-28, branch `contract-v2`). Το `JobOptions` έχει `{verifier, useYield, fundNow}`, το `Job` έχει `yield` στο τέλος, το `Milestone` έχει `epoch`, και το `TokenConfig` έχει `vault`. Το contract χρειάζεται optimizer (18 KB με, 32 KB χωρίς, όριο 24 KB), που μπήκε στο `hardhat.config.cjs`.
-4. ABI, frontend, server, deploy script.
-5. Audit πριν από πραγματικά κεφάλαια.
+1. `owner`, whitelist, `TokenConfig`, fee payee, επιβάρυνση, `quote`, `MilestonePaid`, μετονομασία σε `payer`/`payee`. **Έγινε** (2026-10-28, commit `dca67cc`, στο `main` με το PR #38).
+2. `verifier` και `setVerifier`. **Έγινε** (2026-10-28, commit `dca67cc`, PR #38). Το `JobOptions` έχει `verifier` πριν από το `fundNow`, το `Job` έχει `verifier` στο τέλος, και υπάρχει το σφάλμα `BadVerifier`.
+3. Vault, `MockVault`, `harvest`, `exitVault`, `withdrawFees`. **Έγινε** (2026-10-28, commit `4de99cc`, PR #38). Το `JobOptions` έχει `{verifier, useYield, fundNow}`, το `Job` έχει `yield` στο τέλος, το `Milestone` έχει `epoch`, και το `TokenConfig` έχει `vault`. Το contract χρειάζεται optimizer (18 KB με, 32 KB χωρίς, όριο 24 KB), που μπήκε στο `hardhat.config.cjs`.
+4. ABI, frontend, server, deploy script. **Έγινε.** Το ABI είναι committed στο `abi/` και το CI ελέγχει ότι ταιριάζει με το contract. Το frontend και ο server χρησιμοποιούν το v2 (commit "Use contract v2 from the backend and the frontend", 2026-10-28). Το script για mainnet (`deploy-mainnet.cjs`, `check-deployment.cjs`) μπήκε με το PR #49. **Δεν έχει γίνει deploy σε mainnet.** Αν έγινε deploy σε Base Sepolia δεν φαίνεται από το repo.
+5. Audit πριν από πραγματικά κεφάλαια. **Δεν έχει γίνει.**
 
 ## 11. Αποφάσεις και ανοιχτά
 

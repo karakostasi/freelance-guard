@@ -27,7 +27,7 @@ const check = (condition, message) => {
 console.log("The rules");
 {
   const addr = (n) => `0x${String(n).padStart(40, "0")}`;
-  const ok = { OWNER_ADDRESS: addr(1), ARBITER_ADDRESS: addr(2), TREASURY_ADDRESS: addr(3), REVIEW_PERIOD_DAYS: "3", USDC_MIN_FEE: "43", USDC_MIN_JOB: "2174", EURC_MIN_FEE: "40", EURC_MIN_JOB: "2000" };
+  const ok = { OWNER_ADDRESS: addr(1), ARBITER_ADDRESS: addr(2), TREASURY_ADDRESS: addr(3), GUARDIAN_ADDRESS: addr(4), REVIEW_PERIOD_DAYS: "3", USDC_MIN_FEE: "43", USDC_MIN_JOB: "2174", USDC_MAX_JOB: "10870", EURC_MIN_FEE: "40", EURC_MIN_JOB: "2000", EURC_MAX_JOB: "10000" };
   const asks = (env, network = "base", key = addr(9)) => planDeployment({ ...ok, ...env }, network, key);
   const says = (r, text) => r.errors.some((e) => e.includes(text));
   check(asks({}).plan?.tokens.USDC.address === "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" && asks({}).plan.reviewPeriodSeconds === 3 * 86400, "a complete setting makes a plan, with Circle's USDC for Base");
@@ -35,7 +35,13 @@ console.log("The rules");
   check(units("2000.5") === 2_000_500_000n && units("40") === 40_000_000n, "amounts are read exactly, with no floating point");
   check(says(asks({ OWNER_ADDRESS: undefined }), "OWNER_ADDRESS") && says(asks({ ARBITER_ADDRESS: "0x123" }), "ARBITER_ADDRESS") && says(asks({ TREASURY_ADDRESS: "0x0000000000000000000000000000000000000000" }), "TREASURY_ADDRESS"), "the owner, the arbiter and the treasury have to be named, and be real addresses");
   check(says(asks({ ARBITER_ADDRESS: addr(1) }), "must be different"), "the owner and the arbiter can't be the same");
-  for (const role of ["OWNER_ADDRESS", "ARBITER_ADDRESS", "TREASURY_ADDRESS"]) check(says(asks({ [role]: addr(9) }), "deploying key"), `the deploying key can't be the ${role.split("_")[0].toLowerCase()}`);
+  for (const role of ["OWNER_ADDRESS", "ARBITER_ADDRESS", "TREASURY_ADDRESS", "GUARDIAN_ADDRESS"]) check(says(asks({ [role]: addr(9) }), "deploying key"), `the deploying key can't be the ${role.split("_")[0].toLowerCase()}`);
+  check(asks({}).plan.guardian === addr(4) && asks({}).plan.tokens.EURC.cfg.maxJob === 10_000_000_000n, "the plan carries the guardian and the largest job of each token");
+  check(says(asks({ GUARDIAN_ADDRESS: undefined }), "GUARDIAN_ADDRESS") && says(asks({ GUARDIAN_ADDRESS: "0x123" }), "GUARDIAN_ADDRESS") && says(asks({ GUARDIAN_ADDRESS: "0x0000000000000000000000000000000000000000" }), "GUARDIAN_ADDRESS"), "on a real network the guardian has to be named, as a real address");
+  check(asks({ GUARDIAN_ADDRESS: "none" }).plan?.guardian === null && asks({ GUARDIAN_ADDRESS: "none" }).warnings.some((w) => w.includes("nobody can pause quickly")), "going without a guardian is allowed only when it is said outright, and comes with a warning");
+  check(!says(asks({ GUARDIAN_ADDRESS: undefined }, "baseSepolia"), "GUARDIAN_ADDRESS") && says(asks({ GUARDIAN_ADDRESS: undefined, STRICT: "1" }, "baseSepolia"), "GUARDIAN_ADDRESS"), "a rehearsal may go without one, unless it is held to the rules of real money");
+  check(says(asks({ GUARDIAN_ADDRESS: addr(1) }), "is the owner") && says(asks({ GUARDIAN_ADDRESS: addr(2) }), "is the arbiter"), "the guardian can't be the owner or the arbiter");
+  check(says(asks({ USDC_MAX_JOB: undefined }), "USDC_MAX_JOB") && says(asks({ EURC_MAX_JOB: "abc" }), "EURC_MAX_JOB") && says(asks({ EURC_MAX_JOB: "1999" }), "can't be below") && asks({ EURC_MAX_JOB: "2000" }).plan !== null, "the largest job has to be named, and can't be below the smallest");
   check(says(asks({ REVIEW_PERIOD_DAYS: undefined }), "REVIEW_PERIOD_DAYS") && says(asks({ REVIEW_PERIOD_DAYS: "0" }), "REVIEW_PERIOD_DAYS") && says(asks({ REVIEW_PERIOD_DAYS: "30" }), "REVIEW_PERIOD_DAYS") && says(asks({ REVIEW_PERIOD_DAYS: "2.5" }), "REVIEW_PERIOD_DAYS"), "the review period has to be a whole number of days, within reason");
   check(says(asks({ USDC_MIN_FEE: undefined }), "USDC_MIN_FEE") && says(asks({ EURC_MIN_JOB: "abc" }), "EURC_MIN_FEE") && says(asks({ EURC_MIN_FEE: "0", EURC_MIN_JOB: "0" }), "above zero"), "the limits have to be named, and be numbers above zero");
   check(says(asks({ EURC_MIN_FEE: "101", EURC_MIN_JOB: "2000" }), "5%") && !says(asks({ EURC_MIN_FEE: "100", EURC_MIN_JOB: "2000" }), "5%"), "the smallest fee can't be more than 5% of the smallest job, as in the contract");
@@ -104,19 +110,25 @@ try {
   const deployerSafe = await make(safe, [[deployer.address, signer(12), signer(13)], 2n]);
   const overlapSafe = await make(safe, [[signer(1), signer(14), signer(15)], 2n]);
   const treasury = signer(20);
+  // Hardhat's account #5, which has a key we know, so the guardian can really send a transaction below.
+  const guardianAccount = privateKeyToAccount("0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba");
+  const asGuardian = createWalletClient({ account: guardianAccount, ...chainOpts });
 
   const settings = {
     STRICT: "1",
     OWNER_ADDRESS: ownerSafe,
     ARBITER_ADDRESS: arbiterSafe,
     TREASURY_ADDRESS: treasury,
+    GUARDIAN_ADDRESS: guardianAccount.address,
     REVIEW_PERIOD_DAYS: "3",
     USDC_ADDRESS: usdc,
     EURC_ADDRESS: eurc,
     USDC_MIN_FEE: "43",
     USDC_MIN_JOB: "2174",
+    USDC_MAX_JOB: "10870",
     EURC_MIN_FEE: "40",
     EURC_MIN_JOB: "2000",
+    EURC_MAX_JOB: "10000",
   };
   const deploy = (extra = {}) => run("scripts/deploy-mainnet.cjs", { ...settings, ...extra });
   const refused = (r, text) => r.code !== 0 && r.text.includes(text);
@@ -132,13 +144,15 @@ try {
   check(refused(deploy({ USDC_ADDRESS: eurc }), "calls itself EURC"), "a token that isn't what its address is said to be");
   check(refused(deploy({ USDC_ADDRESS: signer(32) }), "has no contract"), "a token with no contract");
   check(refused(deploy({ MOCK_USDC: "1" }), "MOCK_USDC") && refused(deploy({ USDC_VAULT_ADDRESS: usdc }), "never sets a vault"), "mock tokens and a yield vault");
-  check(refused(deploy({ REVIEW_PERIOD_DAYS: "" }), "REVIEW_PERIOD_DAYS") && refused(deploy({ EURC_MIN_FEE: "" }), "EURC_MIN_FEE"), "limits that were left unnamed");
+  check(refused(deploy({ REVIEW_PERIOD_DAYS: "" }), "REVIEW_PERIOD_DAYS") && refused(deploy({ EURC_MIN_FEE: "" }), "EURC_MIN_FEE") && refused(deploy({ EURC_MAX_JOB: "" }), "EURC_MAX_JOB") && refused(deploy({ GUARDIAN_ADDRESS: "" }), "GUARDIAN_ADDRESS"), "limits and a guardian that were left unnamed");
+  check(refused(deploy({ GUARDIAN_ADDRESS: ownerSafe }), "is the owner"), "a guardian that is the owner");
   check(refused(deploy({ EXECUTE: "1" }), "CONFIRM_CHAIN_ID"), "sending without typing the chain id in");
 
   console.log("\nThe deploy script, when everything is right");
   const dry = deploy();
   check(dry.code === 0 && /DRY RUN/.test(dry.text) && /Nothing was sent/.test(dry.text) && !existsSync(join(dir, "deployments", "localhost.json")), "it checks and prints, and sends nothing");
   check(/owner +0x[0-9a-fA-F]{40} +Safe 1\.4\.1, 2 of 3/.test(dry.text) && /holds no role/.test(dry.text) && /treasury is a plain key/.test(dry.text), "it shows the Safes it found and warns about a treasury that is a plain key");
+  check(new RegExp(`guardian +${guardianAccount.address}`, "i").test(dry.text) && /largest job 10000\.0/.test(dry.text), "it shows the guardian and the largest job of each token");
 
   const sent = deploy({ EXECUTE: "1", CONFIRM_CHAIN_ID: "31337" });
   const file = join(dir, "deployments", "localhost.json");
@@ -148,34 +162,47 @@ try {
   const read = (functionName, args = []) => pub.readContract({ address, abi: escrowAbi, functionName, args });
   check(address && (await read("owner")).toLowerCase() === ownerSafe.toLowerCase() && (await read("arbiter")).toLowerCase() === arbiterSafe.toLowerCase() && (await read("treasury")).toLowerCase() === treasury.toLowerCase() && Number(await read("reviewPeriod")) === 3 * 86400, "on-chain, the owner, arbiter, treasury and review period are what was asked");
   check(record.deployer?.toLowerCase() === deployer.address.toLowerCase() && record.owner?.toLowerCase() === ownerSafe.toLowerCase() && record.code?.runtimeCodeHash?.startsWith("0x"), "the record names the deployer, the owner and the hash of the code");
-  check((await read("pendingOwner")) === "0x0000000000000000000000000000000000000000" && !(await read("paused")) && !(await read("tokenConfig", [usdc]))[0] && !(await read("tokenConfig", [eurc]))[0], "nothing is switched on: no token, no handover, not paused");
+  check((await read("pendingOwner")) === "0x0000000000000000000000000000000000000000" && !(await read("paused")) && !(await read("tokenConfig", [usdc]))[0] && !(await read("tokenConfig", [eurc]))[0] && (await read("guardian")) === "0x0000000000000000000000000000000000000000", "nothing is switched on: no token, no guardian, no handover, not paused");
   check(refused(deploy({ EXECUTE: "1", CONFIRM_CHAIN_ID: "31337" }), "already has a deployment") || /deployment recorded/.test(deploy().text), "a second deployment on the same network is refused");
 
   console.log("\nSwitching the tokens on, and checking the result");
   const check_ = (extra = {}) => run("scripts/check-deployment.cjs", extra);
   const early = check_();
-  check(early.code === 0 && /waiting +USDC is not switched on yet/.test(early.text) && /ok +owner/.test(early.text), "before the owner has switched the tokens on, the check says it is waiting and finds nothing wrong");
+  check(early.code === 0 && /waiting +USDC is not switched on yet/.test(early.text) && /waiting +the guardian 0x[0-9a-fA-F]{40} is not named yet/.test(early.text) && /ok +owner/.test(early.text), "before the owner has switched the tokens on and named the guardian, the check says it is waiting and finds nothing wrong");
   check(check_({ REQUIRE_CONFIGURED: "1" }).code === 2, "and with REQUIRE_CONFIGURED=1 it isn't ready");
   const batch = JSON.parse(readFileSync(join(dir, "deployments", "localhost.safe-config.json"), "utf8"));
-  check(batch.chainId === "31337" && batch.transactions.length === 2 && batch.transactions.every((t) => t.to.toLowerCase() === address.toLowerCase() && t.data.startsWith("0x")), "a batch for the Safe was written, one call for each token");
+  check(batch.chainId === "31337" && batch.transactions.length === 3 && batch.transactions.every((t) => t.to.toLowerCase() === address.toLowerCase() && t.data.startsWith("0x")), "a batch for the Safe was written: one call for each token, and one to name the guardian");
   const safeAbi = parseAbi(["function exec(address to, bytes data) returns (bytes)"]);
   const asSafe = async (data) => pub.waitForTransactionReceipt({ hash: await wallet.writeContract({ address: ownerSafe, abi: safeAbi, functionName: "exec", args: [address, data] }) });
   for (const t of batch.transactions) await asSafe(t.data);
   const done = check_({ REQUIRE_CONFIGURED: "1" });
   check(done.code === 0 && /Everything matches/.test(done.text) && /ok +USDC smallest job/.test(done.text), "once the Safe has run the batch, everything matches");
-  check((await read("tokenConfig", [usdc]))[2] === units("43") && (await read("tokenConfig", [usdc]))[3] === units("2174") && (await read("tokenConfig", [usdc]))[4] === "0x0000000000000000000000000000000000000000", "the limits on-chain are the ones that were named, and there is no vault");
+  check((await read("tokenConfig", [usdc]))[2] === units("43") && (await read("tokenConfig", [usdc]))[3] === units("2174") && (await read("tokenConfig", [usdc]))[4] === "0x0000000000000000000000000000000000000000" && (await read("tokenConfig", [usdc]))[5] === units("10870") && (await read("tokenConfig", [eurc]))[5] === units("10000"), "the limits on-chain are the ones that were named, with a largest job for each token, and there is no vault");
+  check((await read("guardian")).toLowerCase() === guardianAccount.address.toLowerCase(), "and the guardian is the one that was named");
 
   console.log("\nThe check notices when something changes");
   const call = (functionName, args) => asSafe(encodeFunctionData({ abi: escrowAbi, functionName, args }));
-  await call("setPaused", [true]);
+  const noVault = "0x0000000000000000000000000000000000000000";
+  const asKey = async (wallet_, functionName, args = []) => pub.waitForTransactionReceipt({ hash: await wallet_.writeContract({ address, abi: escrowAbi, functionName, args }) });
+  await asKey(asGuardian, "pause");
   const paused = check_({ REQUIRE_CONFIGURED: "1" });
-  check(paused.code === 2 && /waiting +the escrow is paused/.test(paused.text), "a paused escrow is reported");
+  check((await read("paused")) && paused.code === 2 && /waiting +the escrow is paused/.test(paused.text), "the guardian can pause, and the check reports it");
+  check(await asKey(asGuardian, "setPaused", [false]).then(() => false, () => true) && (await read("paused")), "but the guardian can't undo it");
   await call("setPaused", [false]);
-  await call("configureToken", [usdc, { enabled: true, surchargeBps: 25, minFee: units("1"), minJob: units("20"), vault: "0x0000000000000000000000000000000000000000" }]);
+  check(!(await read("paused")), "only the owner Safe unpauses");
+  await call("configureToken", [usdc, { enabled: true, surchargeBps: 25, minFee: units("1"), minJob: units("20"), vault: noVault, maxJob: units("10870") }]);
   const changed = check_();
   check(changed.code === 1 && /WRONG +USDC smallest fee/.test(changed.text), "limits that were changed afterwards are caught");
-  await call("configureToken", [usdc, { enabled: true, surchargeBps: 25, minFee: units("43"), minJob: units("2174"), vault: "0x0000000000000000000000000000000000000000" }]);
+  await call("configureToken", [usdc, { enabled: true, surchargeBps: 25, minFee: units("43"), minJob: units("2174"), vault: noVault, maxJob: units("1000000") }]);
+  const raised = check_();
+  check(raised.code === 1 && /WRONG +USDC largest job/.test(raised.text), "a largest job that was raised afterwards is caught");
+  await call("configureToken", [usdc, { enabled: true, surchargeBps: 25, minFee: units("43"), minJob: units("2174"), vault: noVault, maxJob: units("10870") }]);
   check(check_().code === 0, "and the check is quiet again when they are put back");
+  await call("setGuardian", [signer(41)]);
+  const swapped = check_();
+  check(swapped.code === 1 && /WRONG +guardian is /.test(swapped.text), "a guardian that was swapped for somebody else is caught");
+  await call("setGuardian", [guardianAccount.address]);
+  check(check_().code === 0, "and it is quiet again when the right one is back");
   await call("transferOwnership", [signer(40)]);
   const handover = check_();
   check(handover.code === 1 && /WRONG +ownership is being handed to/.test(handover.text), "a handover of the ownership that nobody planned is caught");

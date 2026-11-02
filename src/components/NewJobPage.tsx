@@ -165,6 +165,7 @@ export function NewJobPage() {
       if (totalUnits <= 0n) return "Enter the amount.";
       if (config && !config.enabled) return `${token.symbol} isn't accepted here.`;
       if (config && totalUnits < config.minJob) return `The smallest job is ${show(config.minJob)}.`;
+      if (config && totalUnits > config.maxJob) return `The largest job for now is ${show(config.maxJob)}.`;
     }
     if (upTo >= 2) {
       if (percentSum !== 100n) return `The shares must add up to 100% (now ${percentSum}%).`;

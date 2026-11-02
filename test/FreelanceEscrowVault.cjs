@@ -50,7 +50,7 @@ describe("FreelanceEscrow vault", () => {
       const v = await ethers.deployContract("MockVault", [await eurc.getAddress()]);
       await expect(escrow.configureToken(await eurc.getAddress(), rules({ vault: await v.getAddress() })))
         .to.emit(escrow, "TokenConfigured")
-        .withArgs(await eurc.getAddress(), true, 0, 0, 0, await v.getAddress());
+        .withArgs(await eurc.getAddress(), true, 0, 0, 0, await v.getAddress(), ethers.MaxUint256);
     });
 
     it("rejects a vault for ETH, for another token, or that is not a contract", async () => {

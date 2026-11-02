@@ -41,6 +41,13 @@ async function main() {
   const nextOwner = await escrow.pendingOwner();
   if (!same(nextOwner, ZERO)) wrong.push(`ownership is being handed to ${nextOwner}: nobody asked for that`);
   if (await escrow.paused()) pending.push("the escrow is paused");
+  // The guardian is named by the owner after the deploy. Until then it is nobody, which is waiting, not wrong. Anyone else is wrong.
+  const guardian = await escrow.guardian();
+  if (record.guardian) {
+    if (same(guardian, ZERO)) pending.push(`the guardian ${record.guardian} is not named yet`);
+    else want("guardian", guardian, record.guardian);
+  } else if (!same(guardian, ZERO)) wrong.push(`a guardian is named (${guardian}), and the record says there is none`);
+  else ok.push("guardian: none, as recorded");
 
   for (const symbol of SYMBOLS) {
     const t = record.tokens[symbol];
@@ -51,6 +58,7 @@ async function main() {
     }
     want(`${symbol} smallest fee`, String(cfg.minFee), t.minFee);
     want(`${symbol} smallest job`, String(cfg.minJob), t.minJob);
+    want(`${symbol} largest job`, String(cfg.maxJob), t.maxJob);
     want(`${symbol} surcharge`, String(cfg.surchargeBps), String(record.surchargeBps));
     want(`${symbol} yield vault`, cfg.vault, ZERO);
   }

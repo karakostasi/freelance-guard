@@ -57,7 +57,8 @@ fee milestone i    = ⌊fee job × amount_i / total⌋            αφαιρεί
 
 | Ρόλος | Ορίζεται | Μπορεί |
 |---|---|---|
-| `owner` | constructor, μεταφορά σε δύο βήματα (`transferOwnership` + `acceptOwnership`) | `configureToken`, `setFeeBps`, `setTreasury`, `setPaused`, `exitVault`. **Δεν** έχει συνάρτηση που κινεί κεφάλαιο μερών |
+| `owner` | constructor, μεταφορά σε δύο βήματα (`transferOwnership` + `acceptOwnership`) | `configureToken`, `setFeeBps`, `setTreasury`, `setPaused`, `setGuardian`, `exitVault`. **Δεν** έχει συνάρτηση που κινεί κεφάλαιο μερών |
+| `guardian` | owner (`setGuardian`), προαιρετικός | **Μόνο** `pause()`. Δεν μπορεί να κάνει unpause, να αλλάξει κανόνα ή να αγγίξει χρήματα. Κλειδί έκτακτης ανάγκης, που δεν περιμένει τις υπογραφές του multisig |
 | `treasury` | owner | Παραλήπτης των fees. Η `withdrawFees` είναι ανοιχτή σε όλους και στέλνει μόνο εκεί |
 | `arbiter` | constructor, immutable (όπως τώρα) | `resolve` |
 | `payer` | `createJob` | `fundMilestone`, `approve`, `dispute`, `refundExpired`, `setVerifier` |
@@ -81,7 +82,9 @@ fee milestone i    = ⌊fee job × amount_i / total⌋            αφαιρεί
 
 **Ανά token:** `activeTotal` (κεφάλαιο μερών σε ενεργά milestones), `vaultDue` (το μέρος του που είναι στο τρέχον vault), `accruedFees`, `vaultEpoch`.
 
-**Γενικά:** `owner`, `pendingOwner`, `treasury`, `feeBps`, `paused`.
+**Γενικά:** `owner`, `pendingOwner`, `guardian`, `treasury`, `feeBps`, `paused`.
+
+**`TokenConfig`:** `enabled`, `surchargeBps`, `minFee`, `minJob`, `vault` και, στο τέλος, `maxJob`, το μεγαλύτερο job σε base units. Στο τέλος, ώστε οι θέσεις των παλιών πεδίων να μείνουν ίδιες για όποιον διαβάζει το `tokenConfig` με θέση. Ένα token δεν ενεργοποιείται χωρίς `maxJob`: το `0` απορρίπτεται (`BadConfig`), άρα η λήθη δεν σημαίνει «χωρίς όριο», και όποιος θέλει όριο-κανένα βάζει ρητά το `type(uint256).max`. Το `maxJob` μετράει μόνο στη δημιουργία: job που υπάρχει χρηματοδοτείται και πληρώνεται όποιο κι αν γίνει το όριο (`JobTooLarge`).
 
 ## 5. Συναρτήσεις
 
@@ -96,6 +99,8 @@ fee milestone i    = ⌊fee job × amount_i / total⌋            αφαιρεί
 | `quote(token, amounts[], useYield)` | κανείς (view) | Νέα. Επιστρέφει `total`, `fee job` και `συνολική επιβάρυνση` (0 αν `useYield`) με τους ίδιους τύπους. Το frontend και ο server τη χρησιμοποιούν, ώστε ο υπολογισμός να υπάρχει σε ένα μέρος |
 | `configureToken(token, cfg)` | owner | Νέα. Ένα atomic call ώστε να αλλάζουν μαζί `vault` και `surchargeBps` |
 | `setFeeBps`, `setTreasury`, `setPaused` | owner | Νέες. Το `setPaused(true)` μπλοκάρει μόνο `createJob` και `fundMilestone`. Πληρωμές και refunds δουλεύουν πάντα |
+| `pause()` | owner ή guardian | Βάζει `paused = true`. Αν είναι ήδη, δεν κάνει τίποτα και δεν εκπέμπει event. Το unpause το κάνει μόνο ο owner με `setPaused(false)` |
+| `setGuardian(to)` | owner | Ορίζει τον guardian. Το `address(0)` τον αφαιρεί |
 | `withdrawFees(token)` | όλοι | Νέα. Στέλνει στο `treasury` το `accruedFees`, αλλά κρατά πίσω ό,τι χρειάζονται τα ανοιχτά milestones: τα idle και το `shortfall` του vault. Αν περισσεύει λιγότερο από το `accruedFees` στέλνει μόνο ό,τι περισσεύει, και αν δεν περισσεύει τίποτα κάνει revert `Insolvent`. Έτσι μετά από απώλεια δεν κολλά για πάντα |
 | `harvest(token)` | όλοι | Νέα. Βγάζει το yield από το vault στα `accruedFees`. Αφήνει στο vault `VAULT_DUST` base units |
 | `exitVault(token)` | owner | Νέα. Έκτακτη έξοδος, παράγραφος 6 |
@@ -147,6 +152,9 @@ fee milestone i    = ⌊fee job × amount_i / total⌋            αφαιρεί
 | Στρογγυλοποίηση | Fee προς τα κάτω, επιβάρυνση προς τα κάτω. Το `dust` πηγαίνει στον payee, κάτω από 20 base units ανά job |
 | Δεκαδικά | `minFee`, `minJob` σε base units του κάθε token (6 για USDC και EURC, 18 για ETH) |
 | Εξουσίες owner | Στο testnet ένα EOA. Πριν από mainnet πολυυπογραφικό (multisig) |
+| Διαρροή κλειδιού του guardian | Στη χειρότερη περίπτωση σταματά τα νέα jobs και τη χρηματοδότηση. Ο owner τον αντικαθιστά με `setGuardian`. Πληρωμές, εγκρίσεις και refunds δεν επηρεάζονται |
+| Λάθος ή κακό μέγεθος job | Το `maxJob` ανά token ορίζει πόσα μπορεί να βάλει σε κίνδυνο ένα bug σε ένα job. Δεν περιορίζει το σύνολο πολλών jobs (δεν υπάρχει όριο συνολικού ποσού ανά token) |
+| Arbiter | Ένα fixed address, στο mainnet Safe. Το constructor αρνείται `address(0)`. Αν χαθεί εντελώς, ένα milestone σε `Disputed` μένει κλειδωμένο: κανένα deadline δεν το απελευθερώνει (ανοιχτό, παράγραφος 11) |
 
 ## 8. Επιπτώσεις στα υπόλοιπα
 
@@ -204,5 +212,8 @@ fee milestone i    = ⌊fee job × amount_i / total⌋            αφαιρεί
 - **Απώλεια στο vault:** ποιος την καλύπτει πέρα από τα fees της πλατφόρμας (παράγραφος 6). Μπλοκάρει το mainnet.
 - **Χωρίς buffer ρευστότητας στο v2** (παράγραφος 6). Πρόταση: ναι, να ξαναδούμε με το Aave.
 - **Owner:** EOA στο testnet, multisig πριν από mainnet.
+- **Dispute χωρίς έξοδο:** αν ο arbiter δεν αποφασίσει ποτέ, το χρήμα ενός `Disputed` milestone μένει κλειδωμένο. Λύση: προθεσμία μετά την οποία το ποσό πάει αυτόματα στη μία πλευρά. Το ποιος κερδίζει από προεπιλογή είναι νομική και εμπορική απόφαση (όροι χρήσης, νομική γνώμη). Δεν έχει υλοποιηθεί.
+- **Όριο συνολικού ποσού ανά token:** το `maxJob` μετράει ένα job. Ένα όριο στο σύνολο που κρατά το escrow, με έλεγχο στη δημιουργία και στη χρηματοδότηση, θα έβαζε φράγμα στη συνολική ζημιά τις πρώτες εβδομάδες. Δεν έχει υλοποιηθεί.
+- **Timelock στις υπόλοιπες εξουσίες του owner** (fee, treasury, tokens). Δεν έχει υλοποιηθεί.
 - **Aave adapter:** το `MockVault` είναι το μόνο vault. Δεν έχει σχεδιαστεί ούτε ελεγχθεί adapter για το πραγματικό Aave (ERC-4626 πάνω από aTokens), ούτε το `VAULT_DUST` απέναντι σε αυτό. Μπλοκάρει το mainnet.
 - **Έξοδος με ανεπαρκή fees:** αν το `exitVault` γίνει με απώλεια μεγαλύτερη από τα `accruedFees`, το έλλειμμα μένει στο contract. Το καλύπτουν τα fees των επόμενων πληρωμών, και αν μείνουν μόνο refunds, το τελευταίο μπορεί να αποτύχει με `TransferFailed`. Είναι το ίδιο ανοιχτό θέμα της απώλειας.

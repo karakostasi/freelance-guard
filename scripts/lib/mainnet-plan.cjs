@@ -5,6 +5,8 @@
 //  - The deploying key holds nothing. The owner is given to the constructor, so there is no moment when a key on a laptop
 //    owns the escrow. The owner is a multisig, and so is the arbiter (which can never be changed).
 //  - Nothing is guessed. Every limit and address is named on purpose, and the tokens are Circle's and nothing else.
+//  - Two things keep a flaw nobody has found yet from costing everything: a largest job for each token, and a guardian, a
+//    key that can pause new jobs at once and can do nothing else.
 //  - Nothing is sent unless it is asked for twice: EXECUTE=1 and the chain id typed in.
 
 const ZERO = "0x0000000000000000000000000000000000000000";
@@ -68,11 +70,21 @@ function planDeployment(env, network, deployer) {
   const arbiter = address("ARBITER_ADDRESS");
   const treasury = address("TREASURY_ADDRESS");
 
+  // The guardian can only pause. On a real network it has to be named, or declined on purpose with GUARDIAN_ADDRESS=none.
+  let guardian = null;
+  const givenGuardian = env.GUARDIAN_ADDRESS;
+  if (givenGuardian === "none") {
+    if (real) warnings.push("GUARDIAN_ADDRESS=none: nobody can pause quickly. Only the owner Safe can, and it has to gather its signatures first.");
+  } else if (givenGuardian) guardian = address("GUARDIAN_ADDRESS");
+  else if (real) errors.push("Set GUARDIAN_ADDRESS to the key that may pause new jobs in an emergency (it can do nothing else), or GUARDIAN_ADDRESS=none to go without one on purpose.");
+
   // Separation of duties: nobody who could change the rules is also the one who decides disputes, and the key that deploys
   // holds no role at all.
   if (owner && arbiter && same(owner, arbiter)) errors.push("OWNER_ADDRESS and ARBITER_ADDRESS must be different: whoever changes the rules shouldn't decide the disputes.");
+  if (guardian && owner && same(guardian, owner)) errors.push("GUARDIAN_ADDRESS is the owner. The point of a guardian is a key that can pause without waiting for the multisig.");
+  if (guardian && arbiter && same(guardian, arbiter)) errors.push("GUARDIAN_ADDRESS is the arbiter. Keep the roles apart.");
   if (deployer) {
-    for (const [name, v] of [["OWNER_ADDRESS", owner], ["ARBITER_ADDRESS", arbiter], ["TREASURY_ADDRESS", treasury]]) {
+    for (const [name, v] of [["OWNER_ADDRESS", owner], ["ARBITER_ADDRESS", arbiter], ["TREASURY_ADDRESS", treasury], ["GUARDIAN_ADDRESS", guardian]]) {
       if (v && same(v, deployer)) errors.push(`${name} is the deploying key. It must hold no role: the key that deploys is on a laptop, the roles are for multisigs.`);
     }
   }
@@ -96,17 +108,22 @@ function planDeployment(env, network, deployer) {
     }
     if (!tokenAddress) errors.push(`Set ${symbol}_ADDRESS (there is no known ${symbol} for ${network}).`);
 
-    // What the smallest fee and the smallest job are, in whole tokens. Named, not computed from an exchange rate.
+    // What the smallest fee and the smallest and largest job are, in whole tokens. Named, not computed from an exchange rate.
+    // The largest job is what a flaw nobody has found yet can put at risk in one job. Start low, and raise it with the owner Safe.
     const minFee = env[`${symbol}_MIN_FEE`];
     const minJob = env[`${symbol}_MIN_JOB`];
+    const maxJob = env[`${symbol}_MAX_JOB`];
     let cfg = null;
     if (!minFee || !DECIMAL.test(minFee) || !minJob || !DECIMAL.test(minJob)) errors.push(`Set ${symbol}_MIN_FEE and ${symbol}_MIN_JOB, in whole ${symbol} (for example 40 and 2000).`);
+    else if (!maxJob || !DECIMAL.test(maxJob)) errors.push(`Set ${symbol}_MAX_JOB, the largest job in whole ${symbol} (for example 10000). It can be raised later by the owner, and it is there to limit the damage of a flaw nobody has found.`);
     else {
       const fee = units(minFee);
       const job = units(minJob);
+      const most = units(maxJob);
       if (job === 0n || fee === 0n) errors.push(`${symbol}_MIN_FEE and ${symbol}_MIN_JOB must be above zero.`);
       else if (fee > job / 20n) errors.push(`${symbol}_MIN_FEE can't be more than 5% of ${symbol}_MIN_JOB: the contract refuses it, so a wrong value can't eat a payment.`);
-      else cfg = { enabled: true, surchargeBps, minFee: fee, minJob: job, vault: ZERO };
+      else if (most < job) errors.push(`${symbol}_MAX_JOB can't be below ${symbol}_MIN_JOB: no job would fit.`);
+      else cfg = { enabled: true, surchargeBps, minFee: fee, minJob: job, vault: ZERO, maxJob: most };
     }
     tokens[symbol] = { address: tokenAddress, cfg };
   }
@@ -131,6 +148,7 @@ function planDeployment(env, network, deployer) {
         owner,
         arbiter,
         treasury,
+        guardian,
         reviewPeriodSeconds: days * 86400,
         reviewPeriodDays: days,
         surchargeBps,
@@ -139,13 +157,13 @@ function planDeployment(env, network, deployer) {
   return { errors, warnings, plan };
 }
 
-/** What a Safe batch (the Transaction Builder of Safe) should do once the escrow exists: switch the tokens on. */
+/** What a Safe batch (the Transaction Builder of Safe) should do once the escrow exists: switch the tokens on, and name the guardian. */
 function safeBatch({ chainId, escrow, calls, createdAt }) {
   return {
     version: "1.0",
     chainId: String(chainId),
     createdAt,
-    meta: { name: "Squirrel: switch on the tokens", description: "configureToken for each token, from the owner. Review every value before signing." },
+    meta: { name: "Squirrel: switch on the tokens and name the guardian", description: "configureToken for each token and setGuardian, from the owner. Review every value before signing." },
     transactions: calls.map((c) => ({ to: escrow, value: "0", data: c.data, contractMethod: null, contractInputsValues: null, description: c.description })),
   };
 }

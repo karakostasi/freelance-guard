@@ -21,13 +21,15 @@ The project's current status is in `docs/thesis-context.md`. If the two disagree
 
 | Role | Who | Notes |
 | --- | --- | --- |
-| **Owner** | A Safe, 2 of 3 or better, hardware wallets | Can switch tokens on, set the fee (at most 1%), change the treasury, pause, and take money out of a vault. Can never touch a job that already exists, or take escrowed money. |
+| **Owner** | A Safe, 2 of 3 or better, hardware wallets | Can switch tokens on, set the fee (at most 1%) and each token's largest job, change the treasury, name the guardian, pause and unpause, and take money out of a vault. Can never touch a job that already exists, or take escrowed money. |
+| **Guardian** | A key kept for emergencies (on a monitoring service, say), or a 1-of-N Safe. Not the owner, not the arbiter | Can pause new jobs and funding, **and nothing else**: it can't unpause, change a rule, name another guardian or touch any money. A leaked guardian key can at worst pause, and the owner Safe removes it. Named by the owner Safe after the deploy (it is in the batch the script writes). |
 | **Arbiter** | A *different* Safe, with different signers | Decides disputes, all or nothing between the payer and the payee. **It is fixed in the contract and can never be changed.** A lost or leaked key can't be replaced, so it is a Safe. |
 | **Treasury** | A Safe if you can | Receives the fees. The owner can change it. |
 | **Deploying key** | A fresh key, used once | Holds **no** role: the owner goes into the constructor, so there is no moment when a key on a laptop owns the escrow. Drop it after the deploy. |
 
 The review period is fixed too. Think about it before the deploy.
 
+**The largest job.** Every token has one, and a token can't be switched on without it (`0` is refused, so "forgot to set it" can't mean "no limit"). It limits what a flaw nobody has found yet can put at risk in one job, and it only looks at new jobs: a job that exists is funded and paid whatever the limit becomes. Start low. The owner Safe raises it with `configureToken` when it is time. `npm run check:deployment` compares it with `deployments/base.json`, so a change nobody recorded shows as WRONG; after a raise you decided on, put the new value in that file.
 The key that creates play money (`MINT_PRIVATE_KEY`) and the test network's deploying key don't belong anywhere near this.
 
 ## 3. Rehearse on Base Sepolia first
@@ -38,7 +40,7 @@ The same script runs on the test network, with the same checks, so every step is
 2. Fill in `.env.mainnet` from `.env.mainnet.example`, but with the test network's values, and run `ENV_FILE=.env.mainnet npm run deploy:rehearsal` (a dry run), then again with `EXECUTE=1`.
 3. Switch the tokens on from the Safe, with the batch the script wrote.
 4. Run the backend with `STRICT=1` and `EXPECTED_CHAIN_ID=84532`: it holds itself to the rules of real money, on a test network.
-5. Practise pausing and unpausing from the Safe.
+5. Practise pausing from the guardian key (`pause`) and unpausing from the Safe (`setPaused(false)`).
 
 ## 4. The deploy, step by step
 
@@ -52,19 +54,20 @@ The dry run reads the chain and refuses (with the reason) if:
 
 - the RPC isn't Base mainnet (chain 8453), or the working tree isn't clean (the deployed code has to be findable from its commit);
 - the owner or the arbiter isn't a Safe, has fewer than 3 signers or needs all of them or needs fewer than 2, or if the deploying key or the same person is a signer on them;
-- the owner, arbiter or treasury is the deploying key, or the owner and the arbiter are the same;
+- the owner, arbiter, treasury or guardian is the deploying key, or the owner and the arbiter are the same, or the guardian is the owner or the arbiter;
+- the guardian isn't named (`GUARDIAN_ADDRESS=none` goes without one on purpose, with a warning), or the largest job of a token isn't named or is below its smallest job;
 - a token isn't Circle's USDC or EURC for Base, or its name, symbol and decimals aren't what they should be;
 - a limit, the review period or the surcharge is missing or outside what the contract allows, or a mock or a yield vault is asked for;
 - the deploying key can't pay for it, or this network already has a deployment recorded.
 
-It sends only with `EXECUTE=1` **and** `CONFIRM_CHAIN_ID=8453`. After it deploys it reads everything back from the chain (owner, arbiter, treasury, review period, nothing switched on, no handover) and writes `deployments/base.json` (address, block, commit, hash of the code) and `deployments/base.safe-config.json`.
+It sends only with `EXECUTE=1` **and** `CONFIRM_CHAIN_ID=8453`. After it deploys it reads everything back from the chain (owner, arbiter, treasury, review period, nothing switched on, no guardian yet, no handover) and writes `deployments/base.json` (address, block, commit, hash of the code) and `deployments/base.safe-config.json`.
 
 Then:
 
-1. **The owner Safe switches the tokens on.** In the Safe app: *Transaction Builder*, drop `deployments/base.safe-config.json` in, check every value, sign. The raw calls are printed too, in case the file isn't taken. (The file format is the Safe Transaction Builder's; I haven't been able to try it with a real Safe.) Yield is **not** switched on here.
+1. **The owner Safe switches the tokens on and names the guardian.** In the Safe app: *Transaction Builder*, drop `deployments/base.safe-config.json` in, check every value, sign. The raw calls are printed too, in case the file isn't taken. (The file format is the Safe Transaction Builder's; I haven't been able to try it with a real Safe.) Yield is **not** switched on here.
 2. **Publish the source:** the script prints the `npx hardhat verify` line (needs `ETHERSCAN_API_KEY`).
-3. **Check what is on-chain:** `ENV_FILE=.env.mainnet REQUIRE_CONFIGURED=1 npm run check:deployment`. It compares the code, the roles, the limits and the vaults with the record, and fails on anything different (a changed limit, a vault someone set, a handover nobody planned). Run it again from time to time, and put it in a monitor.
-4. **A very small job, end to end, with your own money.** Then pause and unpause from the Safe, so the first time isn't during an incident.
+3. **Check what is on-chain:** `ENV_FILE=.env.mainnet REQUIRE_CONFIGURED=1 npm run check:deployment`. It compares the code, the roles (the guardian too), the limits (the largest job too) and the vaults with the record, and fails on anything different (a changed limit, a swapped guardian, a vault someone set, a handover nobody planned). Run it again from time to time, and put it in a monitor.
+4. **A very small job, end to end, with your own money.** Then pause from the guardian key and unpause from the Safe, so the first time isn't during an incident.
 
 ## 5. The backend
 
@@ -92,18 +95,19 @@ A build for the test network has the "Test network" tag.
 
 ## 7. Day two
 
-- **Incident:** the owner Safe pauses (`setPaused(true)`): no new jobs or funding. Payments, approvals and refunds keep working, so nobody's money is stuck. Agree beforehand who signs and how they are reached at night.
+- **Incident:** the guardian key pauses (`pause()`) at once: no new jobs or funding. The owner Safe can pause too (`setPaused(true)`), and only the owner Safe unpauses. Payments, approvals and refunds keep working, so nobody's money is stuck. Agree beforehand who holds the guardian key, who signs for the Safe and how they are reached at night. If the guardian key leaks, the owner Safe replaces it with `setGuardian`.
 - **Rotate a signer** of a Safe in the Safe app. **Hand the owner to a new Safe** with `transferOwnership`, then `acceptOwnership` from the new Safe: two steps, so a mistyped address can't take it. `npm run check:deployment` will say a handover is pending until it is done.
-- **The arbiter can't be rotated.** If its Safe is lost, disputes can't be decided. Payees can still claim after the review period, and payers can still reclaim after a deadline.
+- **The arbiter can't be rotated.** A Safe can change its own signers, so a lost key is not the risk. If the Safe is lost altogether (no way to gather its signatures), a milestone that is already **disputed** stays locked: nothing else releases it. Payees can still claim a milestone that was submitted and not disputed, after the review period, and payers can still reclaim one that was never delivered, after its deadline.
 - Keep `deployments/base.json` with the audit report and the commit.
 
 ## 8. What isn't done, and should be decided before the audit
 
 These need a change in the contract (so a new audit if they come later), or a decision:
 
-- **A guardian who can only pause.** Pausing needs the owner Safe's signatures, which at night may be slow. A separate key that can pause but nothing else is common. A timelock on the owner's other powers is the other usual piece.
-- **A limit on the size of one job.** There is a smallest job, but no largest. A cap in the first weeks bounds the loss from a bug.
-- **A different arbiter than "one address, all or nothing"** (a split, an appeal), if the legal opinion asks for it.
+- **Done in the contract:** a guardian who can only pause, and a largest job for each token (section 2). They are in the code that goes to the audit.
+- **A limit on everything a token holds at once.** The largest job bounds one job, not the sum of many. A cap on the total in escrow per token, checked when a job is created and when a milestone is funded, would bound the whole loss in the first weeks. Not built.
+- **Disputed money has no exit if the arbiter never acts.** The arbiter is one fixed address (a Safe). If it is lost, or refuses, a disputed milestone stays locked for ever. The usual answer is a deadline after which the money goes one way by default (to the payer, say), but who should win by default is a decision for the legal opinion and the terms. Not built.
+- **A timelock on the owner's other powers** (the fee, the treasury, the tokens), so a leaked owner can't change them at once. Not built.- **A different arbiter than "one address, all or nothing"** (a split, an appeal), if the legal opinion asks for it.
 - **A real yield vault.** Only a mock exists. The vault's loss policy, and the real vault (Aave or another ERC-4626), come after the legal opinion.
 - **A price for ETH and USDC in euros** (an oracle or a rate the operator sets), if the site is to show euro values for them.
 - **Card and bank payments and bank payouts** need a real provider behind them. Until then the landing page's mention of euros and dollars is ahead of what a real network offers.

@@ -8,8 +8,8 @@ const item = (title, amount, days = 7) => ({ title, amount, duration: days * DAY
 /** The options of createJob: no verifier, no yield and not funded, unless overridden. */
 const opts = (overrides = {}) => ({ verifier: ethers.ZeroAddress, useYield: false, fundNow: false, ...overrides });
 
-/** Token rules for the escrow, with no fee, no limits and no vault unless overridden. */
-const rules = (overrides = {}) => ({ enabled: true, surchargeBps: 0, minFee: 0n, minJob: 0n, vault: ethers.ZeroAddress, ...overrides });
+/** Token rules for the escrow, with no fee, no limits and no vault unless overridden. A token needs a largest job: here, none in practice. */
+const rules = (overrides = {}) => ({ enabled: true, surchargeBps: 0, minFee: 0n, minJob: 0n, vault: ethers.ZeroAddress, maxJob: ethers.MaxUint256, ...overrides });
 
 /** Seeded random numbers (mulberry32), so a random test run is the same every time. `rnd(n)` is an integer below n. */
 function rng(seed) {

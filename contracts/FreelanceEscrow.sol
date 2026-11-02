@@ -30,6 +30,10 @@ interface IERC4626Minimal {
 ///
 ///         A payer can name a verifier for a job, an address that may approve delivered milestones for the
 ///         payer (an automated check, say). It can do nothing else, and the payer can replace or remove it.
+///
+///         Limits on what can go wrong: every token has a largest job, so a flaw nobody has found yet can only put so
+///         much at risk per job. A guardian, a key kept for the purpose, can stop new jobs and funding at once and
+///         can do nothing else, so it can't unpause, change a rule or touch any money.
 contract FreelanceEscrow {
     enum Status { Unfunded, Funded, Submitted, Disputed, Paid, Refunded }
 
@@ -76,6 +80,7 @@ contract FreelanceEscrow {
         uint256 minFee; // smallest fee for a job, in the token's base units
         uint256 minJob; // smallest total for a job, in the token's base units
         address vault; // ERC-4626 vault for the token's yield. address(0): no yield. Only changes through exitVault
+        uint256 maxJob; // largest total for a job, in the token's base units. A token that is enabled must have one
     }
 
     uint256 public constant MAX_MILESTONES = 20;
@@ -94,6 +99,7 @@ contract FreelanceEscrow {
 
     address public owner;
     address public pendingOwner;
+    address public guardian; // may pause, nothing else. address(0): none. Set by the owner
     address public treasury; // where withdrawFees sends the fees
     uint16 public feeBps; // payee fee as a share of the job, before the per-token minimum
     bool public paused; // blocks new jobs and funding. Payments and refunds always work.
@@ -134,13 +140,14 @@ contract FreelanceEscrow {
     /// `gross` is the milestone amount. The payee received `gross - fee`.
     event MilestonePaid(uint256 indexed id, uint256 indexed milestone, address payee, uint256 gross, uint256 fee);
     event FeesWithdrawn(address indexed token, address indexed to, uint256 amount);
-    event TokenConfigured(address indexed token, bool enabled, uint16 surchargeBps, uint256 minFee, uint256 minJob, address vault);
+    event TokenConfigured(address indexed token, bool enabled, uint16 surchargeBps, uint256 minFee, uint256 minJob, address vault, uint256 maxJob);
     event YieldHarvested(address indexed token, uint256 amount);
     /// `recovered` is what the vault gave back for all shares, `due` what the escrow owed there.
     event VaultExited(address indexed token, address indexed vault, uint256 recovered, uint256 due);
     event FeeBpsSet(uint16 feeBps);
     event TreasurySet(address treasury);
     event PausedSet(bool paused);
+    event GuardianSet(address indexed guardian);
     event OwnershipTransferStarted(address indexed owner, address indexed pendingOwner);
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
@@ -152,6 +159,7 @@ contract FreelanceEscrow {
     error NoSuchMilestone();
     error TokenNotAllowed();
     error JobTooSmall();
+    error JobTooLarge();
     error IsPaused();
     error BadConfig();
     error BadVerifier();
@@ -176,7 +184,8 @@ contract FreelanceEscrow {
     }
 
     constructor(address _owner, address _arbiter, address _treasury, uint64 _reviewPeriod) {
-        require(_owner != address(0) && _treasury != address(0), "bad address");
+        // With no arbiter a dispute could never be decided.
+        require(_owner != address(0) && _arbiter != address(0) && _treasury != address(0), "bad address");
         owner = _owner;
         arbiter = _arbiter;
         treasury = _treasury;
@@ -196,7 +205,7 @@ contract FreelanceEscrow {
     }
 
     /// @notice What a job with these milestone amounts would cost, using the same rules as createJob (it reverts for a
-    ///         token that is not enabled, a job below the minimum, or yield on a token without a vault).
+    ///         token that is not enabled, a job below the minimum or above the maximum, or yield on a token without a vault).
     ///         `fee` is paid by the payee out of the payments, `surcharge` by the payer on top of the
     ///         amounts when funding every milestone. With `useYield` there is no surcharge.
     function quote(address token, uint256[] calldata amounts, bool useYield) external view returns (uint256 total, uint256 fee, uint256 surcharge) {
@@ -208,6 +217,7 @@ contract FreelanceEscrow {
             if (!useYield) surcharge += (amounts[i] * cfg.surchargeBps) / BPS;
         }
         if (total < cfg.minJob) revert JobTooSmall();
+        if (total > cfg.maxJob) revert JobTooLarge();
         fee = _jobFee(cfg.minFee, total);
     }
 
@@ -254,6 +264,7 @@ contract FreelanceEscrow {
             total += items[i].amount;
         }
         if (total < cfg.minJob) revert JobTooSmall();
+        if (total > cfg.maxJob) revert JobTooLarge();
 
         id = ++jobCount;
         uint256 fee = _jobFee(cfg.minFee, total);
@@ -461,6 +472,8 @@ contract FreelanceEscrow {
         // The smallest fee can't be more than 5% of the smallest job, so a wrong value can't eat a payment.
         if (cfg.surchargeBps > MAX_SURCHARGE_BPS || cfg.minFee > cfg.minJob / 20) revert BadConfig();
         if (cfg.enabled && token != address(0) && token.code.length == 0) revert BadConfig();
+        // A token can't be switched on without saying how large a job may be. Use type(uint256).max to mean no limit on purpose.
+        if (cfg.enabled && (cfg.maxJob == 0 || cfg.maxJob < cfg.minJob)) revert BadConfig();
         address current = tokenConfig[token].vault;
         if (cfg.vault != current) {
             // Moving to another vault, or dropping it, goes through exitVault. A vault can only be set when there is none.
@@ -469,7 +482,7 @@ contract FreelanceEscrow {
             if (vaultEpoch[token] == 0) vaultEpoch[token] = 1;
         }
         tokenConfig[token] = cfg;
-        emit TokenConfigured(token, cfg.enabled, cfg.surchargeBps, cfg.minFee, cfg.minJob, cfg.vault);
+        emit TokenConfigured(token, cfg.enabled, cfg.surchargeBps, cfg.minFee, cfg.minJob, cfg.vault, cfg.maxJob);
     }
 
     /// @notice Emergency exit: takes everything out of the token's vault and stops using it. Milestones that were in the
@@ -515,6 +528,21 @@ contract FreelanceEscrow {
     function setPaused(bool value) external onlyOwner {
         paused = value;
         emit PausedSet(value);
+    }
+
+    /// @notice Stops new jobs and funding. The owner or the guardian can call it. Only the owner can undo it (setPaused),
+    ///         and payments, approvals and refunds keep working meanwhile. Nothing happens if it is already paused.
+    function pause() external {
+        if (msg.sender != owner && msg.sender != guardian) revert NotAllowed();
+        if (paused) return;
+        paused = true;
+        emit PausedSet(true);
+    }
+
+    /// @notice Names the guardian, a key that can pause and do nothing else. address(0) removes it.
+    function setGuardian(address to) external onlyOwner {
+        guardian = to;
+        emit GuardianSet(to);
     }
 
     /// @notice Starts handing ownership over. The new owner must call acceptOwnership.

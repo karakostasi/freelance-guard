@@ -131,12 +131,13 @@ async function main() {
   out(`  owner           ${plan.owner}${safes.owner ? `  Safe ${safes.owner.version}, ${safes.owner.threshold} of ${safes.owner.owners.length}` : ""}`);
   out(`  arbiter         ${plan.arbiter}${safes.arbiter ? `  Safe ${safes.arbiter.version}, ${safes.arbiter.threshold} of ${safes.arbiter.owners.length}` : ""}  (can never be changed)`);
   out(`  treasury        ${plan.treasury}`);
+  out(`  guardian        ${plan.guardian ? `${plan.guardian}  (can pause new jobs, nothing else; named by the owner Safe after the deploy)` : "none: only the owner Safe can pause"}`);
   out(`  review period   ${plan.reviewPeriodDays} days  (can never be changed)`);
   for (const symbol of SYMBOLS) {
     const t = plan.tokens[symbol];
     const info = tokenInfo[symbol];
     out(`  ${symbol}            ${t.address}  ${info ? `"${info.name}", ${info.decimals} decimals` : "NOT CHECKED"}`);
-    out(`                  smallest fee ${ethers.formatUnits(t.cfg.minFee, 6)}, smallest job ${ethers.formatUnits(t.cfg.minJob, 6)}, surcharge ${plan.surchargeBps / 100}%, no yield (switched on by the multisig, after the buttons below)`);
+    out(`                  smallest fee ${ethers.formatUnits(t.cfg.minFee, 6)}, smallest job ${ethers.formatUnits(t.cfg.minJob, 6)}, largest job ${ethers.formatUnits(t.cfg.maxJob, 6)}, surcharge ${plan.surchargeBps / 100}%, no yield (switched on by the multisig, after the buttons below)`);
   }
   out(`  code            commit ${commit?.slice(0, 10) ?? "?"}${dirty ? " (not clean)" : ""}, optimizer ${settings.optimizer.enabled ? `${settings.optimizer.runs} runs` : "off"}`);
   out(`  cost            about ${ethers.formatEther(gas * price)} ETH`);
@@ -172,6 +173,7 @@ async function main() {
   expect("treasury", await escrow.treasury(), plan.treasury);
   expect("review period", await escrow.reviewPeriod(), BigInt(plan.reviewPeriodSeconds));
   expect("paused", await escrow.paused(), false);
+  expect("guardian (named later, by the owner)", await escrow.guardian(), ethers.ZeroAddress);
   for (const symbol of SYMBOLS) if ((await escrow.tokenConfig(plan.tokens[symbol].address)).enabled) wrong.push(`${symbol} is already switched on`);
   if (wrong.length > 0) {
     console.error(`\nThe escrow at ${address} is NOT what was asked for. Do not use it:`);
@@ -189,32 +191,34 @@ async function main() {
     owner: plan.owner,
     arbiter: plan.arbiter,
     treasury: plan.treasury,
+    guardian: plan.guardian,
     reviewPeriodSeconds: plan.reviewPeriodSeconds,
     surchargeBps: plan.surchargeBps,
-    tokens: Object.fromEntries(SYMBOLS.map((s) => [s, { address: plan.tokens[s].address, minFee: plan.tokens[s].cfg.minFee, minJob: plan.tokens[s].cfg.minJob }])),
+    tokens: Object.fromEntries(SYMBOLS.map((s) => [s, { address: plan.tokens[s].address, minFee: plan.tokens[s].cfg.minFee, minJob: plan.tokens[s].cfg.minJob, maxJob: plan.tokens[s].cfg.maxJob }])),
     code: { gitCommit: commit, gitClean: !dirty, solc: settings.version ?? hre.config.solidity.compilers[0].version, optimizerRuns: settings.optimizer.runs, runtimeCodeHash: ethers.keccak256(runtimeCode) },
   };
   const json = (value) => JSON.stringify(value, (_k, v) => (typeof v === "bigint" ? v.toString() : v), 2) + "\n";
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(file, json(record));
 
-  // What the multisig has to do next: switch the tokens on. It is theirs to sign, not this script's.
+  // What the multisig has to do next: switch the tokens on, and name the guardian. It is theirs to sign, not this script's.
   const calls = SYMBOLS.map((s) => {
     const t = plan.tokens[s];
-    const cfg = [t.cfg.enabled, t.cfg.surchargeBps, t.cfg.minFee, t.cfg.minJob, t.cfg.vault];
+    const cfg = [t.cfg.enabled, t.cfg.surchargeBps, t.cfg.minFee, t.cfg.minJob, t.cfg.vault, t.cfg.maxJob];
     return { description: `configureToken ${s}`, data: escrow.interface.encodeFunctionData("configureToken", [t.address, cfg]) };
   });
+  if (plan.guardian) calls.push({ description: "setGuardian", data: escrow.interface.encodeFunctionData("setGuardian", [plan.guardian]) });
   const batchFile = path.join(dir, `${network}.safe-config.json`);
   fs.writeFileSync(batchFile, json(safeBatch({ chainId: plan.chainId, escrow: address, calls, createdAt: Date.now() })));
 
   out(`\nRecorded in ${file}`);
-  out(`The next step belongs to the owner Safe (${plan.owner}): switch the tokens on, from ${batchFile}`);
+  out(`The next step belongs to the owner Safe (${plan.owner}): switch the tokens on and name the guardian, from ${batchFile}`);
   out("In the Safe app: New transaction, Transaction Builder, drop the file in. If it isn't taken, send these as custom data to the escrow, one transaction each:");
   for (const c of calls) out(`  ${c.description}: ${c.data}`);
   out("\nThen:");
   out(`  1. Publish the source:   npx hardhat verify --network ${network} ${address} ${plan.owner} ${plan.arbiter} ${plan.treasury} ${plan.reviewPeriodSeconds}`);
   out(`  2. Check what is on-chain:   REQUIRE_CONFIGURED=1 npm run check:deployment${real ? "" : ":rehearsal"}`);
-  out("  3. Try it with a very small job, and practise pausing and unpausing from the Safe, before anyone else uses it.");
+  out(`  3. Try it with a very small job. Practise pausing from the ${plan.guardian ? "guardian key (pause) and unpausing from the Safe (setPaused)" : "Safe"} before anyone else uses it.`);
 }
 
 main().catch((e) => {

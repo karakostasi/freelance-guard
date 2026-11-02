@@ -69,7 +69,7 @@ On Base Sepolia the app uses Circle's test EURC and USDC. Get free test tokens a
 
 **Upgrading an existing deployment:** the contract changed (fees, a token whitelist, a new `createJob` signature and new events), so it needs a new deployment. Order matters:
 1. `npm run deploy:base-sepolia`, then note the new address and deploy block.
-2. The deployer is the owner and sets up ETH, USDC and EURC (the smallest fee and job come from `MIN_FEE_EUR` and `MIN_JOB_EUR`, the launch values are 40 and 2000). Set `ARBITER_ADDRESS`, `TREASURY_ADDRESS` and `OWNER_ADDRESS` to addresses you control before a real deployment.
+2. The deployer is the owner and sets up ETH, USDC and EURC (the smallest fee and job come from `MIN_FEE_EUR` and `MIN_JOB_EUR`, the launch values are 40 and 2000). Set `ARBITER_ADDRESS`, `TREASURY_ADDRESS` and `OWNER_ADDRESS` to addresses you control before a real deployment. `MAX_JOB_EUR` sets the largest job (a token can't be switched on without one), and `GUARDIAN_ADDRESS` names a key that can pause new jobs and nothing else.
 3. Set the new address in Vercel (`VITE_ESCROW_ADDRESS`, `VITE_ESCROW_DEPLOY_BLOCK`), Render (`ESCROW_ADDRESS`) and your local `.env`.
 4. Merge and redeploy. Jobs on the old contract no longer show, and the backend ignores their payment runs.
 

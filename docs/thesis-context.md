@@ -1,6 +1,6 @@
 # Squirrel: κατάσταση του έργου και περίληψη για τη διπλωματική
 
-**Τελευταία ενημέρωση: 2026-11-02, βάση commit `c6b3b8d` (main).**
+**Τελευταία ενημέρωση: 2026-11-02, βάση commit `49c2fd9` (main).**
 
 Αυτό το αρχείο είναι η **πηγή αλήθειας** για το τι ισχύει στο έργο τώρα. Το προϊόν λέγεται Squirrel και το repo `freelance-guard`. Το διαβάζει και το Claude του project της διπλωματικής. Η γλώσσα της διπλωματικής είναι τα ελληνικά.
 
@@ -74,6 +74,7 @@ B2B **milestone escrow** για ψηφιακές υπηρεσίες (software ag
 | Κομμάτι | Κατάσταση |
 |---|---|
 | Escrow contract v2 (milestones, whitelist token, fees, surcharge, verifier, vault και yield, refund, dispute) | **Υλοποιημένο και δοκιμασμένο με tests**, στο `main` (PR #38, 2026-10-28). Το ABI είναι committed στο `abi/` και το CI ελέγχει ότι ταιριάζει. **Δεν έχει γίνει audit.** |
+| Έλεγχοι που περιορίζουν τη ζημιά πριν από το audit | **Υλοποιημένοι και δοκιμασμένοι με tests, όχι σε `main` μέχρι να γίνει merge το PR τους:** `maxJob` ανά token (υποχρεωτικό για να ενεργοποιηθεί token, μετράει μόνο νέα jobs), `guardian` που μπορεί μόνο `pause()`, και constructor που αρνείται arbiter `address(0)`. Τα deploy scripts τα απαιτούν και το `check-deployment` τα ελέγχει. Δεν έχουν δοκιμαστεί με πραγματικό Safe |
 | Frontend και backend πάνω στο v2 | Υλοποιημένα, στο `main`. Το παλιό §10 του `contract-v2-design.md` τα έδειχνε ως ημιτελή, ήταν λάθος και διορθώθηκε |
 | Deploy σε Base Sepolia | **Δεν επαληθεύεται από το repo.** Η διεύθυνση του contract ζει στις μεταβλητές του Vercel και του Render |
 | Deploy σε Base mainnet | **Δεν έχει γίνει.** Υπάρχει script με dry-run (`deploy-mainnet.cjs`, `check-deployment.cjs`), αλλά όχι φάκελος `deployments/` |
@@ -121,7 +122,8 @@ B2B **milestone escrow** για ψηφιακές υπηρεσίες (software ag
 - Δύο ξεχωριστά **Safe multisigs**: owner και arbiter. Το κλειδί του deploy δεν έχει κανέναν ρόλο και ο owner μπαίνει στον constructor. Ο arbiter είναι **σταθερός στο contract** και δεν αλλάζει ποτέ.
 - Το deploy script αρνείται, με λόγο, σε λάθος δίκτυο, ρόλους που δεν είναι Safe, λάθος tokens ή βρώμικο working tree. Στέλνει μόνο με `EXECUTE=1` και `CONFIRM_CHAIN_ID=8453`.
 - Ο server σε πραγματικό δίκτυο αρνείται να ξεκινήσει με ανασφαλείς ρυθμίσεις, και το sandbox μένει κλειστό.
-- **Δεν έχουν γίνει:** audit του contract, νομική γνώμη, πραγματικοί providers για τράπεζα και ramp, guardian που μπορεί μόνο να κάνει pause, όριο στο μέγεθος ενός job, πραγματικό yield vault, τιμή ETH/USDC σε ευρώ.
+- **Guardian και `maxJob`:** το deploy script απαιτεί `GUARDIAN_ADDRESS` (ή `none` ρητά, με προειδοποίηση) και `USDC_MAX_JOB`/`EURC_MAX_JOB`. Ο guardian ορίζεται από το Safe του owner μετά το deploy, με το batch που γράφει το script. Μπορεί μόνο `pause()`: δεν κάνει unpause, δεν αλλάζει κανόνα, δεν αγγίζει χρήματα. Το `maxJob` το ανεβάζει ο owner με `configureToken`, και το `check-deployment` δείχνει WRONG μέχρι να ενημερωθεί το `deployments/base.json`.
+- **Δεν έχουν γίνει:** audit του contract, νομική γνώμη, πραγματικοί providers για τράπεζα και ramp, πραγματικό yield vault, τιμή ETH/USDC σε ευρώ, όριο στο συνολικό ποσό που κρατά το escrow ανά token (το `maxJob` μετράει ένα job), έξοδος για milestone σε `Disputed` αν ο arbiter δεν αποφασίσει ποτέ (θέλει απόφαση για το ποιος κερδίζει από προεπιλογή), timelock στις εξουσίες του owner.
 
 ## 9. Ανοιχτά θέματα και ό,τι δεν έχει επαληθευτεί
 

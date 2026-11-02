@@ -13,6 +13,8 @@ const SURCHARGE_BPS = 25;
 // are 40 and 2000: set MIN_FEE_EUR=40 and MIN_JOB_EUR=2000.
 const MIN_FEE_EUR = Number(process.env.MIN_FEE_EUR || 1);
 const MIN_JOB_EUR = Number(process.env.MIN_JOB_EUR || 20);
+// The largest job, in euros. A token can't be switched on without one. The default is far above any demo.
+const MAX_JOB_EUR = Number(process.env.MAX_JOB_EUR || 1_000_000);
 
 const units = (eur, symbol) => ethers.parseUnits((eur / EUR_PER[symbol]).toFixed(6), DECIMALS[symbol]);
 
@@ -56,10 +58,16 @@ async function main() {
     const minJob = units(MIN_JOB_EUR, symbol);
     const minFee = [units(MIN_FEE_EUR, symbol), minJob / 20n].reduce((a, b) => (a < b ? a : b));
     const vault = vaults[symbol] ?? ethers.ZeroAddress;
-    await (await escrow.configureToken(address, { enabled: true, surchargeBps: SURCHARGE_BPS, minFee, minJob, vault })).wait();
-    console.log(`Enabled ${symbol}: fee at least ${ethers.formatUnits(minFee, DECIMALS[symbol])}, job at least ${ethers.formatUnits(minJob, DECIMALS[symbol])}, ${vault === ethers.ZeroAddress ? "no yield" : "yield from " + vault}`);
+    const maxJob = units(MAX_JOB_EUR, symbol);
+    await (await escrow.configureToken(address, { enabled: true, surchargeBps: SURCHARGE_BPS, minFee, minJob, vault, maxJob })).wait();
+    console.log(`Enabled ${symbol}: fee at least ${ethers.formatUnits(minFee, DECIMALS[symbol])}, job from ${ethers.formatUnits(minJob, DECIMALS[symbol])} to ${ethers.formatUnits(maxJob, DECIMALS[symbol])}, ${vault === ethers.ZeroAddress ? "no yield" : "yield from " + vault}`);
   }
 
+  // A key that can pause new jobs and nothing else, if you name one.
+  if (process.env.GUARDIAN_ADDRESS) {
+    await (await escrow.setGuardian(process.env.GUARDIAN_ADDRESS)).wait();
+    console.log("Guardian (can pause, nothing else):", process.env.GUARDIAN_ADDRESS);
+  }
   if (process.env.OWNER_ADDRESS && process.env.OWNER_ADDRESS !== deployer.address) {
     await (await escrow.transferOwnership(process.env.OWNER_ADDRESS)).wait();
     console.log("Ownership offered to", process.env.OWNER_ADDRESS, "- it must call acceptOwnership()");

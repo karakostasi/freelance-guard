@@ -17,6 +17,8 @@ import { cleanEmail, confirmToken, messagesFor, notifyParties, readEmailToken, u
 import { sendMail } from "../server/mail.mjs";
 import { SESSION_MS, createSession, signInMessage, verifyToken } from "../server/auth.mjs";
 import { fsBlobStore, pgBlobStore } from "../server/blobs.mjs";
+import { describeFailure, makeJwt, mentionsSepa, readKey, renderTable, summarizeCountry, tokenOnBase } from "./lib/coinbase-onramp.mjs";
+import { generateKeyPairSync, verify } from "node:crypto";
 
 let failures = 0;
 const check = (condition, message) => {
@@ -366,6 +368,50 @@ console.log("\nHow a payee is paid");
   const shown = publicPayout(cleanPayout({ route: "sepa", holder: "Ana", iban: "DE89370400440532013000" }));
   check(shown.route === "sepa" && shown.currency === "EUR" && shown.last4 === "3000" && !JSON.stringify(shown).includes("DE89"), "what anyone sees is the route, the currency and the last four digits");
   check(publicPayout(undefined).route === null && currencyOfRoute("eurc") === null && currencyOfRoute("ach") === "USD", "no choice, and the currency of each route");
+}
+
+console.log("\nChecking what Coinbase offers (scripts/coinbase-onramp-check.mjs)");
+{
+  const ed = generateKeyPairSync("ed25519");
+  const jwk = ed.privateKey.export({ format: "jwk" });
+  const edSecret = Buffer.concat([Buffer.from(jwk.d, "base64url"), Buffer.from(jwk.x, "base64url")]).toString("base64");
+  const ec = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
+  const parts = (jwt) => { const [h, c, s] = jwt.split("."); return { header: JSON.parse(Buffer.from(h, "base64url")), claims: JSON.parse(Buffer.from(c, "base64url")), signed: Buffer.from(`${h}.${c}`), signature: Buffer.from(s, "base64url") }; };
+
+  const edToken = parts(makeJwt({ keyId: "k1", secret: edSecret, path: "/onramp/v1/buy/config", now: 1000 }));
+  check(edToken.header.alg === "EdDSA" && edToken.header.kid === "k1" && edToken.claims.sub === "k1" && edToken.claims.iss === "cdp", "an Ed25519 key signs a token that names the key and says it comes from cdp");
+  check(edToken.claims.uris[0] === "GET api.developer.coinbase.com/onramp/v1/buy/config" && edToken.claims.nbf === 1000 && edToken.claims.exp === 1120, "the token is for one method, host and path, and lasts two minutes");
+  check(verify(null, edToken.signed, ed.publicKey, edToken.signature), "the Ed25519 signature checks out with the public key");
+  check(!verify(null, edToken.signed, generateKeyPairSync("ed25519").publicKey, edToken.signature), "and not with another key");
+
+  for (const [name, pem] of [["PKCS8", ec.privateKey.export({ type: "pkcs8", format: "pem" })], ["SEC1", ec.privateKey.export({ type: "sec1", format: "pem" })], ["with \\n written out", ec.privateKey.export({ type: "sec1", format: "pem" }).replace(/\n/g, "\\n")]]) {
+    const t = parts(makeJwt({ keyId: "k2", secret: pem, path: "/x" }));
+    check(t.header.alg === "ES256" && verify("sha256", t.signed, { key: ec.publicKey, dsaEncoding: "ieee-p1363" }, t.signature), `an ECDSA key (${name}) signs a token that checks out`);
+  }
+  check(parts(makeJwt({ keyId: "k", secret: edSecret, path: "/x" })).header.nonce !== edToken.header.nonce, "every token has its own nonce");
+  const refused = (fn) => { try { fn(); return null; } catch (e) { return e.message; } };
+  check(refused(() => readKey("")) && refused(() => readKey("not a key")) && refused(() => makeJwt({ keyId: "", secret: edSecret, path: "/x" })), "an empty or unreadable key, or no key id, is refused");
+  check(refused(() => readKey(generateKeyPairSync("ed25519").privateKey.export({ type: "pkcs8", format: "pem" }))), "a PEM that is not a P-256 key is refused");
+
+  const USDC = CANONICAL_TOKENS[8453].USDC, EURC = CANONICAL_TOKENS[8453].EURC;
+  const base = (address) => ({ name: "base", chain_id: 8453, contract_address: address });
+  const asset = (symbol, networks) => ({ id: symbol, symbol, networks });
+  check(tokenOnBase([asset("USDC", [base(USDC.toLowerCase())])], "USDC").state === "base", "Circle's USDC on Base is recognised, whatever the letter case of the address");
+  check(tokenOnBase([asset("EURC", [base("0x1234567890123456789012345678901234567890")])], "EURC").state === "base-other-address", "a token with another contract on Base is called out");
+  check(tokenOnBase([asset("EURC", [{ name: "ethereum", chain_id: 1, contract_address: EURC }])], "EURC").state === "other-networks" && tokenOnBase([], "EURC").state === "absent", "only on another network, and not offered at all");
+
+  const config = { countries: [{ id: "NL", payment_methods: [{ id: "CARD" }] }] };
+  const options = { payment_currencies: [{ id: "EUR", limits: [{ id: "CARD", min: "5", max: "500" }] }], purchase_currencies: [asset("EURC", [base(EURC)])] };
+  const nl = summarizeCountry("NL", "buy", { config, options });
+  check(nl.inConfig && nl.eur && nl.eurc.state === "base" && nl.usdc.state === "absent" && nl.eurLimits[0].max === "500" && !mentionsSepa(nl), "a country's answer is boiled down to EUR, the two tokens and the limits");
+  const sell = summarizeCountry("NL", "sell", { config, options: { cashout_currencies: [{ id: "USD", limits: [] }], sell_currencies: [asset("USDC", [base(USDC)])] } });
+  check(!sell.eur && sell.usdc.state === "base", "the off-ramp reads cashout_currencies and sell_currencies");
+  check(mentionsSepa({ configMethods: [], eurLimits: [{ id: "SEPA_BANK_ACCOUNT" }] }), "a method id that names SEPA is noticed");
+  const failed = summarizeCountry("FR", "buy", { config, options: null, error: "HTTP 400" });
+  check(!failed.inConfig && failed.error === "HTTP 400", "a country the API refused keeps the reason");
+  const table = renderTable("T", [nl, failed]);
+  check(table[0] === "T" && table.some((l) => l.startsWith("NL") && l.includes("CARD 5-500")) && table.some((l) => l.includes("ERROR: HTTP 400")), "the table shows the answer and the failures");
+  check(describeFailure(401, { code: 16, message: "unauthenticated" }) === "HTTP 401: unauthenticated" && describeFailure(502, "bad gateway") === "HTTP 502: bad gateway", "a refusal is put in one line");
 }
 
 console.log(failures ? `\n${failures} check(s) failed` : "\nAll checks passed");

@@ -1,6 +1,6 @@
 # Squirrel: κατάσταση του έργου και περίληψη για τη διπλωματική
 
-**Τελευταία ενημέρωση: 2026-11-02, βάση commit `188c64e` (main).**
+**Τελευταία ενημέρωση: 2026-11-02, βάση commit `c6b3b8d` (main).**
 
 Αυτό το αρχείο είναι η **πηγή αλήθειας** για το τι ισχύει στο έργο τώρα. Το προϊόν λέγεται Squirrel και το repo `freelance-guard`. Το διαβάζει και το Claude του project της διπλωματικής. Η γλώσσα της διπλωματικής είναι τα ελληνικά.
 
@@ -88,7 +88,7 @@ B2B **milestone escrow** για ψηφιακές υπηρεσίες (software ag
 
 Στόχος: να πληρώνει ο payer με ευρώ και να καταλήγει EURC/USDC στο Base (on-ramp), και ο payee να πουλά και να παίρνει ευρώ (off-ramp). Σήμερα αυτό υπάρχει μόνο ως sandbox (ενότητα 5).
 
-**Τι χτίστηκε.** Το `scripts/coinbase-onramp-check.mjs` (με βοηθητικό κώδικα στο `scripts/lib/coinbase-onramp.mjs`). Είναι script μόνο ανάγνωσης: υπογράφει JWT με CDP Secret API key (Ed25519 ή ECDSA, χωρίς SDK) και ρωτά τα `/onramp/v1/{buy,sell}/config` και `/options?country=` για χώρες της ΕΕ. Δείχνει αν προσφέρεται EUR και αν το EURC/USDC είναι στο Base με τη διεύθυνση της Circle. Δεν κινεί χρήματα. Τρέχει με `npm run check:onramp`. **Η δουλειά αυτή είναι uncommitted στο branch `coinbase-onramp-check`.**
+**Τι χτίστηκε.** Το `scripts/coinbase-onramp-check.mjs` (με βοηθητικό κώδικα στο `scripts/lib/coinbase-onramp.mjs`). Είναι script μόνο ανάγνωσης: υπογράφει JWT με CDP Secret API key (Ed25519 ή ECDSA, χωρίς SDK) και ρωτά τα `/onramp/v1/{buy,sell}/config` και `/options?country=` για χώρες της ΕΕ. Δείχνει αν προσφέρεται EUR και αν το EURC/USDC είναι στο Base με τη διεύθυνση της Circle. Δεν κινεί χρήματα. Τρέχει με `npm run check:onramp`. Είναι στο repo (branch `coinbase-onramp-check`, PR προς το `main`). **Δοκιμασμένο με unit tests:** η υπογραφή του JWT (Ed25519 και ECDSA), το διάβασμα των απαντήσεων και ο πίνακας. **Δεν έχει επαληθευτεί με το πραγματικό API:** όλες οι κλήσεις μέχρι τώρα έδωσαν 404, άρα ο κώδικας δεν έχει δει ποτέ πραγματική απάντηση του Coinbase.
 
 **Τι βρέθηκε.**
 - Χρειάζεται **Secret API key**. Το Client API key δεν κάνει για τα REST APIs του Onramp/Offramp (το λέει το quickstart του Coinbase).

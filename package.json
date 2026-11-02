@@ -21,7 +21,8 @@
     "deploy:rehearsal": "hardhat run scripts/deploy-mainnet.cjs --network baseSepolia",
     "check:deployment": "hardhat run scripts/check-deployment.cjs --network base",
     "check:deployment:rehearsal": "hardhat run scripts/check-deployment.cjs --network baseSepolia",
-    "test:deploy": "node scripts/test-deploy.mjs"
+    "test:deploy": "node scripts/test-deploy.mjs",
+    "check:onramp": "node scripts/coinbase-onramp-check.mjs"
   },
   "dependencies": {
     "@coinbase/cdp-core": "^0.0.128",

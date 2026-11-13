@@ -166,6 +166,21 @@ select.input:disabled { cursor: not-allowed; }
 .wpReview { display: flex; flex-direction: column; align-items: flex-start; gap: .35rem; padding: .85rem 1rem; border-radius: 12px; border: 1px solid var(--line-2); background: var(--card); }
 .wpBig { font-size: 1.4rem; }
 .wpFullAddress { font-family: ui-monospace, monospace; font-size: .85rem; overflow-wrap: anywhere; }
+.wpFullAddress strong { font-size: 1rem; color: var(--accent-text); }
+.wpAddressCard { display: flex; flex-direction: column; gap: .6rem; padding: 1rem; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 14%, transparent), transparent), var(--card); }
+.wpAddressCard .groupTitle { display: flex; align-items: center; gap: .4rem; opacity: 1; color: var(--accent-text); }
+.wpCopy { display: inline-flex; align-items: center; justify-content: center; gap: .45rem; min-height: 44px; }
+.wpNote { display: flex; align-items: flex-start; gap: .4rem; margin: 0; font-size: .85rem; color: var(--warn-text); }
+.wpNote svg { flex-shrink: 0; margin-top: .15rem; }
+.wpBuyCard { display: flex; flex-direction: column; gap: .6rem; padding: 1rem; border-radius: 12px; border: 1px solid var(--line-2); background: var(--card); }
+.wpBuyGrid { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+.wpBuyTile { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: .15rem; min-height: 44px; padding: .75rem; border-radius: 12px; border: 1px solid var(--line-5); background: var(--raised); color: inherit; font: inherit; text-align: left; cursor: pointer; transition: border-color .15s, box-shadow .15s, transform .15s; }
+.wpBuyTile:hover:not(:disabled), .wpBuyTile:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(79, 124, 255, .2); transform: translateY(-1px); }
+.wpBuyTile:disabled { opacity: .5; cursor: not-allowed; }
+.wpBuyIcon { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; margin-bottom: .35rem; border-radius: 50%; background: var(--line-2); }
+.wpBuyOn { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--raised)); }
+.wpBuyOn .wpBuyIcon { background: var(--gradient); color: #fff; }
+.wpBuyCheck { position: absolute; top: .6rem; right: .6rem; color: var(--accent-text); }
 .wpRow { display: flex; gap: .5rem; }
 .wpRow > button { flex: 1; justify-content: center; }
 .wpWaiting { display: flex; align-items: center; gap: .5rem; margin: 0; color: var(--accent-text); }

@@ -6,12 +6,12 @@
 
 
 .iconButton { display: inline-flex; align-items: center; justify-content: center; padding: .35rem; border: 1px solid transparent; border-radius: 8px; background: none; color: inherit; cursor: pointer; opacity: .7; transition: border-color .15s, box-shadow .15s; }
-.iconButton:hover, .iconButton:focus-visible { outline: none; opacity: 1; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(79, 124, 255, .2); }
+.iconButton:hover, .iconButton:focus-visible { outline: none; opacity: 1; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent); }
 
 
 .pickerRow { display: flex; align-items: center; gap: .75rem; }
 .pickerRow select { flex: 1; }
-.pickerLabel { font-size: .8rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; opacity: .6; }
+.pickerLabel { font-size: .8rem; font-weight: 600; opacity: .6; }
 
 .msTabs { display: flex; gap: .5rem; flex-wrap: wrap; }
 .msTab { display: inline-flex; align-items: center; gap: .45rem; padding: .45rem .9rem; border-radius: 999px; border: 1px solid var(--line); background: none; color: inherit; font: inherit; cursor: pointer; transition: border-color .15s, background .15s; }
@@ -47,27 +47,28 @@
 .sidebar { grid-area: side; align-self: stretch; position: relative; min-height: 260px; }
 /* Absolutely placed, so the list scrolls inside the sidebar instead of stretching the row. */
 .sidebarInner { position: absolute; inset: 0; display: flex; flex-direction: column; gap: .75rem; padding: 1rem; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); overflow-y: auto; }
-.sidebarTitle { display: flex; align-items: center; justify-content: space-between; margin: 0; font-size: .8rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; opacity: .8; }
+.sidebarTitle { display: flex; align-items: center; justify-content: space-between; margin: 0; font-size: .8rem; font-weight: 600; opacity: .8; }
 .jobList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .5rem; }
 .jobItem { display: flex; flex-direction: column; align-items: flex-start; gap: .3rem; width: 100%; padding: .7rem .8rem; border-radius: 10px; border: 1px solid var(--line-2); border-left: 4px solid var(--c, #8a8fa0); background: var(--card); color: inherit; font: inherit; text-align: left; cursor: pointer; transition: border-color .15s, background .15s; }
 .jobItem:hover { border-color: var(--c, var(--line-6)); }
-.jobItemActive { background: color-mix(in srgb, var(--c, #4f7cff) 14%, var(--card)); border-color: var(--c, #4f7cff); box-shadow: 0 0 0 1px var(--c, #4f7cff); }
+.jobItemActive { background: color-mix(in srgb, var(--c, var(--accent)) 14%, var(--card)); border-color: var(--c, var(--accent)); box-shadow: 0 0 0 1px var(--c, var(--accent)); }
 .jobItemTop { display: flex; align-items: center; justify-content: space-between; gap: .5rem; width: 100%; min-width: 0; }
 .jobItemBottom { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
 .jobItem > span:last-child { width: 100%; }
 
 
 /* The Jobs page: the same list, with the selected job or the hire form beside it. */
-.jobsLayout { display: grid; grid-template-columns: 280px minmax(0, 1fr) 320px; grid-template-areas: "side top wallet"; gap: 1.5rem; align-items: start; }
+/* The row is at least as tall as the wallet opened on its Receive tab, so with no jobs the list and the wallet are not squeezed to the height of the empty message. */
+.jobsLayout { display: grid; grid-template-columns: 280px minmax(0, 1fr) 320px; grid-template-areas: "side top wallet"; grid-template-rows: minmax(40rem, auto); gap: 1.5rem; align-items: start; }
 
 /* Narrower screens: the wallet card drops under the details, then everything stacks. */
 @media (max-width: 1200px) {
   .wallet { align-self: start; contain: none; overflow-y: visible; }
   .layout { grid-template-columns: 280px minmax(0, 1fr); grid-template-areas: "side top" "side wallet" "stepper stepper"; }
-  .jobsLayout { grid-template-columns: 280px minmax(0, 1fr); grid-template-areas: "side top" "side wallet"; }
+  .jobsLayout { grid-template-columns: 280px minmax(0, 1fr); grid-template-areas: "side top" "side wallet"; grid-template-rows: none; }
 }
 @media (max-width: 900px) {
-  .jobsLayout { grid-template-columns: minmax(0, 1fr); grid-template-areas: "side" "top" "wallet"; }
+  .jobsLayout { grid-template-columns: minmax(0, 1fr); grid-template-areas: "side" "top" "wallet"; grid-template-rows: none; }
   .layout { grid-template-columns: minmax(0, 1fr); grid-template-areas: "side" "top" "wallet" "stepper"; }
   .sidebar { min-height: 0; }
   .sidebarInner { position: static; max-height: 280px; }
@@ -80,7 +81,7 @@
 @keyframes spin { to { transform: rotate(360deg); } }
 .spin { animation: spin 1s linear infinite; }
 .txPending { display: inline-flex; align-items: center; gap: .35rem; font-size: .85rem; opacity: .65; }
-.traceInfo { display: flex; align-items: center; gap: .5rem; margin: 0; padding: .5rem .75rem; border-radius: 8px; background: rgba(79, 124, 255, .1); color: var(--accent-text); font-size: .85rem; }
+.traceInfo { display: flex; align-items: center; gap: .5rem; margin: 0; padding: .5rem .75rem; border-radius: 8px; background: color-mix(in srgb, var(--accent) 10%, transparent); color: var(--accent-text); font-size: .85rem; }
 
 /* The Jobs page before there is a job. */
 .empty { display: flex; flex-direction: column; align-items: flex-start; gap: .75rem; padding: 1.5rem; border-radius: 14px; border: 1px dashed var(--line-4); }

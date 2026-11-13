@@ -4,14 +4,17 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0d0f14" />
+    <meta name="theme-color" content="#f5f6f8" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600..800&family=Figtree:wght@400..700&display=swap" rel="stylesheet" />
     <title>Squirrel</title>
     <script>
-      // Apply a saved light theme before the page paints, so it doesn't flash dark first.
+      // Apply a saved dark theme before the page paints, so it doesn't flash light first.
       try {
-        if (localStorage.getItem("squirrel-theme") === "light") {
-          document.documentElement.dataset.theme = "light";
-          document.querySelector('meta[name="theme-color"]').setAttribute("content", "#f4f6fb");
+        if (localStorage.getItem("squirrel-theme") === "dark") {
+          document.documentElement.dataset.theme = "dark";
+          document.querySelector('meta[name="theme-color"]').setAttribute("content", "#0e1320");
         }
       } catch (e) {}
     </script>

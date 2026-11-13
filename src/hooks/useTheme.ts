@@ -3,14 +3,14 @@ import { useCallback, useEffect, useState } from "react";
 export type Theme = "dark" | "light";
 
 const KEY = "squirrel-theme";
-const COLORS: Record<Theme, string> = { dark: "#0d0f14", light: "#f4f6fb" };
+const COLORS: Record<Theme, string> = { dark: "#0e1320", light: "#f5f6f8" };
 
-/** The saved choice. Dark, the original look, until someone picks the light one. index.html applies it before the first paint. */
+/** The saved choice. Light until someone picks the dark one. index.html applies a saved dark choice before the first paint. */
 function saved(): Theme {
   try {
-    return localStorage.getItem(KEY) === "light" ? "light" : "dark";
+    return localStorage.getItem(KEY) === "dark" ? "dark" : "light";
   } catch {
-    return "dark";
+    return "light";
   }
 }
 

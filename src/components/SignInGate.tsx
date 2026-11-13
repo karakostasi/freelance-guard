@@ -1,4 +1,4 @@
-import { ArrowRight, Banknote, FileCheck, LoaderCircle, Lock, Send, ShieldCheck, Wallet } from "lucide-react";
+import { Banknote, FileCheck, LoaderCircle, Lock, Send, ShieldCheck, Wallet } from "lucide-react";
 import logo from "../assets/logo.svg";
 import { SignInButton } from "./SignInButton";
 import styles from "../App.module.css";
@@ -48,9 +48,6 @@ export function SignInGate({ page, checking = false }: { page: GatedPage; checki
         ))}
       </ol>
       <div className={s.card}>
-        <span className={s.badge}>
-          <Lock size={13} /> {checking ? "Welcome back" : "Sign in to continue"}
-        </span>
         <h2 className={s.title}>{title}</h2>
         <p className={s.text}>{text}</p>
         {checking ? (
@@ -59,7 +56,7 @@ export function SignInGate({ page, checking = false }: { page: GatedPage; checki
           </button>
         ) : (
           <SignInButton className={`${styles.button} ${s.cta}`}>
-            Sign in <ArrowRight size={18} />
+            Sign in
           </SignInButton>
         )}
         <p className={s.note}>{checking ? "Just a moment." : "We email you a code. Already have a wallet? You can use that too."}</p>

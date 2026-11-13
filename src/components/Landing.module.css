@@ -1,75 +1,54 @@
-.landing { display: flex; flex-direction: column; gap: 3.5rem; padding: 1rem 0 3rem; }
+.landing { display: flex; flex-direction: column; gap: 5rem; padding: 1.5rem 0 4rem; }
 
 /* hero: the words, and a picture of a job */
-.hero { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); align-items: center; gap: 2.5rem; padding-top: 1.5rem; }
-.copy { display: flex; flex-direction: column; align-items: flex-start; gap: 1rem; }
-.eyebrow { font-size: .78rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--link); padding: .2rem .75rem; border-radius: 999px; background: rgba(79, 124, 255, .14); }
-.headline { margin: 0; font-size: clamp(2rem, 4.6vw, 3.4rem); line-height: 1.08; letter-spacing: -.02em; text-wrap: balance; }
-.grad { display: block; background: linear-gradient(135deg, var(--accent), var(--accent-2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
-.lead { margin: 0; font-size: 1.1rem; line-height: 1.55; opacity: .8; }
-.cta { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; margin-top: .25rem; }
-.primary { display: inline-flex; align-items: center; gap: .5rem; padding: .8rem 1.5rem; font-size: 1rem; font-weight: 600; }
-.note { margin: 0; font-size: .85rem; opacity: .55; }
+.hero { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); align-items: center; gap: 3rem; padding-top: 1rem; }
+.copy { display: flex; flex-direction: column; align-items: flex-start; gap: 1.1rem; }
+.headline { margin: 0; font-size: clamp(2.2rem, 5vw, 3.8rem); font-weight: 700; line-height: 1.04; letter-spacing: -.02em; text-wrap: balance; }
+.headline span { display: block; }
+.lead { margin: 0; max-width: 34em; font-size: 1.15rem; line-height: 1.55; color: var(--muted); }
+.cta { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; margin-top: .5rem; }
+.primary { display: inline-flex; align-items: center; justify-content: center; padding: .85rem 1.6rem; font-size: 1.05rem; font-weight: 600; }
+.note { margin: 0; font-size: .9rem; color: var(--muted); }
 
-.section { display: flex; flex-direction: column; gap: 1.25rem; }
-.title { margin: 0; font-size: 1.35rem; text-wrap: balance; }
+.section { display: flex; flex-direction: column; gap: 1.5rem; }
+.title { margin: 0; font-size: 1.6rem; text-wrap: balance; }
 
 /* the way the money goes: in, held, out */
-.route { display: grid; grid-template-columns: 1fr 64px 1fr 64px 1fr; align-items: stretch; }
-.node { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .35rem; padding: 1.1rem 1rem; text-align: center; border-radius: 14px; border: 1px solid var(--line); background: var(--panel-2); }
-.node > span:not(.nodeIcons):not(.where) { font-size: .85rem; opacity: .65; }
-.where { display: inline-flex; align-items: center; gap: .3rem; margin-top: .35rem; font-size: .75rem; line-height: 1.3; color: var(--muted); }
+.route { display: grid; grid-template-columns: 1fr 56px 1fr 56px 1fr; align-items: stretch; }
+.node { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .35rem; padding: 1.25rem 1rem; text-align: center; border-radius: 16px; border: 1px solid var(--line); background: var(--card); }
+.node > span:not(.nodeIcons):not(.where) { font-size: .9rem; color: var(--muted); }
+.where { display: inline-flex; align-items: center; gap: .3rem; margin-top: .35rem; font-size: .82rem; line-height: 1.3; color: var(--muted); }
 .where svg { flex: none; color: var(--accent); }
-.nodeIcons { display: inline-flex; gap: .4rem; padding: .55rem .7rem; border-radius: 12px; color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
-.escrow { border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); background: radial-gradient(circle at 50% 0, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%), var(--panel-2); box-shadow: 0 0 40px color-mix(in srgb, var(--accent) 12%, transparent); }
+.nodeIcons { display: inline-flex; gap: .4rem; padding: .55rem .7rem; border-radius: 12px; color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.escrow { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 5%, var(--card)); }
 .wire { position: relative; align-self: center; height: 2px; overflow: hidden; border-radius: 2px; background: var(--line-3); }
 .wire::after { content: ""; position: absolute; inset: 0 auto 0 0; width: 45%; background: linear-gradient(90deg, transparent, var(--accent), transparent); animation: travel 2.4s ease-in-out infinite; }
 .choices { list-style: none; margin: .25rem 0 0; padding: 0; display: flex; flex-direction: column; gap: .35rem; width: 100%; }
-.choices li { display: inline-flex; align-items: center; justify-content: center; gap: .4rem; padding: .4rem .7rem; border-radius: 999px; font-size: .85rem; font-weight: 600; border: 1px solid var(--line-4); background: var(--card-2); }
+.choices li { display: inline-flex; align-items: center; justify-content: center; gap: .4rem; padding: .4rem .7rem; border-radius: 999px; font-size: .9rem; font-weight: 600; border: 1px solid var(--line-3); background: var(--raised); }
 .choices svg { color: var(--accent); }
 
-/* what the app can do, as a ribbon that slowly scrolls past */
-.ribbon { overflow: hidden; margin: -1rem 0; padding: .5rem 0; -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); }
-.track { display: flex; gap: .75rem; width: max-content; margin: 0; padding: 0; list-style: none; animation: ribbon 45s linear infinite; }
-.ribbon:hover .track { animation-play-state: paused; }
-.track li { display: inline-flex; align-items: center; gap: .5rem; padding: .5rem 1rem; border-radius: 999px; font-size: .9rem; font-weight: 600; white-space: nowrap; border: 1px solid var(--line-4); background: var(--panel-2); }
-.track svg { color: var(--accent); }
-@keyframes ribbon { to { transform: translateX(calc(-50% - .375rem)); } }
-@media (prefers-reduced-motion: reduce) {
-  .track { width: auto; flex-wrap: wrap; justify-content: center; animation: none; }
-  .copy2 { display: none; }
-  .ribbon { -webkit-mask-image: none; mask-image: none; }
-}
+/* how it works: four steps, drawn as the bar a job carries, one segment each in the colour that stage has in the app */
+.steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem 1rem; }
+.step { display: flex; flex-direction: column; gap: .4rem; padding-top: 1rem; border-top: 6px solid var(--c); border-radius: 2px; color: var(--muted); line-height: 1.5; }
+.stepTitle { display: inline-flex; align-items: center; gap: .45rem; font-family: var(--font-display); font-size: 1.15rem; color: var(--text); }
+.stepTitle svg { color: var(--c); }
 
-/* how it works: four steps on a line */
-.steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
-.step { position: relative; display: flex; flex-direction: column; align-items: center; gap: .3rem; text-align: center; padding: 0 .5rem; }
-.step:not(:last-child)::after { content: ""; position: absolute; top: 22px; left: calc(50% + 32px); width: calc(100% - 64px + 1rem); height: 2px; background: linear-gradient(90deg, #4f7cff, #8a5cff); opacity: .45; }
-.circle { position: relative; width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; color: #fff; background: linear-gradient(135deg, #4f7cff, #8a5cff); box-shadow: 0 6px 18px rgba(79, 124, 255, .32); }
-.stepNumber { position: absolute; top: -4px; right: -4px; width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; font-size: .66rem; font-weight: 700; color: #4f7cff; background: #fff; }
-.step strong { margin-top: .3rem; }
-
-.final { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; padding: 1.5rem 1.75rem; border-radius: 16px; border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line)); background: linear-gradient(135deg, rgba(79, 124, 255, .12), rgba(138, 92, 255, .12)); }
-.finalTitle { margin: 0; font-size: 1.35rem; }
+.final { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; padding: 2rem; border-radius: 16px; border: 1px solid var(--line); background: var(--card); }
+.finalTitle { margin: 0; font-size: 1.6rem; }
 .final .cta { margin: 0; }
 
 @keyframes travel { from { transform: translateX(-100%); } to { transform: translateX(240%); } }
 @media (prefers-reduced-motion: reduce) { .wire::after { animation: none; width: 100%; opacity: .35; } }
 
 @media (max-width: 900px) {
-  .hero { grid-template-columns: 1fr; gap: 1.5rem; }
-  .copy { align-items: center; text-align: center; }
-  .cta { justify-content: center; }
+  .hero { grid-template-columns: 1fr; gap: 2rem; }
+  .steps { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 700px) {
+  .landing { gap: 3.5rem; }
   .route { grid-template-columns: 1fr; gap: 0; }
   .wire { width: 2px; height: 28px; justify-self: center; }
   .wire::after { inset: 0 0 auto 0; width: auto; height: 45%; background: linear-gradient(180deg, transparent, var(--accent), transparent); animation-name: travelDown; }
-  .steps { grid-template-columns: repeat(2, 1fr); row-gap: 1.5rem; }
-  .step:not(:last-child)::after { display: none; }
-  .final { flex-direction: column; text-align: center; }
+  .final { flex-direction: column; align-items: flex-start; }
 }
 @keyframes travelDown { from { transform: translateY(-100%); } to { transform: translateY(240%); } }
-
-/* The bright accent used as text and icons would be too faint on the light theme, so it is darkened there. */
-:global(:root[data-theme="light"]) .nodeIcons, :global(:root[data-theme="light"]) .track svg, :global(:root[data-theme="light"]) .where svg, :global(:root[data-theme="light"]) .choices svg { color: color-mix(in srgb, var(--accent) 62%, #000); }

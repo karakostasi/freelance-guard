@@ -1,17 +1,18 @@
-.page { max-width: 1320px; margin: 0 auto; padding: 2rem 1rem; }
+.page { max-width: 1320px; margin: 0 auto; padding: 1.5rem 1rem 2rem; }
 .section { margin: 2rem 0; display: flex; flex-direction: column; gap: .5rem; }
-.input { padding: .55rem .7rem; border-radius: 8px; border: 1px solid var(--line); background: var(--input-bg); color: inherit; font: inherit; transition: border-color .15s, box-shadow .15s; }
+.input { padding: .6rem .75rem; border-radius: 10px; border: 1px solid var(--line-3); background: var(--input-bg); color: inherit; font: inherit; transition: border-color .15s, box-shadow .15s; }
 .input::placeholder { color: var(--placeholder); }
-.input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(79, 124, 255, .2); }
-.button { padding: .55rem 1.1rem; border-radius: 8px; border: 0; background: var(--gradient); color: #fff; font: inherit; font-weight: 600; cursor: pointer; box-shadow: 0 4px 14px rgba(79, 124, 255, .28); transition: filter .15s, transform .15s; }
-.button:hover:not(:disabled) { filter: brightness(1.12); transform: translateY(-1px); }
+.input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent); }
+.button { padding: .6rem 1.15rem; border-radius: 10px; border: 0; background: var(--accent); color: #fff; font: inherit; font-weight: 600; cursor: pointer; transition: background .15s; }
+.button:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 86%, #000); }
 .button:disabled { opacity: .5; cursor: not-allowed; box-shadow: none; }
 .error { color: var(--bad-text); }
-.buttonGood { background: linear-gradient(135deg, #2fbf80, #3ecf8e); color: #06130d; box-shadow: 0 4px 14px rgba(62, 207, 142, .25); }
+.buttonGood { background: var(--good-fill); color: var(--on-good); }
+.buttonGood:hover:not(:disabled) { background: color-mix(in srgb, var(--good-fill) 86%, #000); }
 .textButton { padding: 0; border: 0; background: none; color: var(--sky-text); font: inherit; font-size: .9rem; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .problemBox { display: flex; flex-direction: column; align-items: flex-start; gap: .5rem; padding: .9rem 1rem; border-radius: 10px; border: 1px solid var(--line-4); background: var(--raised); }
 .badge { font-size: .75rem; padding: .1rem .5rem; border-radius: 999px; background: var(--line); }
-.muted { opacity: .6; font-size: .85rem; }
+.muted { color: var(--muted); font-size: .85rem; }
 /* Says why a button is disabled. Not an error, so not red, but easy to see. */
 .hint { color: var(--warn-text-3); font-size: .9rem; }
 
@@ -25,24 +26,25 @@
 .action { display: flex; flex-direction: column; gap: .25rem; align-items: flex-start; }
 .avatar { width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0; }
 .walletAddress { font-weight: 600; font-family: ui-monospace, monospace; }
-.ghostButton { padding: .4rem .9rem; border-radius: 999px; border: 1px solid var(--line-5); background: none; color: inherit; cursor: pointer; }
+.ghostButton { padding: .5rem 1rem; border-radius: 10px; border: 1px solid var(--line-5); font: inherit; font-weight: 600; background: none; color: inherit; cursor: pointer; }
 .ghostButton { transition: border-color .15s, box-shadow .15s; }
-.ghostButton:hover, .ghostButton:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(79, 124, 255, .2); }
-.header { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin: -2rem -1rem 1rem; padding: 1rem; background: var(--header-bg); backdrop-filter: blur(10px); /* paint the bar edge to edge on wide screens */ box-shadow: 0 0 0 100vmax var(--header-bg); clip-path: inset(0 -100vmax); }
-.brand { display: flex; align-items: center; gap: .75rem; }
-.brand h1 { margin: 0; font-size: 1.4rem; background: linear-gradient(135deg, var(--brand-from), var(--brand-to)); -webkit-background-clip: text; background-clip: text; color: transparent; }
-.logo { width: 44px; height: 44px; }
-.role { font-size: .7rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; padding: .1rem .5rem; border-radius: 4px; }
+.ghostButton:hover, .ghostButton:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent); }
+.header { position: sticky; top: 0; z-index: 5; background: var(--header-bg); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+.headerInner { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; max-width: 1320px; margin: 0 auto; padding: .75rem 1rem; }
+.brand { display: flex; align-items: center; gap: .6rem; }
+.brand h1 { margin: 0; font-size: 1.3rem; font-weight: 700; letter-spacing: -.02em; color: var(--text); }
+.logo { width: 36px; height: 36px; }
+.role { font-size: .75rem; font-weight: 600; padding: .1rem .5rem; border-radius: 6px; }
 .rolePayer { color: var(--violet-text); background: rgba(139, 108, 255, .16); }
 .rolePayee { color: var(--cyan-text); background: rgba(76, 201, 240, .16); }
 .roleArbiter { color: var(--muted-2); background: rgba(170, 170, 187, .16); }
 .suffixField { position: relative; display: flex; flex-direction: column; }
 .suffixField .input { padding-right: 3.5rem; }
-.suffix { position: absolute; right: .75rem; top: 50%; transform: translateY(-50%); opacity: .6; pointer-events: none; }
-.nav { display: flex; gap: .5rem; }
-.navLink { display: inline-flex; align-items: center; gap: .4rem; white-space: nowrap; padding: .4rem .9rem; border-radius: 999px; border: 1px solid var(--line-3); background: none; color: inherit; font: inherit; cursor: pointer; }
-.navLink:hover { border-color: #4f7cff; }
-.navActive { background: var(--gradient); border-color: transparent; color: #fff; }
+.suffix { position: absolute; right: .75rem; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+.nav { display: flex; gap: .25rem; }
+.navLink { display: inline-flex; align-items: center; gap: .4rem; white-space: nowrap; padding: .45rem .85rem; border-radius: 10px; border: 0; background: none; color: var(--muted); font: inherit; font-weight: 600; cursor: pointer; transition: background .15s, color .15s; }
+.navLink:hover { background: var(--hover); color: var(--text); }
+.navActive, .navActive:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent-text); }
 .brandLink { color: inherit; text-decoration: none; }
 .amountRow { display: grid; grid-template-columns: minmax(0, 1fr) 130px; gap: .5rem; }
 .unfunded { --c: var(--st-unfunded); }
@@ -50,32 +52,32 @@
 .milestones { display: flex; flex-direction: column; gap: .75rem; margin-top: .25rem; }
 .milestone { display: flex; flex-direction: column; align-items: flex-start; gap: .35rem; padding: .85rem 1rem; border-radius: 10px; border: 1px solid var(--line); border-left: 4px solid var(--c, #8a8fa0); background: var(--card-2); }
 .segments { display: flex; gap: 3px; width: 100%; }
-.segment { flex: 1; height: 6px; border-radius: 3px; background: var(--c, #8a8fa0); }
+.segment { flex: 1; height: 6px; border-radius: 2px; background: var(--c, #8a8fa0); }
 .presets { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
-.chipButton { display: inline-flex; align-items: center; gap: .3rem; padding: .25rem .7rem; border-radius: 999px; border: 1px solid var(--line-5); background: none; color: inherit; font: inherit; font-size: .85rem; cursor: pointer; }
-.chipButton:hover:not(:disabled) { border-color: #4f7cff; }
+.chipButton { display: inline-flex; align-items: center; gap: .3rem; padding: .3rem .75rem; border-radius: 999px; border: 1px solid var(--line-5); background: none; color: inherit; font: inherit; font-size: .85rem; cursor: pointer; }
+.chipButton:hover:not(:disabled) { border-color: var(--accent); }
 .chipButton:disabled { opacity: .4; cursor: not-allowed; }
 .milestoneRow { display: grid; grid-template-columns: minmax(0, 1fr) 90px 110px 32px; gap: .5rem; align-items: center; }
 .milestoneAmount { grid-column: 1 / -1; margin-top: -.25rem; }
 .iconButton { border: 1px solid transparent; border-radius: 8px; background: none; color: inherit; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: .25rem; opacity: .7; transition: border-color .15s, box-shadow .15s; }
-.iconButton:hover:not(:disabled), .iconButton:focus-visible { outline: none; opacity: 1; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(79, 124, 255, .2); }
+.iconButton:hover:not(:disabled), .iconButton:focus-visible { outline: none; opacity: 1; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent); }
 .iconButton:disabled { opacity: .25; cursor: not-allowed; }
 
-.groupTitle { margin: 0; font-size: .8rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; opacity: .6; }
-.chipActive { border-color: #4f7cff; background: rgba(79, 124, 255, .16); color: var(--accent-text); cursor: default; }
+.groupTitle { margin: 0; font-size: .85rem; font-weight: 600; color: var(--muted); }
+.chipActive { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent-text); cursor: default; }
 
 /* The yield choice. It changes what the payer pays, so it is a card with a switch that stands out. */
 .yieldCard { display: flex; align-items: center; gap: .9rem; padding: .9rem 1rem; border-radius: 10px; border: 1px solid var(--yield-line); background: var(--card-2); cursor: pointer; transition: border-color .15s, background .15s; }
-.yieldCard:hover { border-color: #3ecf8e; }
-.yieldCardOn { border-color: #3ecf8e; background: rgba(62, 207, 142, .1); box-shadow: 0 0 0 1px #3ecf8e; }
+.yieldCard:hover { border-color: var(--st-paid); }
+.yieldCardOn { border-color: var(--st-paid); background: color-mix(in srgb, var(--st-paid) 10%, transparent); box-shadow: 0 0 0 1px var(--st-paid); }
 .yieldText { display: flex; flex-direction: column; gap: .25rem; flex: 1; min-width: 0; }
 .yieldTitle { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
-.yieldSave { font-size: .75rem; padding: .1rem .55rem; border-radius: 999px; color: var(--good-text); background: rgba(62, 207, 142, .16); border: 1px solid #3ecf8e; }
+.yieldSave { font-size: .75rem; padding: .1rem .55rem; border-radius: 999px; color: var(--good-text); background: color-mix(in srgb, var(--st-paid) 16%, transparent); border: 1px solid var(--st-paid); }
 .switch { position: relative; flex: none; width: 44px; height: 26px; }
 .switch input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
 .switchTrack { position: absolute; inset: 0; border-radius: 999px; background: var(--track); transition: background .15s; pointer-events: none; }
 .switchTrack::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: transform .15s; }
-.switch input:checked + .switchTrack { background: #3ecf8e; }
+.switch input:checked + .switchTrack { background: var(--st-paid); }
 .switch input:checked + .switchTrack::after { transform: translateX(18px); }
 .switch input:focus-visible + .switchTrack { outline: 2px solid var(--accent-3); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { .switchTrack, .switchTrack::after, .yieldCard { transition: none; } }
@@ -84,13 +86,13 @@
 .themeButton:hover { border-color: var(--accent); background: var(--hover); }
 .profileButton { width: 38px; height: 38px; padding: 0; border-radius: 50%; border: 2px solid var(--line); cursor: pointer; transition: border-color .15s; }
 .brandGroup { display: flex; align-items: center; gap: .75rem; min-width: 0; }
-.networkPill { padding: .15rem .6rem; border-radius: 999px; font-size: .72rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--warn-text); background: color-mix(in srgb, var(--warn-text) 14%, transparent); }
+.networkPill { padding: .15rem .6rem; border-radius: 999px; font-size: .78rem; font-weight: 600; color: var(--warn-text); background: color-mix(in srgb, var(--warn-text) 14%, transparent); }
 .mismatch { margin: 0 0 1rem; padding: .75rem 1rem; border-radius: 10px; font-weight: 600; color: var(--bad-text); border: 1px solid color-mix(in srgb, var(--bad-text) 55%, transparent); background: color-mix(in srgb, var(--bad-text) 12%, transparent); }
 /* where the avatar will be, while a session comes back */
 .profilePlaceholder { display: inline-block; width: 38px; height: 38px; border-radius: 50%; border: 2px solid var(--line); background: var(--card-2); animation: placeholder 1.4s ease-in-out infinite; }
 @keyframes placeholder { 50% { opacity: .45; } }
 @media (prefers-reduced-motion: reduce) { .profilePlaceholder { animation: none; } }
-.profileButton:hover, .profileButton[aria-expanded="true"] { border-color: #4f7cff; }
+.profileButton:hover, .profileButton[aria-expanded="true"] { border-color: var(--accent); }
 .menuBackdrop { position: fixed; inset: 0; z-index: 30; }
 .menu { position: fixed; z-index: 31; min-width: 240px; display: flex; flex-direction: column; gap: .15rem; padding: .5rem; border-radius: 12px; border: 1px solid var(--line-3); background: var(--card-2); box-shadow: var(--shadow-menu); }
 .menuAccount { display: flex; align-items: center; gap: .75rem; padding: .5rem .5rem .75rem; margin-bottom: .25rem; border-bottom: 1px solid var(--line); }
@@ -110,7 +112,7 @@ a.fileName { color: var(--link); }
 .docText { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .docText a, .specText a { color: var(--link); }
 .docBilling { display: grid; grid-template-columns: max-content 1fr; gap: .15rem .75rem; margin: 0; font-size: .9rem; }
-.docBilling dt { opacity: .6; }
+.docBilling dt { color: var(--muted); }
 .docBilling dd { margin: 0; overflow-wrap: anywhere; }
 .specText { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .cardTitle { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -122,12 +124,12 @@ a.chipButton { text-decoration: none; }
 .overlay { position: fixed; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center; padding: 1rem; background: var(--overlay); backdrop-filter: blur(2px); }
 .modal { position: relative; width: 100%; max-width: 860px; max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column; gap: .5rem; padding: 1.5rem; border-radius: 14px; border: 1px solid var(--line-3); background: var(--panel); box-shadow: var(--shadow-modal); overflow-wrap: anywhere; }
 .close { position: absolute; top: .75rem; right: .75rem; display: inline-flex; align-items: center; justify-content: center; padding: .35rem; border: 1px solid transparent; border-radius: 8px; background: none; color: inherit; cursor: pointer; opacity: .7; transition: border-color .15s, box-shadow .15s; }
-.close:hover, .close:focus-visible { outline: none; opacity: 1; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(79, 124, 255, .2); }
+.close:hover, .close:focus-visible { outline: none; opacity: 1; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent); }
 
 /* the top of a job card: who is involved, and how much */
 .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: .75rem; }
-.tile { display: flex; flex-direction: column; align-items: flex-start; gap: .45rem; min-width: 0; padding: .85rem 1rem; border-radius: 12px; border: 1px solid var(--line-2); background: linear-gradient(180deg, rgba(255, 255, 255, .03), transparent), var(--card); }
-.tileLabel { font-size: .7rem; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; opacity: .6; }
+.tile { display: flex; flex-direction: column; align-items: flex-start; gap: .45rem; min-width: 0; padding: .85rem 1rem; border-radius: 12px; border: 1px solid var(--line-2); background: var(--card); }
+.tileLabel { font-size: .82rem; font-weight: 600; color: var(--muted); }
 .partyRow { display: flex; align-items: center; gap: .6rem; width: 100%; min-width: 0; }
 .partyText { display: flex; align-items: center; gap: .4rem; flex: 1; min-width: 0; flex-wrap: wrap; }
 .partyAddress { font-family: ui-monospace, monospace; font-weight: 600; }
@@ -153,8 +155,8 @@ select.input:disabled { cursor: not-allowed; }
 .wpTotalValue { font-size: 2rem; letter-spacing: -.02em; }
 .wpActions { display: flex; justify-content: center; gap: 2rem; }
 .wpAction { display: flex; flex-direction: column; align-items: center; gap: .4rem; border: 0; background: none; color: inherit; font: inherit; font-size: .85rem; cursor: pointer; }
-.wpActionIcon { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 50%; background: var(--gradient); color: #fff; box-shadow: 0 4px 14px rgba(79, 124, 255, .28); transition: filter .15s, transform .15s; }
-.wpAction:hover .wpActionIcon { filter: brightness(1.12); transform: translateY(-1px); }
+.wpActionIcon { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 50%; background: var(--accent); color: #fff; transition: background .15s; }
+.wpAction:hover .wpActionIcon { background: color-mix(in srgb, var(--accent) 86%, #000); }
 .wpActionOn { font-weight: 600; }
 .wpBack { align-self: flex-start; display: inline-flex; align-items: center; gap: .35rem; border: 0; background: none; color: var(--link); font: inherit; cursor: pointer; padding: 0; }
 .wpAssets { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .5rem; }

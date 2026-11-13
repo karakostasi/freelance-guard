@@ -26,7 +26,9 @@ The rules are in `docs/business-model.md` and the contract design in `docs/contr
 
 ## Themes
 
-There are two, dark (the original look, and the default) and light. The sun and moon button in the header switches between them, and the choice is remembered in the browser. The colours are tokens in `src/index.css`: the dark values are in `:root` and the light ones in `:root[data-theme="light"]`, so a new colour belongs there and not in a component's CSS. `index.html` applies a saved light theme before the page paints. Receipts stay white paper in both.
+There are two, light (the default) and dark. The sun and moon button in the header switches between them, and the choice is remembered in the browser. The colours are tokens in `src/index.css`: the light values are in `:root` and the dark ones in `:root[data-theme="dark"]`, so a new colour belongs there and not in a component's CSS. `index.html` applies a saved dark theme before the page paints. Receipts stay white paper in both.
+
+The look is flat on purpose: one blue accent for the action to take, the milestone colours (funded, submitted, paid) only for a milestone's state, no gradients and no glows, and only things that float (menus, dialogs, the hero card) have a shadow. Headings use Bricolage Grotesque and text uses Figtree, both loaded from Google Fonts in `index.html`.
 
 ## Layout
 

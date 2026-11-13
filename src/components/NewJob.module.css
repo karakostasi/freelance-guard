@@ -1,13 +1,13 @@
 /* The create-a-job page: three steps in one calm column. */
 .layout { display: grid; grid-template-columns: minmax(0, 760px) 320px; gap: 1.5rem; justify-content: center; align-items: start; }
 .main { display: flex; flex-direction: column; gap: 1.25rem; min-width: 0; }
-.wallet { position: sticky; top: 1rem; align-self: start; }
+.wallet { position: sticky; top: 5rem; align-self: start; }
 /* Narrower screens: the wallet drops under the form. */
 @media (max-width: 1100px) {
   .layout { grid-template-columns: minmax(0, 760px); }
   .wallet { position: static; }
 }
-.card { display: flex; flex-direction: column; gap: 1.1rem; padding: 1.25rem; border-radius: 14px; border: 1px solid var(--line-2); background: linear-gradient(180deg, rgba(255, 255, 255, .03), transparent), var(--card); }
+.card { display: flex; flex-direction: column; gap: 1.1rem; padding: 1.25rem; border-radius: 14px; border: 1px solid var(--line-2); background: var(--card); }
 .card h2 { margin: 0; font-size: 1.4rem; text-wrap: balance; }
 .card p { margin: 0; }
 .field { display: flex; flex-direction: column; gap: .4rem; min-width: 0; }
@@ -17,7 +17,7 @@
 .ok { color: var(--good-text); font-size: .85rem; }
 .row { display: flex; flex-wrap: wrap; gap: .6rem; justify-content: center; }
 .ghost { padding: .55rem 1.1rem; border-radius: 8px; border: 1px solid var(--line-4); background: none; color: inherit; font: inherit; cursor: pointer; transition: border-color .15s; }
-.ghost:hover:not(:disabled) { border-color: #4f7cff; }
+.ghost:hover:not(:disabled) { border-color: var(--accent); }
 .ghost:disabled { opacity: .4; cursor: not-allowed; }
 
 /* the steps */
@@ -27,10 +27,10 @@
 .stepper li.done .stepButton { cursor: pointer; }
 .dot { display: grid; place-items: center; flex: none; width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--line-4); font-size: .75rem; font-weight: 600; }
 .stepName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.stepper li.cur { color: var(--text); border-color: #4f7cff; background: rgba(79, 124, 255, .08); }
+.stepper li.cur { color: var(--text); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
 .stepper li.cur .dot { background: var(--gradient); border-color: transparent; color: #fff; }
 .stepper li.done { color: var(--text); }
-.stepper li.done .dot { background: #3ecf8e; border-color: transparent; color: #08150f; }
+.stepper li.done .dot { background: var(--st-paid); border-color: transparent; color: #08150f; }
 @media (max-width: 560px) { .stepName { display: none; } }
 
 /* the buttons under a step */
@@ -38,7 +38,7 @@
 .footRight { display: flex; flex-direction: column; align-items: flex-end; gap: .35rem; margin-left: auto; text-align: right; }
 
 /* more options, tucked away */
-.more { border: 1px solid var(--line-2); border-radius: 12px; background: rgba(255, 255, 255, .015); }
+.more { border: 1px solid var(--line-2); border-radius: 12px; background: var(--card); }
 .more > summary { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .8rem 1rem; font-weight: 600; font-size: .92rem; cursor: pointer; list-style: none; }
 .more > summary::-webkit-details-marker { display: none; }
 .more > summary::after { content: "+"; color: var(--muted); font-size: 1.2rem; line-height: 1; }
@@ -47,7 +47,7 @@
 .fieldset { display: flex; flex-direction: column; gap: .5rem; margin: 0; padding: 0; border: 0; min-width: 0; }
 .fieldset legend { padding: 0; margin-bottom: .25rem; }
 .radio { display: flex; align-items: flex-start; gap: .6rem; font-size: .9rem; cursor: pointer; }
-.radio input { margin-top: .25rem; accent-color: #4f7cff; }
+.radio input { margin-top: .25rem; accent-color: var(--accent); }
 .radioOff { opacity: .5; cursor: not-allowed; }
 
 /* the review */
@@ -57,11 +57,11 @@
 .rows dt { color: var(--muted); }
 .rows dd { margin: 0; text-align: right; min-width: 0; overflow-wrap: anywhere; }
 .sched { width: 100%; border-collapse: collapse; font-size: .9rem; }
-.sched th { text-align: left; color: var(--muted); font-size: .75rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; padding: .35rem 0; }
+.sched th { text-align: left; color: var(--muted); font-size: .75rem; font-weight: 600; padding: .35rem 0; }
 .sched td { padding: .55rem 0; border-top: 1px solid var(--line-2); }
 .sched td:last-child, .sched th:last-child { text-align: right; font-variant-numeric: tabular-nums; }
-.total { display: flex; flex-direction: column; gap: .2rem; padding: 1rem 1.1rem; border-radius: 12px; background: rgba(79, 124, 255, .08); border: 1px solid rgba(79, 124, 255, .35); }
-.totalLabel { color: var(--muted); font-size: .85rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+.total { display: flex; flex-direction: column; gap: .2rem; padding: 1rem 1.1rem; border-radius: 12px; background: color-mix(in srgb, var(--accent) 8%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); }
+.totalLabel { color: var(--muted); font-size: .85rem; font-weight: 600; }
 .totalValue { font-size: 2.1rem; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .assure { display: flex; align-items: flex-start; gap: .6rem; font-size: .9rem; color: var(--muted); }
 .assure svg { flex: none; margin-top: 2px; }
@@ -72,4 +72,4 @@
 
 /* after the job is created */
 .success { align-items: center; text-align: center; padding: 2.25rem 1.25rem; }
-.check { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 50%; background: rgba(62, 207, 142, .16); border: 1px solid #3ecf8e; color: var(--good-text); }
+.check { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 50%; background: color-mix(in srgb, var(--st-paid) 16%, transparent); border: 1px solid var(--st-paid); color: var(--good-text); }

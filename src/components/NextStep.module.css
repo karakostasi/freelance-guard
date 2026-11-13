@@ -1,9 +1,9 @@
 /* The next step on a job: one sentence and one main button. */
 .card { display: flex; flex-direction: column; align-items: flex-start; gap: .8rem; padding: 1.25rem; border-radius: 14px; border: 1px solid var(--line-2); background: var(--card); }
-.action { border-color: #f5b942; background: linear-gradient(180deg, rgba(245, 185, 66, .09), transparent), var(--card); }
-.wait { border-color: #4f7cff; background: linear-gradient(180deg, rgba(79, 124, 255, .09), transparent), var(--card); }
-.done { border-color: #3ecf8e; background: linear-gradient(180deg, rgba(62, 207, 142, .09), transparent), var(--card); }
-.eyebrow { font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.action { border-color: var(--st-submitted); background: color-mix(in srgb, var(--st-submitted) 9%, var(--card)); }
+.wait { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, var(--card)); }
+.done { border-color: var(--st-paid); background: color-mix(in srgb, var(--st-paid) 8%, var(--card)); }
+.eyebrow { font-size: .88rem; font-weight: 700; color: var(--muted); }
 .action .eyebrow { color: var(--warn-text); }
 .wait .eyebrow { color: var(--sky-text); }
 .done .eyebrow { color: var(--good-text); }

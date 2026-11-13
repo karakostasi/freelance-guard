@@ -79,6 +79,8 @@ Set the values in `.env.mainnet` on the server. With `EXPECTED_CHAIN_ID=8453` (o
 - there is a `DATABASE_URL` (a file store needs `ALLOW_FILE_DB=1`, said on purpose);
 - `MINT_PRIVATE_KEY` is not set, and `USDC_ADDRESS` and `EURC_ADDRESS`, if set, are Circle's.
 
+"Buy with Coinbase" is separate and optional: it is on only with `CDP_API_KEY_ID`, `CDP_API_KEY_SECRET` and a `CORS_ORIGIN` that names sites (Coinbase refuses a wildcard). The key is a Secret API key of a project Coinbase has enabled for Onramp, and it stays on the server. Set `TRUST_PROXY=1` behind one proxy (Render) so Coinbase is given the client's real address.
+
 While it runs on a real network the **sandbox is shut**: no card payment can be started, the sandbox bank and its webhook answer 503, and bank details for a payout aren't taken (only "keep the stablecoin" is). `/api/health` says `realMoney`, `bankRails` and `chainId`, and the site shows a red banner if its server is on a network the site doesn't know. Nothing turns these rules off; `STRICT=1` only adds them to a test network.
 
 ## 6. The site

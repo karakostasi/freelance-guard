@@ -2,10 +2,11 @@
 // your dev servers), deploys the escrow and a mock EURC, and then drives real payments through the HTTP API
 // and the contract, the way the frontend does. Run it with: npm run test:flow
 import { execFileSync, spawn } from "node:child_process";
+import { createServer } from "node:http";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createHash } from "node:crypto";
+import { createHash, generateKeyPairSync, verify } from "node:crypto";
 import { createPublicClient, createWalletClient, http, parseEther, parseUnits } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { hardhat } from "viem/chains";
@@ -480,6 +481,83 @@ async function run({ escrow, eurc, usdc, vault, dir }) {
     check((await choose({ route: "sepa", holder: "Ana Ferreira", iban: "DE89 3704 0044 0532 0130 00" })).status === 503, "bank details aren't taken while nothing can pay them out");
     check((await choose({ route: "eurc" })).status === 200, "keeping the stablecoin is still a choice");
     await attempt("/api/payout", { method: "DELETE", headers: { authorization: `Bearer ${token}` } });
+  }
+
+  // Buying on Coinbase: the route needs a signed-in wallet, our key and a named list of sites. Coinbase is played by a small
+  // server here, which checks the signature like the real one should.
+  console.log("\nBuying on Coinbase");
+  {
+    const ed = generateKeyPairSync("ed25519");
+    const jwk = ed.privateKey.export({ format: "jwk" });
+    const secret = Buffer.concat([Buffer.from(jwk.d, "base64url"), Buffer.from(jwk.x, "base64url")]).toString("base64");
+    const asked = [];
+    let refuse = false;
+    const coinbase = createServer((req, res) => {
+      let data = "";
+      req.on("data", (c) => (data += c));
+      req.on("end", () => {
+        const [h, c, sig] = String(req.headers.authorization ?? "").replace("Bearer ", "").split(".");
+        const signed = !!sig && verify(null, Buffer.from(`${h}.${c}`), ed.publicKey, Buffer.from(sig, "base64url")) && JSON.parse(Buffer.from(c, "base64url")).uris?.[0] === `POST ${req.headers.host}${req.url}`;
+        asked.push({ signed, url: req.url, body: JSON.parse(data || "{}") });
+        res.writeHead(refuse ? 404 : 200, { "content-type": "application/json" });
+        res.end(JSON.stringify(refuse ? { code: 5, message: "failed to find app" } : { token: "one-use-token", channel_id: "" }));
+      });
+    });
+    await new Promise((resolve) => coinbase.listen(0, "127.0.0.1", resolve));
+    try {
+      const env = (port, extra = {}) => ({
+        PORT: String(port),
+        RPC_URL: RPC,
+        ESCROW_ADDRESS: escrow,
+        WEBHOOK_SECRET: "w".repeat(40),
+        SESSION_SECRET: "s".repeat(40),
+        CORS_ORIGIN: "http://localhost:5173",
+        APP_URL: "http://localhost:5173",
+        DB_FILE: join(dir, `onramp-${port}.json`),
+        FILES_DIR: join(dir, `onramp-files-${port}`),
+        DATABASE_URL: "",
+        NOTIFY_WEBHOOK_URL: "",
+        MINT_PRIVATE_KEY: "",
+        CDP_API_KEY_ID: "test-key",
+        CDP_API_KEY_SECRET: secret,
+        ONRAMP_API_URL: `http://127.0.0.1:${coinbase.address().port}`,
+        TRUST_PROXY: "1",
+        ...extra,
+      });
+      const port = Number(API_PORT) + 3;
+      const base = `http://127.0.0.1:${port}`;
+      launch("onramp", "node", ["server/index.mjs"], env(port));
+      const open = `http://127.0.0.1:${port + 1}`;
+      launch("onramp-open", "node", ["server/index.mjs"], env(port + 1, { CORS_ORIGIN: "" }));
+      await until(async () => (await fetch(`${base}/api/health`)).ok && (await fetch(`${open}/api/health`)).ok, "the Coinbase test servers");
+
+      const signIn = async (where) => {
+        const issuedAt = new Date().toISOString();
+        const body = JSON.stringify({ address: payee.address, issuedAt, signature: await payee.signMessage({ message: signInMessage(payee.address, issuedAt) }) });
+        return (await (await fetch(`${where}/api/auth`, { method: "POST", headers: { "content-type": "application/json" }, body })).json()).token;
+      };
+      const buy = (where, token, body, headers = {}) => fetch(`${where}/api/onramp/buy`, { method: "POST", headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}), ...headers }, body: JSON.stringify(body) });
+
+      check((await (await fetch(`${base}/api/health`)).json()).onramp === true, "with our key and a list of sites, the server says buying is available");
+      const token = await signIn(base);
+      check((await buy(base, null, { asset: "EURC" })).status === 401, "without signing in there is no link");
+      check((await buy(base, token, { asset: "ETH" })).status === 400, "an asset other than EURC or USDC is refused");
+      const res = await buy(base, token, { asset: "EURC", address: "0x" + "99".repeat(20) }, { "x-forwarded-for": "6.6.6.6, 198.51.100.7" });
+      const { url } = await res.json();
+      const sent = asked.at(-1);
+      check(res.status === 200 && url?.startsWith("https://pay.coinbase.com/buy/select-asset?") && new URL(url).searchParams.get("sessionToken") === "one-use-token", "a signed-in wallet gets the address of Coinbase's buy page");
+      check(sent?.signed === true && sent.url === "/onramp/v1/token", "the request to Coinbase was signed with our key, for that path");
+      check(sent?.body.addresses?.[0].address === payee.address.toLowerCase() && sent.body.addresses.length === 1 && sent.body.clientIp === "198.51.100.7", "the coins can only go to the signed-in address, even if the request names another, and Coinbase is told the real client address");
+      refuse = true;
+      const refused = await buy(base, token, { asset: "USDC" });
+      check(refused.status === 502 && /Coinbase said HTTP 404: failed to find app/.test((await refused.json()).error), "when Coinbase refuses, the person is told why");
+
+      const openHealth = await (await fetch(`${open}/api/health`)).json();
+      check(openHealth.onramp === false && (await buy(open, await signIn(open), { asset: "EURC" })).status === 503, "with no list of sites (any site could call it) the route stays shut, key or not");
+      check((await (await fetch(`${API}/api/health`)).json()).onramp === false && (await buy(API, await signIn(API), { asset: "EURC" })).status === 503, "and so does a server with no Coinbase key");
+    } finally {
+      coinbase.close();
+    }
   }
 }
 

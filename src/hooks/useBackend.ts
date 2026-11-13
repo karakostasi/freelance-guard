@@ -16,6 +16,8 @@ export function useBackendStatus() {
     error: error ? (error as Error).message : null,
     /** Whether card and bank payments, and bank payouts, are open. An older backend that doesn't say has them. */
     bankRails: data?.bankRails !== false,
+    /** Whether the backend can send people to Coinbase to buy EURC or USDC. An older backend that doesn't say can't. */
+    onramp: data?.onramp === true,
     /** The network the backend is on, when it says. */
     chainId: data?.chainId,
   };

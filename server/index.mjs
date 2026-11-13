@@ -7,6 +7,7 @@ import { db, flush, save } from "./db.mjs";
 import { watchEscrow, ESCROW_ADDRESS, RPC_URL, abi, client } from "./chain.mjs";
 import { cleanEmail, confirmToken, notifyParties, readEmailToken, unsubscribeToken } from "./emails.mjs";
 import { sendMail } from "./mail.mjs";
+import { buyLink, cleanBuy, clientIpOf } from "./onramp.mjs";
 import { ROUTES, cleanPayout, publicPayout } from "./payout.mjs";
 import { bankReceived, createRun, fail, milestonePlan, onChainEvent, onThisContract, publicRun, resumePayouts, subscribe } from "./pipeline.mjs";
 import { EUR_PER_ETH } from "./providers.mjs";
@@ -43,6 +44,12 @@ const allowedOrigins = (process.env.CORS_ORIGIN ?? "")
   .split(",")
   .map((o) => o.trim().replace(/\/+$/, ""))
   .filter(Boolean);
+
+// Buying on Coinbase's page needs our own Coinbase key, and Coinbase requires the server to name the sites that may call it
+// (never any site). Without both, the route stays shut.
+const { CDP_API_KEY_ID, CDP_API_KEY_SECRET } = process.env;
+const onrampReady = !!(CDP_API_KEY_ID && CDP_API_KEY_SECRET) && allowedOrigins.length > 0 && !allowedOrigins.includes("*");
+if (CDP_API_KEY_ID && CDP_API_KEY_SECRET && !onrampReady) console.warn("[onramp] CDP_API_KEY_ID is set, but CORS_ORIGIN isn't a list of sites: buying on Coinbase stays off.");
 
 const corsFor = (req) => {
   const origin = req.headers.origin;
@@ -184,7 +191,7 @@ const server = createServer(async (req, res) => {
       return res.end();
     }
 
-    if (req.method === "GET" && path === "/api/health") return send(res, 200, { ok: true, escrow: ESCROW_ADDRESS, rpc: RPC_URL, eurPerEth: EUR_PER_ETH, processedBlock: db.cursor, chainId, realMoney, bankRails: !realMoney });
+    if (req.method === "GET" && path === "/api/health") return send(res, 200, { ok: true, escrow: ESCROW_ADDRESS, rpc: RPC_URL, eurPerEth: EUR_PER_ETH, processedBlock: db.cursor, chainId, realMoney, bankRails: !realMoney, onramp: onrampReady });
 
     if (req.method === "POST" && path === "/api/auth") {
       const { body } = await json(req);
@@ -238,6 +245,16 @@ const server = createServer(async (req, res) => {
     // Anyone can see how an address is paid (not the account). Only that address can read the account or change the choice.
     const payoutOf = path.match(/^\/api\/payout\/(0x[0-9a-fA-F]{40})$/);
     if (req.method === "GET" && payoutOf) return send(res, 200, publicPayout(db.payouts[payoutOf[1].toLowerCase()]));
+    if (req.method === "POST" && path === "/api/onramp/buy") {
+      const owner = bearer(req)?.toLowerCase();
+      if (!owner) throw Object.assign(new Error("Sign in with your wallet to buy"), { status: 401 });
+      if (!onrampReady) throw Object.assign(new Error("Buying with Coinbase isn't set up on this server."), { status: 503 });
+      const { asset, fiatAmount } = cleanBuy((await json(req)).body);
+      // The coins go to the signed-in address and nowhere else.
+      const url = await buyLink({ keyId: CDP_API_KEY_ID, secret: CDP_API_KEY_SECRET, address: owner, ip: clientIpOf(req, process.env.TRUST_PROXY === "1"), asset, fiatAmount, redirectUrl: `${APP_URL}/`, baseUrl: process.env.ONRAMP_API_URL });
+      return send(res, 200, { url });
+    }
+
     if (path === "/api/payout") {
       const owner = bearer(req)?.toLowerCase();
       if (!owner) throw Object.assign(new Error("Sign in with your wallet to choose how you get paid"), { status: 401 });

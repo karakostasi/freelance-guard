@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAccount } from "wagmi";
 import { useQueryClient } from "@tanstack/react-query";
 import { Landmark, X } from "lucide-react";
@@ -73,6 +73,18 @@ export function PayoutSettings({ onClose }: { onClose: () => void }) {
       setSaved(true);
     });
 
+  // Show "Saved" for a moment, then close. Closing by hand first cancels it. The parents hand in a new onClose on every
+  // render, and one of them renders every second, so the timer must not depend on it or it would restart before it fires.
+  const close = useRef(onClose);
+  useEffect(() => {
+    close.current = onClose;
+  });
+  useEffect(() => {
+    if (!saved) return;
+    const t = setTimeout(() => close.current(), 1200);
+    return () => clearTimeout(t);
+  }, [saved]);
+
   const load = () => run("Loading…", async (token) => show(await payoutApi.get(token)));
   // An email login signs by itself, so it just loads. A browser wallet asks first.
   const emailWallet = useEmailWallet(load);
@@ -120,10 +132,10 @@ export function PayoutSettings({ onClose }: { onClose: () => void }) {
             )}
             {way !== "eurc" && <span className={styles.muted}>This is a sandbox: no money moves. Only the last four digits of the account are ever shown to anyone else.</span>}
             <div style={{ display: "flex", gap: ".5rem", alignItems: "center" }}>
-              <button className={styles.button} disabled={busy} onClick={save}>
+              <button className={styles.button} disabled={busy || saved} onClick={save}>
                 {working || "Save"}
               </button>
-              {saved && <span className={p.ok}>Saved</span>}
+              {saved && <span className={p.ok} role="status">Saved</span>}
             </div>
           </>
         )}

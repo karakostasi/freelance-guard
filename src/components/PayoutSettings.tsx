@@ -37,14 +37,12 @@ export function PayoutSettings({ onClose }: { onClose: () => void }) {
   const [routing, setRouting] = useState("");
   const [account, setAccount] = useState("");
   const [loaded, setLoaded] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [working, setWorking] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const run = async (label: string, work: (token: string) => Promise<void>) => {
     if (!address) return;
     setError(null);
-    setSaved(false);
     setWorking(label);
     try {
       await work(await sessionToken(address));
@@ -70,7 +68,7 @@ export function PayoutSettings({ onClose }: { onClose: () => void }) {
   const save = () =>
     run("Saving…", async (token) => {
       await payoutApi.set(token, way === "eurc" ? { route: "eurc" } : way === "sepa" ? { route: "sepa", holder, iban } : { route: "ach", holder, routing, account });
-      setSaved(true);
+      onClose();
     });
 
   const load = () => run("Loading…", async (token) => show(await payoutApi.get(token)));
@@ -119,12 +117,9 @@ export function PayoutSettings({ onClose }: { onClose: () => void }) {
               </div>
             )}
             {way !== "eurc" && <span className={styles.muted}>This is a sandbox: no money moves. Only the last four digits of the account are ever shown to anyone else.</span>}
-            <div style={{ display: "flex", gap: ".5rem", alignItems: "center" }}>
-              <button className={styles.button} disabled={busy} onClick={save}>
-                {working || "Save"}
-              </button>
-              {saved && <span className={p.ok}>Saved</span>}
-            </div>
+            <button className={styles.button} disabled={busy} onClick={save}>
+              {working || "Save"}
+            </button>
           </>
         )}
         {error && <p className={styles.error}>{error}</p>}

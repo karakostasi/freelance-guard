@@ -5,4 +5,3 @@
 .way input { margin-top: .25rem; accent-color: #4f7cff; }
 .wayOn { border-color: #4f7cff; box-shadow: 0 0 0 1px #4f7cff; background: rgba(79, 124, 255, .08); }
 .mono { font-family: ui-monospace, monospace; }
-.ok { color: var(--good-text); font-size: .9rem; }

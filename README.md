@@ -104,6 +104,10 @@ People can sign in with an **email**: we send a code, and a wallet is made for t
 - **Why not Base Account (passkey):** it would keep the keys with the person, but new Base Accounts can't send transactions on Base Sepolia ([base/account-sdk #363](https://github.com/base/account-sdk/issues/363)).
 - **Not tested with the real service:** the code is checked against the connector's types and a stand-in wallet. The real email code, the smart account and the sponsored gas need a CDP project, and have to be tried by hand.
 
+### Buying with Coinbase (optional)
+
+With `CDP_API_KEY_ID` and `CDP_API_KEY_SECRET` (a Secret API key of a project Coinbase has enabled for Onramp) and `CORS_ORIGIN` naming your site, the wallet's *Receive* tab shows **Buy EURC** and **Buy USDC**. The server signs in to Coinbase with its own key, asks for a token that works once, and sends the person to Coinbase's page, which delivers the coins to the signed-in address on Base. The address always comes from the session, never from the request. Without the keys or with a wildcard `CORS_ORIGIN` the route answers 503 and `/api/health` says `onramp: false`. `npm run check:onramp` asks Coinbase what it offers in Europe (read-only). Only buying is built: selling (Offramp) is not, and nothing here has run against a real Coinbase app yet (see `docs/thesis-context.md`, section 6).
+
 ## Real money (Base mainnet)
 
 The app is for play money (Base Sepolia) until it is built for the real network. `VITE_CHAIN=base` makes a build for Base mainnet, and everything that depends on the network comes from that one setting. On a real network the backend refuses to start with an unsafe setting and keeps the sandbox bank and the mint shut, and `npm run deploy:mainnet` puts the escrow there with an owner and an arbiter that are multisigs, from a key that holds no role, after a dry run that reads the chain. **Read `docs/mainnet.md`: it says what has to exist first (an audit, a legal opinion, real providers), what each step checks, and what isn't done.** The settings are in `.env.mainnet.example`.

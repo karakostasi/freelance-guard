@@ -19,6 +19,7 @@ import { SESSION_MS, createSession, signInMessage, verifyToken } from "../server
 import { fsBlobStore, pgBlobStore } from "../server/blobs.mjs";
 import { describeFailure, makeJwt, mentionsSepa, readKey, renderTable, summarizeCountry, tokenOnBase } from "./lib/coinbase-onramp.mjs";
 import { generateKeyPairSync, verify } from "node:crypto";
+import { buyLink, cleanBuy, clientIpOf } from "../server/onramp.mjs";
 
 let failures = 0;
 const check = (condition, message) => {
@@ -412,6 +413,38 @@ console.log("\nChecking what Coinbase offers (scripts/coinbase-onramp-check.mjs)
   const table = renderTable("T", [nl, failed]);
   check(table[0] === "T" && table.some((l) => l.startsWith("NL") && l.includes("CARD 5-500")) && table.some((l) => l.includes("ERROR: HTTP 400")), "the table shows the answer and the failures");
   check(describeFailure(401, { code: 16, message: "unauthenticated" }) === "HTTP 401: unauthenticated" && describeFailure(502, "bad gateway") === "HTTP 502: bad gateway", "a refusal is put in one line");
+}
+
+console.log("\nBuying on Coinbase (server/onramp.mjs)");
+{
+  const refused = async (fn) => { try { await fn(); return null; } catch (e) { return e; } };
+  check(cleanBuy({ asset: "EURC" }).asset === "EURC" && cleanBuy({ asset: "USDC", fiatAmount: "12.345" }).fiatAmount === 12.35, "a request names EURC or USDC, and may name an amount in euros, to the cent");
+  const bad = (body) => { try { cleanBuy(body); return null; } catch (e) { return e.status; } };
+  check(bad({ asset: "ETH" }) === 400 && bad({}) === 400 && bad({ asset: "EURC", fiatAmount: 0 }) === 400 && bad({ asset: "EURC", fiatAmount: -5 }) === 400 && bad({ asset: "EURC", fiatAmount: "lots" }) === 400 && bad({ asset: "EURC", fiatAmount: 1e6 }) === 400, "another asset, or an amount that isn't one, is refused");
+
+  const req = (headers, remote) => ({ headers, socket: { remoteAddress: remote } });
+  check(clientIpOf(req({ "x-forwarded-for": "6.6.6.6" }, "::ffff:203.0.113.9"), false) === "203.0.113.9", "without a proxy of ours a forwarded header is not believed, and the IPv4-in-IPv6 prefix goes");
+  check(clientIpOf(req({ "x-forwarded-for": "6.6.6.6, 198.51.100.7" }, "10.0.0.1"), true) === "198.51.100.7" && clientIpOf(req({}, "10.0.0.1"), true) === "10.0.0.1", "behind our proxy it is the last address the proxy added, not what the caller wrote first");
+
+  const ed = generateKeyPairSync("ed25519");
+  const jwk = ed.privateKey.export({ format: "jwk" });
+  const secret = Buffer.concat([Buffer.from(jwk.d, "base64url"), Buffer.from(jwk.x, "base64url")]).toString("base64");
+  const ADDRESS = "0x" + "ab".repeat(20);
+  let seen;
+  const fake = (status, reply) => async (url, init) => { seen = { url: String(url), init, body: JSON.parse(init.body) }; return new Response(JSON.stringify(reply), { status }); };
+  const link = await buyLink({ keyId: "k1", secret, address: ADDRESS, ip: "198.51.100.7", asset: "EURC", fiatAmount: 50, redirectUrl: "https://app.example/", fetchImpl: fake(200, { token: "tok-1", channel_id: "" }) });
+  const page = new URL(link);
+  check(seen.url === "https://api.developer.coinbase.com/onramp/v1/token" && seen.init.method === "POST", "it asks Coinbase for a token at the documented address");
+  check(JSON.stringify(seen.body) === JSON.stringify({ addresses: [{ address: ADDRESS, blockchains: ["base"] }], assets: ["EURC"], clientIp: "198.51.100.7" }), "the token is for that address on Base only, with the real client address");
+  const [h, c, sig] = seen.init.headers.authorization.replace("Bearer ", "").split(".");
+  check(verify(null, Buffer.from(`${h}.${c}`), ed.publicKey, Buffer.from(sig, "base64url")) && JSON.parse(Buffer.from(c, "base64url")).uris[0] === "POST api.developer.coinbase.com/onramp/v1/token", "the request is signed with the key, for that method and path");
+  check(page.origin + page.pathname === "https://pay.coinbase.com/buy/select-asset" && page.searchParams.get("sessionToken") === "tok-1" && page.searchParams.get("defaultAsset") === "EURC" && page.searchParams.get("defaultNetwork") === "base" && page.searchParams.get("presetFiatAmount") === "50" && page.searchParams.get("fiatCurrency") === "EUR" && page.searchParams.get("partnerUserRef") === ADDRESS && page.searchParams.get("redirectUrl") === "https://app.example/", "the page is Coinbase's buy page, set up for that asset, network, amount and return address");
+  const plain = new URL(await buyLink({ keyId: "k1", secret, address: ADDRESS, ip: "1.1.1.1", asset: "USDC", fetchImpl: fake(200, { token: "t" }) }));
+  check(!plain.searchParams.has("presetFiatAmount") && !plain.searchParams.has("redirectUrl"), "an amount or a return address that wasn't given isn't put in the address");
+  const notFound = await refused(() => buyLink({ keyId: "k1", secret, address: ADDRESS, ip: "1.1.1.1", asset: "EURC", fetchImpl: fake(404, { code: 5, message: "failed to find app" }) }));
+  check(notFound?.status === 502 && notFound.message === "Coinbase said HTTP 404: failed to find app" && !notFound.message.includes(secret), "when Coinbase refuses, the reason is passed on and the key isn't in it");
+  check((await refused(() => buyLink({ keyId: "k1", secret, address: ADDRESS, ip: "1.1.1.1", asset: "EURC", fetchImpl: fake(200, {}) })))?.status === 502, "an answer without a token is an error");
+  check(!!(await refused(() => buyLink({ keyId: "k1", secret: "nope", address: ADDRESS, ip: "1.1.1.1", asset: "EURC", fetchImpl: fake(200, { token: "t" }) }))), "an unreadable key stops it before anything is sent");
 }
 
 console.log(failures ? `\n${failures} check(s) failed` : "\nAll checks passed");

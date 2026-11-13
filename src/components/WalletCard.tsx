@@ -5,6 +5,9 @@ import { waitForTransactionReceipt } from "wagmi/actions";
 import { erc20Abi } from "viem";
 import { ArrowDownLeft, ArrowLeft, ArrowUpRight, Check, Copy, ExternalLink, LoaderCircle } from "lucide-react";
 import { config } from "../wagmi";
+import { onrampApi } from "../lib/api";
+import { sessionToken } from "../lib/files";
+import { useBackendStatus } from "../hooks/useBackend";
 import { contractCall, sendWalletCalls } from "../lib/tx";
 import { useWalletAssets, type Asset } from "../hooks/useWalletAssets";
 import { avatarGradient } from "../lib/avatar";
@@ -173,6 +176,27 @@ function Send({ assets, from }: { assets: Asset[]; from: string }) {
 
 function Receive({ address, network }: { address: string; network: string }) {
   const [copied, setCopied] = useState(false);
+  const { onramp } = useBackendStatus();
+  const [buying, setBuying] = useState<"EURC" | "USDC" | null>(null);
+  const [buyError, setBuyError] = useState<string | null>(null);
+  const buy = async (asset: "EURC" | "USDC") => {
+    setBuying(asset);
+    setBuyError(null);
+    // Opened first, while the click still counts, so the browser doesn't block it. It is pointed at Coinbase once we have the address.
+    const tab = window.open("", "_blank");
+    try {
+      const { url } = await onrampApi.buy(await sessionToken(address), asset);
+      if (tab) {
+        tab.opener = null;
+        tab.location.assign(url);
+      } else window.location.assign(url);
+    } catch (e) {
+      tab?.close();
+      setBuyError((e as Error).message);
+    } finally {
+      setBuying(null);
+    }
+  };
   const copy = async () => {
     await navigator.clipboard.writeText(address);
     setCopied(true);
@@ -188,6 +212,21 @@ function Receive({ address, network }: { address: string; network: string }) {
         </button>
       </div>
       <p className={styles.muted}>Only send assets on {network} to this address.</p>
+
+      {onramp && (
+        <>
+          <h3 className={styles.groupTitle}>Buy with Coinbase</h3>
+          <p className={styles.muted}>You sign in to Coinbase and pay there. The coins arrive at your address above, on Base mainnet{isMainnet ? "." : ", not on this test network: it is real money."}</p>
+          <div className={styles.wpRow}>
+            {(["EURC", "USDC"] as const).map((asset) => (
+              <button key={asset} className={styles.ghostButton} disabled={!!buying} onClick={() => buy(asset)}>
+                {buying === asset ? "Opening…" : `Buy ${asset}`}
+              </button>
+            ))}
+          </div>
+          {buyError && <p className={styles.error}>{buyError}</p>}
+        </>
+      )}
 
       {!isMainnet && (
         <>

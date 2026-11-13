@@ -52,7 +52,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 const post = <T>(path: string, body: unknown) => request<T>(path, { method: "POST", body: JSON.stringify(body) });
 
 export const api = {
-  health: () => request<{ ok: boolean; eurPerEth: number; chainId?: number; realMoney?: boolean; bankRails?: boolean }>("/api/health"),
+  health: () => request<{ ok: boolean; eurPerEth: number; chainId?: number; realMoney?: boolean; bankRails?: boolean; onramp?: boolean }>("/api/health"),
   createPayment: (body: { payer: string; payee: string; amount: string; token: "eth" | "eurc" | "usdc"; useYield?: boolean; milestones: { title: string; amount: string; days: string }[]; description: string }) =>
     post<{ run: PaymentRun; bank: { reference: string; amountEur: number; amount: number; currency: "EUR" | "USD" } }>("/api/payments", body),
   bankTransfer: (reference: string) => post<{ ok: boolean }>("/api/sandbox/bank-transfer", { reference }),
@@ -62,6 +62,11 @@ export const api = {
     const res = await fetch(`${API_URL}/api/jobs/${jobId}/run`);
     return res.ok ? ((await res.json()) as PaymentRun) : null;
   },
+};
+
+/** Buying EURC or USDC on Base with Coinbase. The server returns the address of Coinbase's page, which opens in a new tab. */
+export const onrampApi = {
+  buy: (token: string, asset: "EURC" | "USDC") => request<{ url: string }>("/api/onramp/buy", { method: "POST", headers: { authorization: `Bearer ${token}` }, body: JSON.stringify({ asset }) }),
 };
 
 export type EmailStatus = { email: string | null; verified: boolean };

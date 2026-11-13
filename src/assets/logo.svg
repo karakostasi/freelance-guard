@@ -1,9 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
   <defs>
     <linearGradient id="tile" x1="4" y1="2" x2="60" y2="62" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#38bdf8"/>
-      <stop offset=".5" stop-color="#4f7cff"/>
-      <stop offset="1" stop-color="#8a5cff"/>
+      <stop stop-color="#5b86ff"/>
+      <stop offset="1" stop-color="#3558d6"/>
     </linearGradient>
     <linearGradient id="fur" x1="24" y1="14" x2="44" y2="58" gradientUnits="userSpaceOnUse">
       <stop stop-color="#d9965a"/>

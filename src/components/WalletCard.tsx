@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useAccount } from "wagmi";
 import { waitForTransactionReceipt } from "wagmi/actions";
 import { erc20Abi } from "viem";
-import { ArrowDownLeft, ArrowLeft, ArrowUpRight, Check, Copy, ExternalLink, LoaderCircle } from "lucide-react";
+import { ArrowDownLeft, ArrowLeft, ArrowUpRight, Check, Copy, DollarSign, Euro, ExternalLink, Info, LoaderCircle, Wallet } from "lucide-react";
 import { config } from "../wagmi";
 import { onrampApi } from "../lib/api";
 import { sessionToken } from "../lib/files";
@@ -21,6 +21,11 @@ type View = "assets" | "send" | "receive";
 type Stage = "form" | "review" | "confirm" | "pending" | "done";
 
 const BADGE_COLOR: Record<string, string> = { ETH: "#627eea", EURC: "#2775ca", USDC: "#2775ca" };
+
+const BUY = [
+  { asset: "EURC", name: "Euro", Icon: Euro },
+  { asset: "USDC", name: "US dollar", Icon: DollarSign },
+] as const;
 
 const AssetIcon = ({ symbol }: { symbol: string }) => (
   <span className={styles.wpIcon} style={{ background: BADGE_COLOR[symbol] ?? "#555" }}>
@@ -178,6 +183,7 @@ function Receive({ address, network }: { address: string; network: string }) {
   const [copied, setCopied] = useState(false);
   const { onramp } = useBackendStatus();
   const [buying, setBuying] = useState<"EURC" | "USDC" | null>(null);
+  const [pick, setPick] = useState<"EURC" | "USDC">("EURC");
   const [buyError, setBuyError] = useState<string | null>(null);
   const buy = async (asset: "EURC" | "USDC") => {
     setBuying(asset);
@@ -204,28 +210,45 @@ function Receive({ address, network }: { address: string; network: string }) {
   };
   return (
     <div className={styles.wpSection}>
-      <h3 className={styles.groupTitle}>Your address</h3>
-      <div className={styles.wpReview}>
-        <span className={styles.wpFullAddress}>{address}</span>
-        <button className={styles.chipButton} onClick={copy}>
-          {copied ? <Check size={12} /> : <Copy size={12} />} {copied ? "Copied!" : "Copy address"}
+      <div className={styles.wpAddressCard}>
+        <h3 className={styles.groupTitle}>
+          <Wallet size={14} aria-hidden /> Your address
+        </h3>
+        {/* The start and end are what people check, so they are the heavy part. The text stays one string for copying and screen readers. */}
+        <span className={styles.wpFullAddress}>
+          <strong>{address.slice(0, 6)}</strong>
+          {address.slice(6, -4)}
+          <strong>{address.slice(-4)}</strong>
+        </span>
+        <button className={`${styles.button} ${styles.wpCopy}`} onClick={copy}>
+          {copied ? <Check size={16} aria-hidden /> : <Copy size={16} aria-hidden />} {copied ? "Copied!" : "Copy address"}
         </button>
+        <p className={styles.wpNote}>
+          <Info size={14} aria-hidden /> Only send assets on {network} to this address.
+        </p>
       </div>
-      <p className={styles.muted}>Only send assets on {network} to this address.</p>
 
       {onramp && (
-        <>
+        <div className={styles.wpBuyCard}>
           <h3 className={styles.groupTitle}>Buy with Coinbase</h3>
-          <p className={styles.muted}>You sign in to Coinbase and pay there. The coins arrive at your address above, on Base mainnet{isMainnet ? "." : ", not on this test network: it is real money."}</p>
-          <div className={styles.wpRow}>
-            {(["EURC", "USDC"] as const).map((asset) => (
-              <button key={asset} className={styles.ghostButton} disabled={!!buying} onClick={() => buy(asset)}>
-                {buying === asset ? "Opening…" : `Buy ${asset}`}
+          <div className={styles.wpBuyGrid} role="group" aria-label="Coin to buy">
+            {BUY.map(({ asset, name, Icon }) => (
+              <button key={asset} className={`${styles.wpBuyTile} ${pick === asset ? styles.wpBuyOn : ""}`} disabled={!!buying} aria-pressed={pick === asset} onClick={() => setPick(asset)}>
+                {pick === asset && <Check size={14} className={styles.wpBuyCheck} aria-hidden />}
+                <span className={styles.wpBuyIcon}>
+                  <Icon size={20} aria-hidden />
+                </span>
+                <strong>{asset}</strong>
+                <span className={styles.muted}>{name}</span>
               </button>
             ))}
           </div>
+          <button className={`${styles.button} ${styles.wpCopy}`} disabled={!!buying} onClick={() => buy(pick)}>
+            {buying ? <LoaderCircle size={16} className={styles.wpSpin} aria-hidden /> : null} {buying ? "Opening…" : `Buy ${pick}`}
+          </button>
+          <p className={styles.muted}>You sign in to Coinbase and pay there. The coins arrive at your address above, on Base mainnet{isMainnet ? "." : ", not on this test network: it is real money."}</p>
           {buyError && <p className={styles.error}>{buyError}</p>}
-        </>
+        </div>
       )}
 
       {!isMainnet && (

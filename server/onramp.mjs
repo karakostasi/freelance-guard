@@ -6,13 +6,23 @@ export const BUY_ASSETS = ["EURC", "USDC"];
 const PAY_URL = "https://pay.coinbase.com";
 const badRequest = (message) => Object.assign(new Error(message), { status: 400 });
 
+// Addresses that belong to a network, not to a visitor. Coinbase refuses them ("private IP addresses are not allowed").
+const isPrivate = (ip) => /^(10\.|127\.|169\.254\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.|::1$|f[cd]|fe80:)/i.test(ip);
+
 /**
  * The address the request really came from. A header the caller sent isn't believed: only behind a proxy of ours (Render, with
- * TRUST_PROXY=1) is the last address it added taken. shortcut: one proxy in front. With more, take the matching entry.
+ * TRUST_PROXY=1) are the proxy's headers read. Render's Cloudflare sets CF-Connecting-IP to the visitor, replacing any copy the
+ * caller sent. Without it, the last address in X-Forwarded-For that isn't private (Render's own hop after the visitor is).
  */
 export function clientIpOf(req, trustProxy) {
-  const forwarded = String(req.headers["x-forwarded-for"] ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-  return ((trustProxy && forwarded.at(-1)) || req.socket?.remoteAddress || "").replace(/^::ffff:/, "");
+  if (trustProxy) {
+    const cloudflare = String(req.headers["cf-connecting-ip"] ?? "").trim();
+    if (cloudflare) return cloudflare.replace(/^::ffff:/, "");
+    const forwarded = String(req.headers["x-forwarded-for"] ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+    const visitor = forwarded.findLast((ip) => !isPrivate(ip));
+    if (visitor) return visitor;
+  }
+  return (req.socket?.remoteAddress ?? "").replace(/^::ffff:/, "");
 }
 
 /** What a request to buy may ask for: one of the two assets, and optionally an amount in euros. */

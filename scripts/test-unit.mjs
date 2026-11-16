@@ -425,6 +425,8 @@ console.log("\nBuying on Coinbase (server/onramp.mjs)");
   const req = (headers, remote) => ({ headers, socket: { remoteAddress: remote } });
   check(clientIpOf(req({ "x-forwarded-for": "6.6.6.6" }, "::ffff:203.0.113.9"), false) === "203.0.113.9", "without a proxy of ours a forwarded header is not believed, and the IPv4-in-IPv6 prefix goes");
   check(clientIpOf(req({ "x-forwarded-for": "6.6.6.6, 198.51.100.7" }, "10.0.0.1"), true) === "198.51.100.7" && clientIpOf(req({}, "10.0.0.1"), true) === "10.0.0.1", "behind our proxy it is the last address the proxy added, not what the caller wrote first");
+  check(clientIpOf(req({ "cf-connecting-ip": "203.0.113.50", "x-forwarded-for": "6.6.6.6, 10.20.30.40" }, "10.0.0.1"), true) === "203.0.113.50" && clientIpOf(req({ "cf-connecting-ip": "203.0.113.50" }, "10.0.0.1"), false) === "10.0.0.1", "behind Render the visitor is the address Cloudflare names, and that header is not believed without our proxy");
+  check(clientIpOf(req({ "x-forwarded-for": "198.51.100.7, 172.16.4.2, 10.20.30.40" }, "10.0.0.1"), true) === "198.51.100.7" && clientIpOf(req({ "x-forwarded-for": "10.20.30.40" }, "10.0.0.1"), true) === "10.0.0.1", "a private address the proxy added after the visitor is skipped, since Coinbase refuses private addresses");
 
   const ed = generateKeyPairSync("ed25519");
   const jwk = ed.privateKey.export({ format: "jwk" });
